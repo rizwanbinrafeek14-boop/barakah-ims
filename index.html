@@ -3068,9 +3068,17 @@ async function startImport() {
   addImportLog('Reading file headers...', 'info');
   setProgress(5, 'Reading file...', `${_importData.length - 1} rows found`);
 
-  // ── Step 1: Use AI to map columns ──────────────────────────
-  const headers  = _importData[0];
-  const sample   = _importData.slice(1, 4); // 3 sample rows
+  // ── Step 1: Smart header detection ─────────────────────────
+  // Find first row with actual data (skip empty/numeric-only header rows)
+  let headerRowIdx = 0;
+  for (let i = 0; i < Math.min(5, _importData.length); i++) {
+    const row = _importData[i];
+    const hasText = row.some(c => c && isNaN(parseFloat(String(c).replace(/,/g,''))) && String(c).trim().length > 0);
+    if (hasText) { headerRowIdx = i; break; }
+  }
+
+  const headers = _importData[headerRowIdx];
+  const sample  = _importData.slice(headerRowIdx + 1, headerRowIdx + 6); // 5 sample rows
 
   addImportLog('Sending to AI for column detection...', 'info');
   setProgress(15, 'AI analyzing columns...', 'Claude is reading your headers');
@@ -3098,7 +3106,7 @@ async function startImport() {
   await sleep(400);
 
   // ── Step 2: Import rows one by one ─────────────────────────
-  const dataRows   = _importData.slice(1);
+  const dataRows   = _importData.slice(headerRowIdx + 1);
   let imported     = 0;
   let skipped      = 0;
   const errors     = [];
@@ -3108,7 +3116,7 @@ async function startImport() {
     const pct  = 30 + Math.round((i / dataRows.length) * 65);
     const name = String(row[colMap.nameCol] || '').trim();
     const code = colMap.codeCol >= 0 ? String(row[colMap.codeCol] || '').trim() : '';
-    const qty  = colMap.qtyCol  >= 0 ? parseInt(row[colMap.qtyCol]) || 0 : 0;
+    const qty  = colMap.qtyCol  >= 0 ? Math.round(parseFloat(String(row[colMap.qtyCol]||'0').replace(/,/g,'')) ) || 0 : 0;
 
     if (!name) continue; // skip empty rows
 
@@ -3200,21 +3208,31 @@ async function startImport() {
 
 // ── AI COLUMN DETECTION ──────────────────────────────────────
 async function aiDetectColumns(headers, sampleRows) {
+  // Build a rich description including actual data samples
+  // so AI can detect columns even with blank/numeric headers
+  const colDescriptions = headers.map((h, i) => {
+    const samples = sampleRows.map(r => r[i]).filter(v => v !== '' && v !== null && v !== undefined);
+    return `Column ${i}: header="${h}", samples=${JSON.stringify(samples.slice(0,3))}`;
+  }).join('\n');
+
   const prompt = `You are analyzing an Excel/CSV file for a product inventory system.
 
-Headers row: ${JSON.stringify(headers)}
-Sample data rows (first 3):
-${sampleRows.map((r,i) => `Row ${i+1}: ${JSON.stringify(r)}`).join('\n')}
+The file columns (with header and first 3 data samples):
+${colDescriptions}
 
-Your task: identify which column index (0-based) corresponds to:
-1. Product Name (the product description/name)
-2. Product Code (item code, SKU, part number — may not exist, use -1 if missing)
-3. Quantity (stock quantity, amount, count — may not exist, use -1 if missing)
+IMPORTANT: Headers may be empty, numeric, or in Arabic. Use the DATA SAMPLES to identify columns.
 
-Headers might be in Arabic, English, or mixed. Be smart about it.
+Rules:
+- Product NAME column: contains long text descriptions like material specs (e.g. "CS PIPE SMLS S/40 ASTM A106 GR.B 6MTR 2"" or "Gate Valve 2 inch")
+- Product CODE column: contains short alphanumeric codes like "CSPSMLS40-010" or "GV-2IN-SS" — usually shorter than names
+- QUANTITY column: contains numbers only (integers or decimals) — look for columns with purely numeric data
+- Row NUMBER columns (1,2,3...) are NOT quantity — ignore sequential integers
+- Company name columns (like "BARAKAH") appearing as a header with numbers below IS the quantity column
 
 Respond ONLY with valid JSON, no explanation, no markdown:
-{"nameCol": 0, "codeCol": 1, "qtyCol": 2}`;
+{"nameCol": 2, "codeCol": 1, "qtyCol": 3}
+
+Use -1 if a column genuinely does not exist.`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -3235,19 +3253,52 @@ Respond ONLY with valid JSON, no explanation, no markdown:
 
 // ── MANUAL FALLBACK COLUMN DETECTION ────────────────────────
 function manualDetectColumns(headers) {
-  const nameKeywords = ['name','product','description','item','الاسم','المنتج','وصف','اسم'];
-  const codeKeywords = ['code','sku','ref','part','رمز','كود','رقم'];
-  const qtyKeywords  = ['qty','quantity','stock','amount','count','الكمية','كمية','العدد'];
+  const nameKeywords = ['name','product','description','item','desc','الاسم','المنتج','وصف','اسم','specification','spec'];
+  const codeKeywords = ['code','sku','ref','part','id','رمز','كود','رقم'];
+  const qtyKeywords  = ['qty','quantity','stock','amount','count','الكمية','كمية','العدد','barakah','bv','is','sw','total'];
 
   const find = (keywords) => headers.findIndex(h =>
     keywords.some(k => String(h).toLowerCase().includes(k))
   );
 
-  return {
-    nameCol: find(nameKeywords),
-    codeCol: find(codeKeywords),
-    qtyCol:  find(qtyKeywords)
-  };
+  let nameCol = find(nameKeywords);
+  let codeCol = find(codeKeywords);
+  let qtyCol  = find(qtyKeywords);
+
+  // Data-driven fallback: analyze the raw data from _importData
+  if ((nameCol === -1 || qtyCol === -1) && _importData && _importData.length > 2) {
+    const sampleRows = _importData.slice(1, 6); // up to 5 data rows
+    const colCount = headers.length;
+
+    // For each column, check if it's numeric-only (likely qty) or long text (likely name)
+    const colStats = Array.from({length: colCount}, (_, ci) => {
+      const vals = sampleRows.map(r => r[ci]).filter(v => v !== '' && v != null);
+      const numericCount = vals.filter(v => !isNaN(parseFloat(v)) && String(v).trim() !== '').length;
+      const avgLen = vals.length ? vals.reduce((a,v) => a + String(v).length, 0) / vals.length : 0;
+      const isSequential = vals.length > 1 && vals.every((v,i,arr) => i === 0 || parseFloat(v) === parseFloat(arr[i-1]) + 1);
+      return { ci, numericCount, total: vals.length, avgLen, isSequential, pctNumeric: vals.length ? numericCount/vals.length : 0 };
+    });
+
+    // Name column: highest avg text length, not all numeric
+    if (nameCol === -1) {
+      const textCols = colStats.filter(c => c.pctNumeric < 0.3 && c.avgLen > 5 && !c.isSequential);
+      if (textCols.length) nameCol = textCols.sort((a,b) => b.avgLen - a.avgLen)[0].ci;
+    }
+
+    // Code column: short text, not sequential numbers, not the name col
+    if (codeCol === -1) {
+      const codeCols = colStats.filter(c => c.pctNumeric < 0.5 && c.avgLen > 3 && c.avgLen < 20 && c.ci !== nameCol);
+      if (codeCols.length) codeCol = codeCols[0].ci;
+    }
+
+    // Qty column: mostly numeric, not sequential row numbers
+    if (qtyCol === -1) {
+      const numCols = colStats.filter(c => c.pctNumeric > 0.7 && !c.isSequential && c.ci !== codeCol);
+      if (numCols.length) qtyCol = numCols.sort((a,b) => b.pctNumeric - a.pctNumeric)[0].ci;
+    }
+  }
+
+  return { nameCol, codeCol, qtyCol };
 }
 
 // ── SHOW SUMMARY ─────────────────────────────────────────────
