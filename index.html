@@ -4388,8 +4388,8 @@ const COMPANY_INFO = {
     vat: '300773565600003',
     address: 'Prince Talal St. B/W Cross 2/3, Al Khobar Shamaliyah, Saudi Arabia',
     addressAr: 'شارع الأمير طلال بين تقاطع ٢/٣، الخبر الشمالية، المملكة العربية السعودية',
-    phone: '+966 13 xxx xxxx',
-    email: '',
+    phone: '+966 13 8941999 / +966 13 8939298',
+    email: 'info@barakahvalves.com | sales@barakahvalves.com',
     accentColor: '#1e3a5f',
     accentColor2: '#2563eb',
   },
@@ -4416,8 +4416,8 @@ const COMPANY_INFO = {
     vat: '312016296800003',
     address: 'St. B/W Cross 4/5, Al Khobar Shamaliyah, Saudi Arabia',
     addressAr: 'شارع بين تقاطع ٤/٥، الخبر الشمالية، المملكة العربية السعودية',
-    phone: '+966 13 xxx xxxx',
-    email: '',
+    phone: '013-8952399 / 013-8944434',
+    email: 'sales@stablewayksa.com',
     accentColor: '#5c4a1e',
     accentColor2: '#b8860b',
   }
@@ -4943,7 +4943,7 @@ function renderPOs() {
       <td onclick="event.stopPropagation()" style="white-space:nowrap">
         <button class="btn btn-sm btn-outline" onclick="printPO(allPOs.find(x=>x.id==='${po.id}'))">Print</button>
         <button class="btn btn-sm btn-success" onclick="updatePOStatus('${po.id}','received')">✓ Received</button>
-        <button class="btn btn-sm btn-danger admin-only" onclick="deletePO('${po.id}','${po.po_no}')">🗑️</button>
+        ${currentProfile?.role === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deletePO('${po.id}','${po.po_no}')">🗑️</button>` : ''}
       </td>
     </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:28px">No purchase orders yet. Click + New PO to create one.</td></tr>';
 }
@@ -4961,6 +4961,7 @@ async function updatePOStatus(id, status) {
 }
 
 async function deletePO(id, poNo) {
+  if (currentProfile?.role !== 'admin') { showToast('Admin only', 'error'); return; }
   if (!confirm(`Delete PO ${poNo}?`)) return;
   showLoading('DELETING...');
   try {
