@@ -707,11 +707,16 @@ input[type=file]{ display: none; }
   .sidebar-overlay.open { display: block; }
   .hamburger { display: flex; }
   .main { margin-left: 0 !important; }
-  .topbar { padding: 0 14px 0 64px; }
+  .topbar { padding: 0 10px 0 60px; height: 52px; }
+  .topbar-title { font-size: 16px; }
   .topbar-title { font-size: 18px; }
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr !important; }
+  .grid-3, .grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .grid-2 { grid-template-columns: 1fr 1fr !important; }
+  .grid-2.stack { grid-template-columns: 1fr !important; }
   .page { padding: 14px; }
-  .page-header { flex-direction: column; gap: 12px; }
+  .page-header { flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .page-header-title h1 { font-size: 20px; }
+  .page-header-title p { font-size: 11px; display: none; }
   .filter-bar { flex-direction: column; }
   .search-input { min-width: unset; }
   .auth-box { padding: 32px 24px; }
@@ -721,11 +726,20 @@ input[type=file]{ display: none; }
   .product-grid { grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); }
   tbody td, thead th { padding: 9px 10px; }
   .btn { padding: 7px 12px; font-size: 12px; }
+  .grid-2.stack { grid-template-columns: 1fr !important; }
+  .card { padding: 14px; }
+  .card-title { font-size: 14px; margin-bottom: 10px; }
 }
 @media (max-width: 480px) {
   .product-grid { grid-template-columns: 1fr 1fr; }
   .topbar-right { gap: 6px; }
   .topbar-right img { height: 18px !important; }
+  .grid-3, .grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .stat-card { padding: 12px 10px; }
+  .stat-value { font-size: 22px !important; }
+  .stat-label { font-size: 9px; }
+  .stat-icon { font-size: 20px; top: 10px; right: 10px; }
+  .stat-sub { font-size: 10px; }
 }
 
 /* iOS Safari specific fixes */
@@ -872,11 +886,11 @@ window.onerror = function(msg, src, line, col, err) {
         <button class="btn btn-gold manager-only" onclick="openAddProduct()">+ Add Product</button>
       </div>
       <div class="grid-4" style="margin-bottom:18px" id="dashboard-stats"></div>
-      <div class="grid-2" style="margin-bottom:18px">
+      <div class="grid-2 stack" style="margin-bottom:18px">
         <div class="card"><div class="card-title">Stock by Company</div><div id="company-chart"></div></div>
         <div class="card"><div class="card-title">Recent Movements</div><div id="recent-movements-list"></div></div>
       </div>
-      <div class="grid-2">
+      <div class="grid-2 stack">
         <div class="card"><div class="card-title">Low Stock Alerts</div><div id="dash-low-stock"></div></div>
         <div class="card"><div class="card-title">Recent Quotations</div><div id="dash-quotations"></div></div>
       </div>
