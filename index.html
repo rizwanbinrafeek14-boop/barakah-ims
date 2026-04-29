@@ -319,7 +319,8 @@ h1,h2,h3,h4 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
 .error-msg { color: #ff7070; font-size: 12px; margin-top: 10px; text-align: center; min-height: 18px; line-height: 1.4; }
 
 /* ── APP LAYOUT ── */
-#app { display: none; min-height: 100vh; }
+#app { display: none; min-height: 100vh; min-height: -webkit-fill-available; }
+.main { min-height: 100vh; min-height: -webkit-fill-available; }
 
 /* ── SIDEBAR ── */
 .sidebar {
@@ -764,7 +765,7 @@ input[type=file]{ display: none; }
 
 /* iOS Safari specific fixes */
 @supports (-webkit-touch-callout: none) {
-  .sidebar { height: -webkit-fill-available; }
+  .sidebar { height: 100%; min-height: -webkit-fill-available; }
   #auth-screen { height: -webkit-fill-available; }
   .modal-overlay { height: -webkit-fill-available; }
   .main { min-height: -webkit-fill-available; }
@@ -852,6 +853,58 @@ input[type=file]{ display: none; }
 .is-mobile .topbar { padding: 0 12px !important; gap: 8px; }
 /* Remove old floating hamburger styles */
 .hamburger { display: none !important; }
+
+
+/* ── LANDSCAPE ON MOBILE ── */
+@media (max-width: 900px) and (orientation: landscape) {
+  :root { --sidebar-w: 0px; }
+  .sidebar {
+    transform: translateX(-240px);
+    width: 240px;
+    z-index: 150;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .hamburger-inline { display: flex !important; }
+  .main { margin-left: 0 !important; }
+  .topbar { padding: 0 12px !important; height: 48px !important; }
+  .page { padding: 10px 14px !important; }
+  .grid-4 { grid-template-columns: repeat(4,1fr) !important; }
+  .grid-2 { grid-template-columns: 1fr 1fr !important; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr !important; }
+  .stat-card { padding: 10px !important; }
+  .stat-value { font-size: 20px !important; }
+  .page-header { flex-direction: row !important; }
+  .page-header-title p { display: none !important; }
+  /* Sidebar full height in landscape */
+  .sidebar { height: 100vh; overflow-y: auto; }
+}
+
+/* ── VERY SMALL SCREENS (iPhone SE etc) ── */
+@media (max-width: 380px) {
+  .stat-value { font-size: 18px !important; }
+  .stat-card { padding: 10px 8px !important; }
+  .page { padding: 10px !important; }
+  .topbar-title { font-size: 14px !important; }
+  .btn { padding: 6px 10px !important; font-size: 11px !important; }
+}
+
+/* ── PWA STANDALONE MODE ── */
+@media (display-mode: standalone) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-240px); width: 240px; }
+  .sidebar.open { transform: translateX(0); }
+  .hamburger-inline { display: flex !important; }
+  .main { margin-left: 0 !important; }
+  .topbar {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .page { padding: 14px !important; }
+  .grid-3, .grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .grid-2.stack { grid-template-columns: 1fr !important; }
+}
 
 </style>
 
@@ -1582,16 +1635,31 @@ window.onerror = function(msg, src, line, col, err) {
     document.documentElement.classList.add('is-mobile');
   }
 
-  // Re-check on resize
-  window.addEventListener('resize', function() {
-    if (window.innerWidth <= 768) {
+  // Re-check on resize AND orientation change
+  function checkMobileLayout() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // On mobile: use smaller dimension as width check
+    const effectiveWidth = Math.min(w, h);
+    if (isStandalone || isMobileWidth || effectiveWidth <= 768) {
       document.documentElement.style.setProperty('--sidebar-w', '0px');
       document.documentElement.classList.add('is-mobile');
     } else {
       document.documentElement.style.removeProperty('--sidebar-w');
       document.documentElement.classList.remove('is-mobile');
     }
+  }
+
+  window.addEventListener('resize', checkMobileLayout);
+  window.addEventListener('orientationchange', function() {
+    // Small delay to let browser update dimensions after rotation
+    setTimeout(checkMobileLayout, 150);
   });
+
+  // Try to lock orientation to portrait in PWA mode
+  if (isStandalone && screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('portrait').catch(() => {});
+  }
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
