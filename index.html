@@ -1711,50 +1711,65 @@ async function doLogin() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  try {
+    const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
 
-  if (error || !data) {
-    // Profile missing — auto-create admin profile if this is first login
-    const isFirstUser = currentUser.email === currentUser.email; // always true, just checking we have user
-    const autoProfile = {
-      id: currentUser.id,
-      username: currentUser.email.split('@')[0],
-      full_name: currentUser.email.split('@')[0],
-      email: currentUser.email,
-      role: 'admin',
-      company_access: 'all',
-      status: 'active',
-      created_at: new Date().toISOString()
-    };
-    const { error: insertErr } = await sb.from('profiles').upsert(autoProfile);
-    if (insertErr) {
-      // Show error on login screen
-      document.getElementById('login-error').textContent = 'Profile error: ' + insertErr.message + ' — Did you run the SQL schema?';
-      document.getElementById('login-btn').textContent = 'LOGIN';
-      document.getElementById('login-btn').disabled = false;
+    if (error || !data) {
+      // Auto-create profile on first login
+      const autoProfile = {
+        id: currentUser.id,
+        username: currentUser.email.split('@')[0],
+        full_name: currentUser.email.split('@')[0],
+        email: currentUser.email,
+        role: 'admin',
+        company_access: 'all',
+        status: 'active',
+        created_at: new Date().toISOString()
+      };
+      const { error: insertErr } = await sb.from('profiles').upsert(autoProfile);
+      if (insertErr) {
+        hideLoading();
+        document.getElementById('auth-screen').style.display = 'flex';
+        const errEl = document.getElementById('login-error');
+        if (errEl) errEl.textContent = 'Profile error: ' + insertErr.message;
+        const btn = document.getElementById('login-btn');
+        if (btn) { btn.textContent = 'LOGIN'; btn.disabled = false; }
+        await sb.auth.signOut();
+        return;
+      }
+      currentProfile = autoProfile;
+      launchApp();
+      return;
+    }
+
+    if (data.status === 'inactive') {
+      hideLoading();
+      document.getElementById('auth-screen').style.display = 'flex';
+      const errEl = document.getElementById('login-error');
+      if (errEl) errEl.textContent = 'Account disabled. Contact admin.';
+      const btn = document.getElementById('login-btn');
+      if (btn) { btn.textContent = 'LOGIN'; btn.disabled = false; }
       await sb.auth.signOut();
       return;
     }
-    currentProfile = autoProfile;
+
+    currentProfile = data;
+    // Fire-and-forget: sync email and last login (don't await — don't block launch)
+    sb.from('profiles').update({
+      last_login: new Date().toISOString(),
+      email: currentUser.email
+    }).eq('id', currentUser.id).then(() => {}).catch(() => {});
+
     launchApp();
-    return;
+  } catch(err) {
+    console.error('loadProfile error:', err);
+    hideLoading();
+    document.getElementById('auth-screen').style.display = 'flex';
+    const errEl = document.getElementById('login-error');
+    if (errEl) errEl.textContent = 'Error loading profile. Please try again.';
+    const btn = document.getElementById('login-btn');
+    if (btn) { btn.textContent = 'LOGIN'; btn.disabled = false; }
   }
-
-  if (data.status === 'inactive') {
-    document.getElementById('login-error').textContent = 'Account disabled. Contact admin.';
-    document.getElementById('login-btn').textContent = 'LOGIN';
-    document.getElementById('login-btn').disabled = false;
-    await sb.auth.signOut();
-    return;
-  }
-
-  currentProfile = data;
-  // Sync email and last login
-  await sb.from('profiles').update({
-    last_login: new Date().toISOString(),
-    email: currentUser.email
-  }).eq('id', currentUser.id);
-  launchApp();
 }
 
 async function doLogout() {
@@ -1786,21 +1801,31 @@ async function launchApp() {
   }
 
   await loadSettings();
-  await preloadData();
+  try {
+    await preloadData();
+  } catch(e) {
+    console.warn('preloadData error:', e);
+  }
   populateMonthFilter();
+  clearTimeout(window._loadingTimeout);
   hideLoading();
   showPage('dashboard');
 }
 
 async function preloadData() {
-  const [p, m, q] = await Promise.all([
-    sb.from('products').select('*').order('name'),
-    sb.from('stock_movements').select('*, profiles(full_name)').order('created_at', { ascending: false }),
-    sb.from('quotations').select('*, quotation_lines(*)').order('created_at', { ascending: false })
-  ]);
-  allProducts = p.data || [];
-  allMovements = m.data || [];
-  allQuotations = q.data || [];
+  try {
+    const [p, m, q] = await Promise.all([
+      sb.from('products').select('*').order('name'),
+      sb.from('stock_movements').select('*, profiles(full_name)').order('created_at', { ascending: false }),
+      sb.from('quotations').select('*, quotation_lines(*)').order('created_at', { ascending: false })
+    ]);
+    allProducts  = p.data || [];
+    allMovements = m.data || [];
+    allQuotations = q.data || [];
+  } catch(e) {
+    console.error('preloadData failed:', e);
+    allProducts = []; allMovements = []; allQuotations = [];
+  }
   checkLowStock();
 }
 
@@ -2696,6 +2721,20 @@ async function init() {
   initTheme();
   showLoading();
 
+  // Safety net — never get stuck on loading screen
+  const loadingTimeout = setTimeout(() => {
+    hideLoading();
+    const auth = document.getElementById('auth-screen');
+    const app  = document.getElementById('app');
+    // If app is visible, we're logged in — just hide loader
+    if (app && app.style.display !== 'none' && app.style.display !== '') return;
+    // Otherwise show login
+    if (auth) { auth.style.display = 'flex'; }
+    const errEl = document.getElementById('login-error');
+    if (errEl && !errEl.textContent) errEl.textContent = 'Connection timed out. Check your internet and try again.';
+  }, 12000); // 12 second max
+  window._loadingTimeout = loadingTimeout;
+
   // Check Supabase SDK loaded
   if (typeof supabase === 'undefined' || (!supabase.createClient && !supabase.default?.createClient)) {
     hideLoading();
@@ -2724,13 +2763,27 @@ async function init() {
   }
 
   // Check existing session
-  const { data: { session } } = await sb.auth.getSession();
+  let session = null;
+  try {
+    const sessionResult = await Promise.race([
+      sb.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+    ]);
+    session = sessionResult?.data?.session || null;
+  } catch(e) {
+    console.warn('Session check failed:', e.message);
+  }
+
   if (session) {
     currentUser = session.user;
+    clearTimeout(window._loadingTimeout);
     await loadProfile();
   } else {
+    clearTimeout(window._loadingTimeout);
     hideLoading();
-    document.getElementById('auth-screen').style.display = 'flex'; document.getElementById('auth-screen').style.alignItems = 'center'; document.getElementById('auth-screen').style.justifyContent = 'center';
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('auth-screen').style.alignItems = 'center';
+    document.getElementById('auth-screen').style.justifyContent = 'center';
   }
 
   // Listen for auth changes
