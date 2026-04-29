@@ -1790,11 +1790,28 @@ async function confirmDelete() {
   _pendingDeleteId = null;
   closeModal('modal-delete-confirm');
   showLoading('DELETING...');
+
+  // Step 1: delete quotation lines referencing this product
+  await sb.from('quotation_lines').delete().eq('product_id', id);
+
+  // Step 2: delete product documents
+  await sb.from('product_documents').delete().eq('product_id', id);
+
+  // Step 3: delete stock movements
+  await sb.from('stock_movements').delete().eq('product_id', id);
+
+  // Step 4: delete the product itself
   const { error } = await sb.from('products').delete().eq('id', id);
+
   hideLoading();
   if (error) { showToast('Delete failed: ' + error.message, 'error'); return; }
-  allProducts = allProducts.filter(x => x.id !== id);
+
+  allProducts  = allProducts.filter(x => x.id !== id);
   allMovements = allMovements.filter(x => x.product_id !== id);
+  allQuotations.forEach(q => {
+    if (q.quotation_lines) q.quotation_lines = q.quotation_lines.filter(l => l.product_id !== id);
+  });
+
   renderInventory();
   checkLowStock();
   showToast('Product deleted successfully');
