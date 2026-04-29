@@ -414,6 +414,16 @@ h1,h2,h3,h4 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
   display: flex; align-items: center; justify-content: space-between;
   position: sticky; top: 0; z-index: 90;
 }
+/* iOS standalone: push topbar below status bar */
+@supports (-webkit-touch-callout: none) {
+  .topbar {
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(60px + env(safe-area-inset-top, 0px));
+  }
+  .main {
+    padding-top: 0;
+  }
+}
 .topbar-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--text); letter-spacing: 1px; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .theme-toggle {
@@ -758,13 +768,9 @@ input[type=file]{ display: none; }
   #auth-screen { height: -webkit-fill-available; }
   .modal-overlay { height: -webkit-fill-available; }
   .main { min-height: -webkit-fill-available; }
-  /* Prevent double-tap zoom */
   * { touch-action: manipulation; }
-  /* Fix for iOS rubber-band scrolling in modals */
   .modal { -webkit-overflow-scrolling: touch; }
   .sidebar-nav { -webkit-overflow-scrolling: touch; }
-  /* Fix topbar on iOS notch */
-  .topbar { padding-top: env(safe-area-inset-top, 0); }
   .sidebar { padding-top: env(safe-area-inset-top, 0); }
 }
 
@@ -780,8 +786,9 @@ input[type=file]{ display: none; }
   display: flex !important;
 }
 .is-mobile .topbar {
-  padding: 0 10px 0 60px !important;
-  height: 52px !important;
+  padding: 0 12px !important;
+  height: calc(52px + env(safe-area-inset-top, 0px)) !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
 }
 .is-mobile .grid-3,
 .is-mobile .grid-4 {
@@ -811,6 +818,41 @@ input[type=file]{ display: none; }
   padding: 32px 24px !important;
 }
 
+
+/* ── HAMBURGER INLINE IN TOPBAR ── */
+.hamburger-inline {
+  display: none;
+  width: 38px; height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+  margin-right: 10px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.hamburger-inline span {
+  display: block;
+  width: 16px; height: 2px;
+  background: var(--gold);
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+/* Show hamburger on mobile */
+@media (max-width: 768px) {
+  .hamburger-inline { display: flex !important; }
+  .topbar { padding: 0 12px !important; gap: 8px; }
+}
+.is-mobile .hamburger-inline { display: flex !important; }
+.is-mobile .topbar { padding: 0 12px !important; gap: 8px; }
+/* Remove old floating hamburger styles */
+.hamburger { display: none !important; }
+
 </style>
 
 </head>
@@ -834,9 +876,6 @@ window.onerror = function(msg, src, line, col, err) {
 </script>
 
 <!-- LOADING -->
-<button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">
-  <span></span><span></span><span></span>
-</button>
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="loading-overlay" id="loading-overlay">
   <div class="spinner"></div>
@@ -921,6 +960,9 @@ window.onerror = function(msg, src, line, col, err) {
 
   <main class="main">
     <div class="topbar">
+      <button class="hamburger-inline" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
       <div class="topbar-title" id="topbar-title">Dashboard</div>
       <div class="topbar-right">
         <div style="display:flex;gap:8px;align-items:center">
