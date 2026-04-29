@@ -324,16 +324,24 @@ h1,h2,h3,h4 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
 
 /* ── SIDEBAR ── */
 .sidebar {
-  position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); -webkit-overflow-scrolling: touch;
+  position: fixed; left: 0; top: 0; bottom: 0;
+  width: 240px;
   background: var(--sidebar-glass);
   backdrop-filter: var(--blur);
   -webkit-backdrop-filter: var(--blur);
   border-right: 1px solid var(--glass-border);
   display: flex; flex-direction: column;
-  z-index: 100;
+  z-index: 150;
   transition: transform 0.3s cubic-bezier(.16,1,.3,1);
   will-change: transform;
   -webkit-overflow-scrolling: touch;
+  /* Desktop: always visible */
+  transform: translateX(0);
+}
+/* Mobile: hidden by default, slides in */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-240px); }
+  .sidebar.open { transform: translateX(0) !important; }
 }
 .sidebar-logo {
   padding: 20px 18px; border-bottom: 1px solid var(--glass-border);
@@ -398,12 +406,12 @@ h1,h2,h3,h4 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
 }
 .hamburger span { display: block; width: 18px; height: 2px; background: var(--gold); border-radius: 2px; transition: all 0.3s; }
 .sidebar-overlay {
-  display: none; position: fixed; top:0;right:0;bottom:0;left:0; background: rgba(0,0,0,0.5);
-  z-index: 99; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  display: none; position: fixed; top:0;right:0;bottom:0;left:0; background: rgba(0,0,0,0.6);
+  z-index: 140; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
 }
 
 /* ── MAIN CONTENT ── */
-.main { margin-left: var(--sidebar-w); min-height: 100vh; }
+.main { margin-left: 240px; min-height: 100vh; }
 
 /* ── TOPBAR ── */
 .topbar {
@@ -777,8 +785,11 @@ input[type=file]{ display: none; }
 
 /* ── IS-MOBILE CLASS (PWA standalone + small screens) ── */
 .is-mobile .sidebar {
-  transform: translateX(-240px);
-  width: 240px;
+  transform: translateX(-240px) !important;
+  width: 240px !important;
+}
+.is-mobile .sidebar.open {
+  transform: translateX(0) !important;
 }
 .is-mobile .main {
   margin-left: 0 !important;
@@ -822,7 +833,7 @@ input[type=file]{ display: none; }
 
 /* ── HAMBURGER INLINE IN TOPBAR ── */
 .hamburger-inline {
-  display: none;
+  display: none; /* hidden by default on desktop */
   width: 38px; height: 38px;
   border-radius: 8px;
   border: 1px solid var(--glass-border);
@@ -875,8 +886,7 @@ input[type=file]{ display: none; }
   .stat-value { font-size: 20px !important; }
   .page-header { flex-direction: row !important; }
   .page-header-title p { display: none !important; }
-  /* Sidebar full height in landscape */
-  .sidebar { height: 100vh; overflow-y: auto; }
+
 }
 
 /* ── VERY SMALL SCREENS (iPhone SE etc) ── */
@@ -890,9 +900,8 @@ input[type=file]{ display: none; }
 
 /* ── PWA STANDALONE MODE ── */
 @media (display-mode: standalone) {
-  :root { --sidebar-w: 0px; }
-  .sidebar { transform: translateX(-240px); width: 240px; }
-  .sidebar.open { transform: translateX(0); }
+  .sidebar { transform: translateX(-240px) !important; }
+  .sidebar.open { transform: translateX(0) !important; }
   .hamburger-inline { display: flex !important; }
   .main { margin-left: 0 !important; }
   .topbar {
