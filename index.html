@@ -761,6 +761,9 @@ window.onerror = function(msg, src, line, col, err) {
       <div class="nav-item" onclick="showPage('quotations')" id="nav-quotations">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Quotations
       </div>
+      <div class="nav-item" onclick="showPage('purchase-orders')" id="nav-purchase-orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Purchase Orders
+      </div>
       <div class="nav-item" onclick="showPage('low-stock')" id="nav-low-stock">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         Low Stock <span class="notif-dot" id="low-stock-dot" style="display:none;margin-left:auto"></span>
@@ -875,6 +878,9 @@ window.onerror = function(msg, src, line, col, err) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export Excel
           </button>
+          <button class="btn btn-outline admin-only" onclick="toggleSelectMode()" id="select-mode-btn" style="border-color:rgba(220,38,38,0.4);color:#dc2626">
+            ☑️ Select
+          </button>
           <button class="btn btn-outline admin-only" onclick="openDuplicatesScanner()" style="border-color:rgba(224,153,64,0.4);color:#e0b060">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Find Duplicates
@@ -896,7 +902,21 @@ window.onerror = function(msg, src, line, col, err) {
             <option value="">All Levels</option><option value="low">Low Stock</option><option value="ok">Normal</option>
           </select>
         </div>
-        <div id="inv-count" style="font-size:12px;color:var(--text-muted)"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <div id="inv-count" style="font-size:12px;color:var(--text-muted)"></div>
+          <div id="bulk-actions" style="display:none;align-items:center;gap:8px">
+            <span id="selected-count" style="font-size:12px;font-weight:600;color:var(--text)"></span>
+            <button class="btn btn-sm btn-outline" onclick="selectAllProducts()">Select All</button>
+            <button class="btn btn-sm btn-outline" onclick="clearSelection()">Clear</button>
+            <button class="btn btn-sm btn-danger admin-only" onclick="bulkDeleteSelected()">🗑️ Delete Selected</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;display:none" id="select-mode-bar">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this)" style="width:16px;height:16px;cursor:pointer">
+            <span style="color:var(--text-muted)">Enable selection mode</span>
+          </label>
+        </div>
       </div>
       <div id="inventory-container"></div>
     </div>
@@ -1848,8 +1868,8 @@ function renderInventory() {
   if (currentView==='grid') {
     document.getElementById('inventory-container').innerHTML = `<div class="product-grid">${list.map(p=>renderProductCard(p,threshold)).join('')}</div>`;
   } else {
-    document.getElementById('inventory-container').innerHTML = `<div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>Photo</th><th>Code</th><th>Name</th><th>Material</th><th>Size</th><th>BV</th><th>IS</th><th>SW</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+    document.getElementById('inventory-container').innerHTML = `<div class="card"><div class="table-wrap"><table id="inv-table">
+      <thead><tr><th id="inv-select-header" style="display:none"><input type="checkbox" id="inv-select-all" onchange="toggleSelectAll(this)" style="width:15px;height:15px;cursor:pointer"></th><th>Photo</th><th>Code</th><th>Name</th><th>Material</th><th>Size</th><th>BV</th><th>IS</th><th>SW</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>${list.map(p=>renderProductRow(p,threshold,canEdit)).join('')}</tbody></table></div></div>`;
   }
 }
@@ -4361,7 +4381,7 @@ renderDashboard = function() {
 const COMPANY_INFO = {
   bv: {
     nameEn: 'BARAKAH VALVES TRADING COMPANY',
-    nameAr: 'شركة بركة للمحابس التجارية',
+    nameAr: 'شركة صمام البركة التجارية',
     taglineEn: 'For all types of Carbon Steel & Stainless Steel Pipes, Fittings, Valves, Flanges, Electrical & Safety Solutions',
     taglineAr: 'لجميع أنواع الأنابيب الفولاذية والمقاومة للصدأ، التركيبات، المحابس، والوصلات',
     cr: '2050104479',
@@ -4565,6 +4585,524 @@ function executePrint(q, printCo) {
   w.document.close();
 }
 
+// ═══════════════════════════════════════════════════════════════
+// BULK SELECT & DELETE (Admin only)
+// ═══════════════════════════════════════════════════════════════
+let selectedProductIds = new Set();
+let selectModeActive = false;
+
+function toggleSelectMode() {
+  selectModeActive = !selectModeActive;
+  selectedProductIds.clear();
+
+  const btn = document.getElementById('select-mode-btn');
+  const bulkBar = document.getElementById('bulk-actions');
+  const selectHeader = document.getElementById('inv-select-header');
+  const invSelectAll = document.getElementById('inv-select-all');
+
+  if (btn) {
+    btn.textContent = selectModeActive ? '✕ Cancel' : '☑️ Select';
+    btn.style.background = selectModeActive ? '#fef2f2' : '';
+  }
+  if (bulkBar) bulkBar.style.display = selectModeActive ? 'flex' : 'none';
+  if (selectHeader) selectHeader.style.display = selectModeActive ? '' : 'none';
+  if (invSelectAll) invSelectAll.checked = false;
+
+  updateSelectedCount();
+  renderInventory(); // re-render with/without checkboxes
+}
+
+function toggleSelectAll(cb) {
+  const filtered = getFilteredProducts();
+  if (cb.checked) {
+    filtered.forEach(p => selectedProductIds.add(p.id));
+  } else {
+    filtered.forEach(p => selectedProductIds.delete(p.id));
+  }
+  updateSelectedCount();
+  renderInventory();
+}
+
+function selectAllProducts() {
+  const filtered = getFilteredProducts();
+  filtered.forEach(p => selectedProductIds.add(p.id));
+  updateSelectedCount();
+  renderInventory();
+  const cb = document.getElementById('inv-select-all');
+  if (cb) cb.checked = true;
+}
+
+function clearSelection() {
+  selectedProductIds.clear();
+  updateSelectedCount();
+  renderInventory();
+  const cb = document.getElementById('inv-select-all');
+  if (cb) cb.checked = false;
+}
+
+function toggleProductSelect(id, checked) {
+  if (checked) selectedProductIds.add(id);
+  else selectedProductIds.delete(id);
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const countEl = document.getElementById('selected-count');
+  const deleteBtn = document.querySelector('#bulk-actions .btn-danger');
+  const count = selectedProductIds.size;
+  if (countEl) countEl.textContent = count > 0 ? `${count} selected` : '';
+  if (deleteBtn) {
+    deleteBtn.disabled = count === 0;
+    deleteBtn.style.opacity = count === 0 ? '0.5' : '1';
+  }
+}
+
+function getFilteredProducts() {
+  const search = (document.getElementById('inv-search')?.value || '').toLowerCase();
+  const filterCo = document.getElementById('inv-filter-company')?.value || '';
+  const filterMat = document.getElementById('inv-filter-material')?.value || '';
+  const threshold = parseInt(settings.lowStockThreshold || 10);
+  return allProducts.filter(p => {
+    const s = !search || p.name.toLowerCase().includes(search) || (p.code||'').toLowerCase().includes(search);
+    const m = !filterMat || p.material === filterMat;
+    const c = !filterCo || (p['qty_'+filterCo]||0) > 0;
+    return s && m && c;
+  });
+}
+
+function bulkDeleteSelected() {
+  if (currentProfile?.role !== 'admin') { showToast('Admin only', 'error'); return; }
+  if (selectedProductIds.size === 0) { showToast('No products selected', 'error'); return; }
+  document.getElementById('bulk-delete-count').textContent = selectedProductIds.size + ' Products';
+  openModal('modal-bulk-delete');
+}
+
+async function confirmBulkDelete() {
+  const ids = [...selectedProductIds];
+  const btn = document.getElementById('bulk-delete-btn');
+  btn.textContent = 'Deleting...';
+  btn.disabled = true;
+  closeModal('modal-bulk-delete');
+  showLoading(`DELETING ${ids.length} PRODUCTS...`);
+
+  let deleted = 0, failed = 0;
+  for (const id of ids) {
+    try {
+      await sb.from('quotation_lines').delete().eq('product_id', id);
+      await sb.from('product_documents').delete().eq('product_id', id);
+      await sb.from('stock_movements').delete().eq('product_id', id);
+      const { error } = await sb.from('products').delete().eq('id', id);
+      if (error) { failed++; console.error('Delete failed:', id, error); }
+      else { deleted++; allProducts = allProducts.filter(x => x.id !== id); allMovements = allMovements.filter(x => x.product_id !== id); }
+    } catch(e) { failed++; }
+  }
+
+  selectedProductIds.clear();
+  selectModeActive = false;
+  const selectBtn = document.getElementById('select-mode-btn');
+  if (selectBtn) selectBtn.textContent = '☑️ Select';
+  const bulkBar = document.getElementById('bulk-actions');
+  if (bulkBar) bulkBar.style.display = 'none';
+  const selectHeader = document.getElementById('inv-select-header');
+  if (selectHeader) selectHeader.style.display = 'none';
+
+  hideLoading();
+  renderInventory();
+  checkLowStock();
+  btn.textContent = 'Delete All';
+  btn.disabled = false;
+
+  if (failed > 0) showToast(`Deleted ${deleted}, failed ${failed}`, 'error');
+  else showToast(`${deleted} products deleted successfully`);
+}
+
+// Patch renderProductRow to add checkbox when in select mode
+const _origRenderProductRow = renderProductRow;
+renderProductRow = function(p, threshold, canEdit) {
+  const row = _origRenderProductRow(p, threshold, canEdit);
+  if (!selectModeActive) return row;
+  const checked = selectedProductIds.has(p.id) ? 'checked' : '';
+  const cbCell = `<td onclick="event.stopPropagation()"><input type="checkbox" ${checked} onchange="toggleProductSelect('${p.id}',this.checked)" style="width:15px;height:15px;cursor:pointer"></td>`;
+  return row.replace('<tr onclick=', `<tr style="${selectedProductIds.has(p.id)?'background:var(--gold-light)':''}" onclick=`).replace('<td>', cbCell + '<td>');
+};
+
+// ═══════════════════════════════════════════════════════════════
+// PURCHASE ORDER MODULE
+// ═══════════════════════════════════════════════════════════════
+let allPOs = [];
+let poLineIdx = 0;
+let _editingPOId = null;
+
+// Add 'purchase-orders' to PAGE_TITLES
+PAGE_TITLES['purchase-orders'] = 'Purchase Orders';
+
+// Hook into showPage
+const _origShowPage2 = showPage;
+showPage = function(id) {
+  _origShowPage2(id);
+  if (id === 'purchase-orders') renderPOs();
+};
+
+async function loadPOs() {
+  try {
+    const { data } = await sb.from('purchase_orders').select('*, purchase_order_lines(*)').order('created_at', { ascending: false });
+    allPOs = data || [];
+  } catch(e) { allPOs = []; }
+}
+
+function openNewPO() {
+  _editingPOId = null;
+  poLineIdx = 0;
+  document.getElementById('po-modal-title').textContent = 'New Purchase Order';
+  document.getElementById('po-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('po-delivery-date').value = '';
+  ['po-supplier','po-contact','po-delivery-addr','po-notes'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('po-lines-body').innerHTML = '';
+  document.getElementById('po-totals').innerHTML = '';
+  addPOLine();
+  openModal('modal-po');
+}
+
+function addPOLine() {
+  const idx = poLineIdx++;
+  const tr = document.createElement('tr');
+  tr.id = 'pol-' + idx;
+  tr.innerHTML = `
+    <td style="padding:4px">
+      <select style="width:100%;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px" onchange="onPOLProductChange(${idx},this)">
+        <option value="">Select product or type custom...</option>
+        ${allProducts.map(p => `<option value="${p.id}" data-unit="${p.unit||'PCS'}">${p.name}${p.code?' ('+p.code+')':''}</option>`).join('')}
+        <option value="_custom">Custom item / Free text</option>
+      </select>
+      <input type="text" id="pol-custom-${idx}" placeholder="Custom item description" style="display:none;width:100%;margin-top:3px;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px" oninput="recalcPOL(${idx})">
+    </td>
+    <td style="padding:4px"><input type="number" id="pol-qty-${idx}" value="1" min="1" style="width:70px;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;text-align:center" oninput="recalcPOL(${idx})"></td>
+    <td style="padding:4px"><input type="number" id="pol-price-${idx}" value="0" step="0.01" style="width:85px;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px" oninput="recalcPOL(${idx})"></td>
+    <td style="padding:4px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600" id="pol-total-${idx}">0.00</td>
+    <td><button class="btn btn-sm btn-danger" onclick="removePOL(${idx})">×</button></td>`;
+  document.getElementById('po-lines-body').appendChild(tr);
+  updatePOTotals();
+}
+
+function onPOLProductChange(idx, sel) {
+  const custom = document.getElementById('pol-custom-'+idx);
+  if (sel.value === '_custom') { custom.style.display = ''; }
+  else { custom.style.display = 'none'; }
+  recalcPOL(idx);
+}
+
+function recalcPOL(idx) {
+  const qty = parseFloat(document.getElementById('pol-qty-'+idx)?.value) || 0;
+  const price = parseFloat(document.getElementById('pol-price-'+idx)?.value) || 0;
+  const el = document.getElementById('pol-total-'+idx);
+  if (el) el.textContent = (qty*price).toFixed(2);
+  updatePOTotals();
+}
+
+function removePOL(idx) {
+  document.getElementById('pol-'+idx)?.remove();
+  updatePOTotals();
+}
+
+function updatePOTotals() {
+  let sub = 0;
+  document.querySelectorAll('[id^="pol-total-"]').forEach(el => { sub += parseFloat(el.textContent)||0; });
+  const vr = parseFloat(settings.vatRate||15)/100;
+  document.getElementById('po-totals').innerHTML = `
+    <div style="font-size:13px;color:var(--text-muted)">Subtotal: SAR ${sub.toFixed(2)}</div>
+    <div style="font-size:13px;color:var(--text-muted)">VAT (${Math.round(vr*100)}%): SAR ${(sub*vr).toFixed(2)}</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold)">Total: SAR ${(sub*(1+vr)).toFixed(2)}</div>`;
+}
+
+async function savePO(status) {
+  const supplier = document.getElementById('po-supplier').value.trim();
+  if (!supplier) { showToast('Supplier name required', 'error'); return; }
+  const company = document.getElementById('po-company').value;
+
+  // Collect lines
+  const lines = [];
+  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
+    const idx = tr.id.replace('pol-','');
+    const sel = tr.querySelector('select');
+    const custom = document.getElementById('pol-custom-'+idx);
+    const qty = parseFloat(document.getElementById('pol-qty-'+idx)?.value)||0;
+    const unitPrice = parseFloat(document.getElementById('pol-price-'+idx)?.value)||0;
+    if (qty <= 0) return;
+    const pid = sel?.value === '_custom' ? null : sel?.value || null;
+    const pObj = pid ? allProducts.find(x=>x.id===pid) : null;
+    lines.push({ product_id:pid, custom_desc:custom?.value||'', qty, unit:pObj?.unit||'PCS', unit_price:unitPrice, total:qty*unitPrice, product_name:pObj?pObj.name:(custom?.value||'Item') });
+  });
+
+  const sub = lines.reduce((a,l)=>a+l.total,0);
+  const vr = parseFloat(settings.vatRate||15)/100;
+  const poNo = `PO-${company.toUpperCase()}-${Date.now().toString().slice(-6)}`;
+
+  // Try to save to Supabase (create table if first use)
+  showLoading('SAVING PO...');
+  try {
+    const { data: poData, error } = await sb.from('purchase_orders').insert({
+      po_no: poNo, company, supplier, status,
+      contact: document.getElementById('po-contact').value,
+      delivery_addr: document.getElementById('po-delivery-addr').value,
+      delivery_date: document.getElementById('po-delivery-date').value || null,
+      notes: document.getElementById('po-notes').value,
+      po_date: document.getElementById('po-date').value,
+      subtotal: sub, vat: sub*vr, total: sub*(1+vr),
+      created_by: currentProfile.id
+    }).select().single();
+
+    if (!error && poData) {
+      const lineInserts = lines.map((l,i) => ({ po_id:poData.id, product_id:l.product_id, custom_desc:l.custom_desc, qty:l.qty, unit:l.unit, unit_price:l.unit_price, total:l.total, sort_order:i }));
+      if (lineInserts.length) await sb.from('purchase_order_lines').insert(lineInserts);
+      allPOs = [{ ...poData, purchase_order_lines: lines }, ...allPOs];
+      hideLoading();
+      closeModal('modal-po');
+      renderPOs();
+      showToast('Purchase Order saved!');
+      if (status === 'sent') printPO({ ...poData, lines });
+    } else {
+      throw error || new Error('Save failed');
+    }
+  } catch(e) {
+    hideLoading();
+    // Table may not exist yet — show SQL to create it
+    if (e.message?.includes('relation') || e.message?.includes('does not exist') || e.code === '42P01') {
+      showToast('Run PO schema SQL first — see instructions below', 'error');
+      showPOSchemaNotice();
+    } else {
+      showToast('Save failed: ' + e.message, 'error');
+    }
+  }
+}
+
+function showPOSchemaNotice() {
+  const sql = `-- Run this in Supabase SQL Editor:
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_no TEXT UNIQUE NOT NULL,
+  company TEXT NOT NULL,
+  supplier TEXT NOT NULL,
+  contact TEXT, delivery_addr TEXT, delivery_date DATE,
+  status TEXT DEFAULT 'draft',
+  subtotal NUMERIC(12,2) DEFAULT 0,
+  vat NUMERIC(12,2) DEFAULT 0,
+  total NUMERIC(12,2) DEFAULT 0,
+  notes TEXT, po_date DATE,
+  created_by UUID, created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS purchase_order_lines (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id),
+  custom_desc TEXT, qty NUMERIC(10,2) DEFAULT 1,
+  unit TEXT DEFAULT 'PCS', unit_price NUMERIC(12,2) DEFAULT 0,
+  total NUMERIC(12,2) DEFAULT 0, sort_order INTEGER DEFAULT 0
+);
+CREATE POLICY "po_all" ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "pol_all" ON purchase_order_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);
+ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_order_lines ENABLE ROW LEVEL SECURITY;`;
+
+  // Show in an alert-style overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `<div style="background:var(--surface);border-radius:14px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto">
+    <div style="font-family:var(--font-display);font-size:20px;color:var(--gold);margin-bottom:8px">One-time Setup Required</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Purchase Orders need two new database tables. Copy and run this SQL in Supabase → SQL Editor:</p>
+    <pre style="background:var(--surface2);border-radius:8px;padding:14px;font-size:11px;overflow-x:auto;color:var(--text);line-height:1.6">${sql}</pre>
+    <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="navigator.clipboard.writeText(\`${sql}\`).then(()=>showToast('Copied!'))">📋 Copy SQL</button>
+      <button class="btn btn-gold" onclick="this.closest('div[style*=fixed]').remove()">Close</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+function renderPOs() {
+  const search = (document.getElementById('po-search')?.value||'').toLowerCase();
+  const fc = document.getElementById('po-filter-company')?.value||'';
+  const fs = document.getElementById('po-filter-status')?.value||'';
+  const statusColors = {draft:'badge-warn',sent:'badge-blue',received:'badge-green',partial:'badge-gold',cancelled:'badge-red'};
+
+  const list = allPOs.filter(po =>
+    (!search || po.supplier.toLowerCase().includes(search) || po.po_no.toLowerCase().includes(search)) &&
+    (!fc || po.company===fc) && (!fs || po.status===fs)
+  );
+
+  document.getElementById('po-tbody').innerHTML = list.length ? list.map(po => `
+    <tr>
+      <td class="mono" style="font-size:12px;color:var(--gold)">${po.po_no}</td>
+      <td style="font-size:13px">${new Date(po.po_date||po.created_at).toLocaleDateString()}</td>
+      <td><div style="font-weight:500">${po.supplier}</div><div style="font-size:11px;color:var(--text-muted)">${po.contact||''}</div></td>
+      <td><span class="badge badge-blue" style="font-size:10px">${COMPANY_NAMES[po.company]||po.company}</span></td>
+      <td>${(po.purchase_order_lines||[]).length} items</td>
+      <td class="mono" style="font-weight:600">SAR ${Number(po.total||0).toFixed(2)}</td>
+      <td><span class="badge ${statusColors[po.status]||'badge-blue'}">${(po.status||'').toUpperCase()}</span></td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <button class="btn btn-sm btn-outline" onclick="printPO(allPOs.find(x=>x.id==='${po.id}'))">Print</button>
+        <button class="btn btn-sm btn-success" onclick="updatePOStatus('${po.id}','received')">✓ Received</button>
+        <button class="btn btn-sm btn-danger admin-only" onclick="deletePO('${po.id}','${po.po_no}')">🗑️</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:28px">No purchase orders yet. Click + New PO to create one.</td></tr>';
+}
+
+async function updatePOStatus(id, status) {
+  try {
+    await sb.from('purchase_orders').update({ status }).eq('id', id);
+    const po = allPOs.find(x=>x.id===id); if(po) po.status=status;
+    renderPOs();
+    if (status === 'received') {
+      addNotification('stock_in', 'PO Received', `Purchase order ${po?.po_no} marked as received`);
+    }
+    showToast(`PO marked as ${status}`);
+  } catch(e) { showToast('Update failed: '+e.message,'error'); }
+}
+
+async function deletePO(id, poNo) {
+  if (!confirm(`Delete PO ${poNo}?`)) return;
+  showLoading('DELETING...');
+  try {
+    await sb.from('purchase_order_lines').delete().eq('po_id', id);
+    await sb.from('purchase_orders').delete().eq('id', id);
+    allPOs = allPOs.filter(x=>x.id!==id);
+    hideLoading(); renderPOs(); showToast('PO deleted');
+  } catch(e) { hideLoading(); showToast('Delete failed: '+e.message,'error'); }
+}
+
+function printPO(po) {
+  if (!po) return;
+  const co = po.company || 'bv';
+  const info = COMPANY_INFO[co] || COMPANY_INFO.bv;
+  const stored = getCompanyData(co);
+  const lines = po.purchase_order_lines || po.lines || [];
+  const vatRate = settings.vatRate || '15';
+  const cr = stored.cr || info.cr;
+  const vat = stored.vat || info.vat;
+  const phone = stored.phone || info.phone;
+  const addr = stored.addr || info.address;
+  const name = stored.name || info.nameEn;
+  const logoUrl = stored.logoUrl || '';
+
+  const w = window.open('','_blank','width=960,height=800');
+  w.document.write(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${po.po_no}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:13px;}
+  .page{max-width:850px;margin:0 auto;padding:0;}
+  .lh-header{display:flex;justify-content:space-between;align-items:flex-start;padding:24px 32px 18px;border-bottom:4px solid ${info.accentColor};}
+  .lh-left{display:flex;align-items:flex-start;gap:16px;}
+  .lh-logo{width:90px;height:70px;object-fit:contain;display:block;}
+  .lh-logo-ph{width:90px;height:70px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;border-radius:8px;font-size:10px;font-weight:700;color:${info.accentColor};text-align:center;padding:6px;line-height:1.2;}
+  .co-en{font-size:18px;font-weight:800;color:${info.accentColor};}
+  .co-tag{font-size:10px;color:#64748b;margin-top:3px;}
+  .co-cr{font-size:11px;font-weight:600;color:${info.accentColor2};margin-top:4px;}
+  .lh-right{text-align:right;direction:rtl;}
+  .co-ar{font-size:17px;font-weight:800;color:${info.accentColor};font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+  .co-vat{font-size:11px;font-weight:600;color:${info.accentColor2};margin-top:4px;}
+  .po-band{background:${info.accentColor};color:#fff;padding:10px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .po-band h1{font-size:17px;font-weight:700;letter-spacing:2px;}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;padding:18px 32px;border-bottom:1px solid #e2e8f0;gap:20px;}
+  .ib .label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:3px;}
+  .ib .val{font-size:13px;font-weight:600;color:#1a1a2e;}
+  .ib .sub{font-size:11px;color:#64748b;margin-top:2px;}
+  .items{padding:18px 32px;}
+  .items h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:10px;}
+  table{width:100%;border-collapse:collapse;}
+  thead th{background:${info.accentColor};color:#fff;padding:9px 12px;text-align:left;font-size:11px;font-weight:600;}
+  thead th:last-child{text-align:right;}
+  tbody tr:nth-child(even){background:#f8fafc;}
+  tbody td{padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0;}
+  tbody td:last-child{text-align:right;font-weight:600;}
+  tfoot td{padding:8px 12px;font-size:12px;text-align:right;}
+  .grand{font-size:16px;font-weight:800;color:${info.accentColor};border-top:2px solid ${info.accentColor}!important;}
+  .sig-section{display:grid;grid-template-columns:1fr 1fr;gap:40px;padding:24px 32px;margin-top:20px;}
+  .sig-box{border-top:1px solid #94a3b8;padding-top:8px;font-size:11px;color:#64748b;}
+  .lh-footer{background:${info.accentColor};color:rgba(255,255,255,.9);padding:10px 32px;font-size:10px;display:flex;justify-content:space-between;align-items:center;margin-top:auto;}
+  .footer-ar{direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+  .print-btn{display:block;margin:20px auto;padding:10px 28px;background:${info.accentColor};color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;}
+  .watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:80px;font-weight:900;color:rgba(0,0,0,0.03);pointer-events:none;white-space:nowrap;}
+  @media print{.print-btn,.watermark{display:none!important;}body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style></head>
+<body>
+<div class="page">
+  <div class="watermark">${info.nameEn}</div>
+  <div class="lh-header">
+    <div class="lh-left">
+      ${logoUrl ? `<img src="${logoUrl}" class="lh-logo">` : `<div class="lh-logo-ph">${info.nameEn}</div>`}
+      <div>
+        <div class="co-en">${name}</div>
+        <div class="co-tag">${info.taglineEn}</div>
+        <div class="co-cr">C.R. ${cr}</div>
+      </div>
+    </div>
+    <div class="lh-right">
+      <div class="co-ar">${info.nameAr}</div>
+      <div class="co-tag" style="direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif">${info.taglineAr}</div>
+      <div class="co-vat">VAT Reg No: ${vat}</div>
+    </div>
+  </div>
+  <div class="po-band">
+    <h1>PURCHASE ORDER / أمر شراء</h1>
+    <div style="font-size:13px;opacity:.85">${po.po_no} · ${new Date(po.po_date||po.created_at).toLocaleDateString('en-SA',{day:'numeric',month:'long',year:'numeric'})}</div>
+  </div>
+  <div class="info-grid">
+    <div class="ib">
+      <div class="label">Supplier / المورد</div>
+      <div class="val">${po.supplier}</div>
+      ${po.contact ? `<div class="sub">${po.contact}</div>` : ''}
+    </div>
+    <div class="ib" style="text-align:right">
+      <div class="label">Deliver To / التسليم إلى</div>
+      <div class="val">${po.delivery_addr || addr}</div>
+      ${po.delivery_date ? `<div class="sub">Expected: ${new Date(po.delivery_date).toLocaleDateString()}</div>` : ''}
+    </div>
+  </div>
+  <div class="items">
+    <h3>Items / البنود</h3>
+    <table>
+      <thead><tr><th>#</th><th>Description / الوصف</th><th>Qty / الكمية</th><th>Unit Price (SAR)</th><th>Total (SAR)</th></tr></thead>
+      <tbody>
+        ${lines.map((l,i) => `<tr>
+          <td style="color:#94a3b8">${i+1}</td>
+          <td>${l.product_id ? (allProducts.find(x=>x.id===l.product_id)?.name||l.product_name||'Item') : (l.custom_desc||l.product_name||'Item')}</td>
+          <td>${l.qty} ${l.unit||'PCS'}</td>
+          <td style="text-align:right">${Number(l.unit_price).toFixed(2)}</td>
+          <td>${Number(l.total).toFixed(2)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="4" style="color:#64748b">Subtotal</td><td>SAR ${Number(po.subtotal||0).toFixed(2)}</td></tr>
+        <tr><td colspan="4" style="color:#64748b">VAT ${vatRate}%</td><td>SAR ${Number(po.vat||0).toFixed(2)}</td></tr>
+        <tr class="grand"><td colspan="4" style="text-align:right;font-size:14px;font-weight:700">TOTAL / الإجمالي</td><td style="font-size:16px">SAR ${Number(po.total||0).toFixed(2)}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+  ${po.notes ? `<div style="padding:0 32px 16px"><div style="background:#fffbf0;border-left:3px solid ${info.accentColor2};padding:10px 14px;border-radius:0 6px 6px 0;font-size:12px"><b>Notes:</b> ${po.notes}</div></div>` : ''}
+  <div class="sig-section">
+    <div class="sig-box">Authorized Signature / التوقيع المعتمد<br><br><br></div>
+    <div class="sig-box" style="text-align:right">Received By / استلم بواسطة<br><br><br></div>
+  </div>
+  <div class="lh-footer">
+    <div>Tel: ${phone}${info.email ? ' · '+info.email : ''} · ${addr}</div>
+    <div class="footer-ar">${info.addressAr}</div>
+  </div>
+</div>
+<button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+</body></html>`);
+  w.document.close();
+}
+
+// Load POs when app launches
+const _origLaunchApp2 = launchApp;
+launchApp = async function() {
+  await _origLaunchApp2();
+  loadPOs();
+};
+
 window.addEventListener('DOMContentLoaded', init);
 
 </script>
@@ -4580,6 +5118,71 @@ window.addEventListener('DOMContentLoaded', init);
     <div class="modal-footer" style="justify-content:center;margin-top:20px">
       <button class="btn btn-outline" onclick="closeModal('modal-delete-quot')" style="min-width:100px">Cancel</button>
       <button class="btn btn-danger" onclick="confirmDeleteQuotation()" style="min-width:100px">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW PO MODAL -->
+<div class="modal-overlay" id="modal-po">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-title" id="po-modal-title">New Purchase Order</div>
+    <div class="grid-2">
+      <div class="field"><label>Company (from) *</label>
+        <select id="po-company">
+          <option value="bv">Barakah Valves Trading Co.</option>
+          <option value="is">Iron Spring Trading</option>
+          <option value="sw">Stable Way Trading</option>
+        </select>
+      </div>
+      <div class="field"><label>PO Date *</label><input type="date" id="po-date"></div>
+    </div>
+    <div class="field"><label>Supplier / Vendor Name *</label><input type="text" id="po-supplier" placeholder="Supplier company name"></div>
+    <div class="grid-2">
+      <div class="field"><label>Supplier Contact</label><input type="text" id="po-contact" placeholder="Contact person"></div>
+      <div class="field"><label>Delivery Date (Expected)</label><input type="date" id="po-delivery-date"></div>
+    </div>
+    <div class="field"><label>Delivery Address</label>
+      <input type="text" id="po-delivery-addr" placeholder="e.g. Prince Talal St, Al Khobar">
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Line Items</div>
+        <button class="btn btn-outline btn-sm" onclick="addPOLine()">+ Add Item</button>
+      </div>
+      <table style="width:100%;font-size:13px" id="po-lines-table">
+        <thead><tr style="border-bottom:2px solid var(--border)">
+          <th style="padding:6px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Product / Description</th>
+          <th style="padding:6px;width:80px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Qty</th>
+          <th style="padding:6px;width:100px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Unit Price</th>
+          <th style="padding:6px;width:90px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Total</th>
+          <th style="width:30px"></th>
+        </tr></thead>
+        <tbody id="po-lines-body"></tbody>
+      </table>
+      <div id="po-totals" style="text-align:right;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>
+    </div>
+    <div class="field"><label>Notes / Terms</label><textarea id="po-notes" rows="2" placeholder="Payment terms, delivery instructions..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
+      <button class="btn btn-outline" onclick="savePO('draft')">Save Draft</button>
+      <button class="btn btn-gold" onclick="savePO('sent')">Save & Print</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-bulk-delete">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">⚠️</div>
+    <div class="modal-title" style="text-align:center">Delete Selected Products?</div>
+    <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px">You are about to permanently delete:</p>
+    <div style="font-size:28px;font-family:'Bebas Neue',sans-serif;color:#dc2626;margin-bottom:12px" id="bulk-delete-count"></div>
+    <div class="alert alert-danger" style="text-align:left;margin-bottom:16px">
+      ⚠️ All documents, movement history and quotation references for these products will also be deleted. This cannot be undone.
+    </div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-outline" onclick="closeModal('modal-bulk-delete')" style="min-width:100px">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmBulkDelete()" style="min-width:100px" id="bulk-delete-btn">Delete All</button>
     </div>
   </div>
 </div>
@@ -4680,5 +5283,106 @@ window.addEventListener('DOMContentLoaded', init);
     </div>
   </div>
 </div>
+
+<!-- NEW PO MODAL -->
+<div class="modal-overlay" id="modal-po">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-title" id="po-modal-title">New Purchase Order</div>
+    <div class="grid-2">
+      <div class="field"><label>Company (from) *</label>
+        <select id="po-company">
+          <option value="bv">Barakah Valves Trading Co.</option>
+          <option value="is">Iron Spring Trading</option>
+          <option value="sw">Stable Way Trading</option>
+        </select>
+      </div>
+      <div class="field"><label>PO Date *</label><input type="date" id="po-date"></div>
+    </div>
+    <div class="field"><label>Supplier / Vendor Name *</label><input type="text" id="po-supplier" placeholder="Supplier company name"></div>
+    <div class="grid-2">
+      <div class="field"><label>Supplier Contact</label><input type="text" id="po-contact" placeholder="Contact person"></div>
+      <div class="field"><label>Delivery Date (Expected)</label><input type="date" id="po-delivery-date"></div>
+    </div>
+    <div class="field"><label>Delivery Address</label>
+      <input type="text" id="po-delivery-addr" placeholder="e.g. Prince Talal St, Al Khobar">
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Line Items</div>
+        <button class="btn btn-outline btn-sm" onclick="addPOLine()">+ Add Item</button>
+      </div>
+      <table style="width:100%;font-size:13px" id="po-lines-table">
+        <thead><tr style="border-bottom:2px solid var(--border)">
+          <th style="padding:6px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Product / Description</th>
+          <th style="padding:6px;width:80px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Qty</th>
+          <th style="padding:6px;width:100px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Unit Price</th>
+          <th style="padding:6px;width:90px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Total</th>
+          <th style="width:30px"></th>
+        </tr></thead>
+        <tbody id="po-lines-body"></tbody>
+      </table>
+      <div id="po-totals" style="text-align:right;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>
+    </div>
+    <div class="field"><label>Notes / Terms</label><textarea id="po-notes" rows="2" placeholder="Payment terms, delivery instructions..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
+      <button class="btn btn-outline" onclick="savePO('draft')">Save Draft</button>
+      <button class="btn btn-gold" onclick="savePO('sent')">Save & Print</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-bulk-delete">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">⚠️</div>
+    <div class="modal-title" style="text-align:center">Delete Selected Products?</div>
+    <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px">You are about to permanently delete:</p>
+    <div style="font-size:28px;font-family:'Bebas Neue',sans-serif;color:#dc2626;margin-bottom:12px" id="bulk-delete-count"></div>
+    <div class="alert alert-danger" style="text-align:left;margin-bottom:16px">
+      ⚠️ All documents, movement history and quotation references for these products will also be deleted. This cannot be undone.
+    </div>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-outline" onclick="closeModal('modal-bulk-delete')" style="min-width:100px">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmBulkDelete()" style="min-width:100px" id="bulk-delete-btn">Delete All</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+    <!-- PURCHASE ORDERS PAGE -->
+    <div class="page" id="page-purchase-orders">
+      <div class="page-header">
+        <div class="page-header-title"><h1>Purchase Orders</h1><p>Create and track purchase orders to suppliers</p></div>
+        <button class="btn btn-gold manager-only" onclick="openNewPO()">+ New PO</button>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="filter-bar">
+          <input class="search-input" type="text" placeholder="Search POs..." id="po-search" oninput="renderPOs()">
+          <select class="filter-select" id="po-filter-company" onchange="renderPOs()">
+            <option value="">All Companies</option>
+            <option value="bv">Barakah Valves</option>
+            <option value="is">Iron Spring</option>
+            <option value="sw">Stable Way</option>
+          </select>
+          <select class="filter-select" id="po-filter-status" onchange="renderPOs()">
+            <option value="">All Status</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="received">Received</option>
+            <option value="partial">Partial</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table><thead><tr>
+            <th>PO No.</th><th>Date</th><th>Supplier</th><th>Company</th><th>Items</th><th>Total (SAR)</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="po-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
 </body>
 </html>
