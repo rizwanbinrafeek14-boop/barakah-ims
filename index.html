@@ -1194,6 +1194,12 @@ window.onerror = function(msg, src, line, col, err) {
             <label for="lib-upload-input" class="btn btn-gold" style="cursor:pointer;margin:0">
               📷 Upload Photos
             </label>
+            <label for="lib-upload-assign-input" class="btn btn-outline" style="cursor:pointer;margin:0;border-color:rgba(37,99,235,0.4);color:var(--steel)">
+              📷 Upload & Assign
+            </label>
+            <input type="file" id="lib-upload-assign-input" accept="image/*,image/heic,image/heif"
+              style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)"
+              onchange="uploadAndAssign(this)">
           </div>
           <input type="file" id="lib-upload-input" accept="image/*,image/heic,image/heif" multiple
             style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)"
@@ -5278,15 +5284,24 @@ function renderLibraryGrid() {
 
   const isAdmin = currentProfile?.role === 'admin';
   grid.innerHTML = filtered.map(p => `
-    <div style="position:relative;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);background:var(--surface2);box-shadow:var(--shadow-sm);transition:all .2s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div style="position:relative;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);background:var(--surface);box-shadow:var(--shadow-sm);transition:all .2s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
       <img src="${p.file_url}" alt="${p.name||''}"
         style="width:100%;height:120px;object-fit:cover;display:block;cursor:pointer"
         onclick="viewLibraryPhoto('${p.file_url}','${p.name||''}')">
-      <div style="padding:8px">
+      <div style="padding:8px 8px 4px">
         <div style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name || 'Untitled'}</div>
         <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${p.category || 'Other'}</div>
       </div>
-      ${isAdmin ? `<button onclick="deleteLibraryPhoto('${p.id}','${p.file_url}')"
+      ${isAdmin ? `
+      <div style="padding:4px 8px 8px">
+        <button onclick="openAssignModal('${p.file_url}','${(p.name||'').replace(/'/g,'\'')}')"
+          style="width:100%;padding:5px;background:var(--gold-light);border:1px solid var(--gold);color:var(--gold);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s"
+          onmouseover="this.style.background='var(--gold)';this.style.color='#0f1f3d'"
+          onmouseout="this.style.background='var(--gold-light)';this.style.color='var(--gold)'">
+          📌 Assign to Products
+        </button>
+      </div>
+      <button onclick="deleteLibraryPhoto('${p.id}','${p.file_url}')"
         style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(220,38,38,0.85);border:none;color:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;line-height:1"
         title="Delete photo">×</button>` : ''}
     </div>`).join('');
@@ -6053,6 +6068,296 @@ async function applyAutoAssign() {
   showToast(`${success} products updated with photos!`);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PHOTO ASSIGNMENT — MANUAL SELECTION
+// ═══════════════════════════════════════════════════════════════
+
+let _assignPhotoUrl  = '';
+let _assignPhotoName = '';
+let _assignSelected  = new Set(); // product ids selected for assignment
+let _assignVisible   = [];        // currently visible/filtered products
+
+// ── OPEN ASSIGN MODAL ────────────────────────────────────────
+function openAssignModal(photoUrl, photoName) {
+  _assignPhotoUrl  = photoUrl;
+  _assignPhotoName = photoName || 'Library Photo';
+  _assignSelected  = new Set();
+
+  // Set preview
+  const prevImg = document.getElementById('assign-photo-preview');
+  const prevName = document.getElementById('assign-photo-name');
+  if (prevImg)  prevImg.src = photoUrl;
+  if (prevName) prevName.textContent = _assignPhotoName;
+
+  // Reset filters
+  const search = document.getElementById('assign-search');
+  const cat    = document.getElementById('assign-filter-cat');
+  const mat    = document.getElementById('assign-filter-mat');
+  if (search) search.value = '';
+  if (cat)    cat.value    = '';
+  if (mat)    mat.value    = '';
+
+  // Reset select-all checkbox
+  const allCb = document.getElementById('assign-select-all');
+  if (allCb) allCb.checked = false;
+
+  renderAssignProductList();
+  updateAssignCount();
+  openModal('modal-assign-photo');
+}
+
+// ── UPLOAD & ASSIGN (upload new photo then open assign modal) ─
+async function uploadAndAssign(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  // Show category picker first
+  const category = await pickCategoryForUpload();
+  if (!category) return; // user cancelled
+
+  const tag = await pickTagForUpload(file.name);
+
+  showLoading('UPLOADING PHOTO...');
+  try {
+    const ext  = file.name.split('.').pop().toLowerCase();
+    const path = `library/${category}/${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('product-images').upload(path, file, { upsert: true });
+    if (upErr) throw upErr;
+
+    const { data: urlData } = sb.storage.from('product-images').getPublicUrl(path);
+    const fileUrl = urlData.publicUrl;
+
+    const { data: saved } = await sb.from('photo_library').insert({
+      name: tag || file.name.replace(/\.[^.]+$/, ''),
+      category,
+      file_url: fileUrl,
+      file_path: path,
+      uploaded_by: currentProfile.id
+    }).select().single();
+
+    if (saved) photoLibrary.unshift(saved);
+    hideLoading();
+    renderLibraryGrid();
+    showToast('Photo uploaded!');
+
+    // Immediately open assign modal
+    setTimeout(() => openAssignModal(fileUrl, tag || saved?.name || file.name.replace(/\.[^.]+$/, '')), 300);
+  } catch(e) {
+    hideLoading();
+    showToast('Upload failed: ' + e.message, 'error');
+  }
+}
+
+function pickCategoryForUpload() {
+  return new Promise(resolve => {
+    const cats = ['Valves','Pipes','Fittings','Flanges','Electrical','Safety Equipment','Instruments','Other'];
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+    overlay.innerHTML = `<div style="background:var(--surface);border-radius:16px;padding:24px;max-width:380px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.4)">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--gold);margin-bottom:6px">Select Category</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Which category does this photo belong to?</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${cats.map(c => `<button onclick="this.closest('div[style*=fixed]')._resolve('${c}');this.closest('div[style*=fixed]').remove()"
+          style="padding:10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;transition:all .15s;text-align:left"
+          onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'"
+          onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">${c}</button>`).join('')}
+      </div>
+      <button onclick="this.closest('div[style*=fixed]')._resolve(null);this.closest('div[style*=fixed]').remove()"
+        style="width:100%;margin-top:12px;padding:9px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:13px;cursor:pointer">
+        Cancel
+      </button>
+    </div>`;
+    overlay._resolve = resolve;
+    document.body.appendChild(overlay);
+  });
+}
+
+function pickTagForUpload(fileName) {
+  return new Promise(resolve => {
+    const defaultName = fileName.replace(/\.[^.]+$/, '').replace(/[_-]/g,' ');
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+    overlay.innerHTML = `<div style="background:var(--surface);border-radius:16px;padding:24px;max-width:380px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.4)">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--gold);margin-bottom:6px">Name this photo</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Give it a descriptive name (optional)</p>
+      <input type="text" id="upload-tag-input" value="${defaultName}"
+        style="width:100%;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;margin-bottom:12px"
+        onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border)'"
+        placeholder="e.g. CS Pipe Nipple, Gate Valve SS...">
+      <div style="display:flex;gap:8px">
+        <button onclick="const v=document.getElementById('upload-tag-input').value.trim();this.closest('div[style*=fixed]')._resolve(v);this.closest('div[style*=fixed]').remove()"
+          style="flex:1;padding:10px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0f1f3d;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
+          Continue
+        </button>
+        <button onclick="this.closest('div[style*=fixed]')._resolve('');this.closest('div[style*=fixed]').remove()"
+          style="padding:10px 16px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:14px;cursor:pointer">
+          Skip
+        </button>
+      </div>
+    </div>`;
+    overlay._resolve = resolve;
+    document.body.appendChild(overlay);
+    setTimeout(() => document.getElementById('upload-tag-input')?.select(), 100);
+  });
+}
+
+// ── RENDER PRODUCT LIST IN ASSIGN MODAL ──────────────────────
+function renderAssignProductList() {
+  const search    = (document.getElementById('assign-search')?.value || '').toLowerCase();
+  const catFilter = document.getElementById('assign-filter-cat')?.value || '';
+  const matFilter = document.getElementById('assign-filter-mat')?.value || '';
+
+  _assignVisible = allProducts.filter(p => {
+    const matchSearch = !search ||
+      p.name.toLowerCase().includes(search) ||
+      (p.code || '').toLowerCase().includes(search) ||
+      (p.material || '').toLowerCase().includes(search);
+    const matchCat = !catFilter || p.category === catFilter;
+    const matchMat = !matFilter || p.material === matFilter;
+    return matchSearch && matchCat && matchMat;
+  });
+
+  const list  = document.getElementById('assign-product-list');
+  const empty = document.getElementById('assign-empty');
+  const visCount = document.getElementById('assign-visible-count');
+  if (visCount) visCount.textContent = _assignVisible.length;
+
+  if (!_assignVisible.length) {
+    if (list)  list.innerHTML = '';
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  list.innerHTML = _assignVisible.map(p => {
+    const checked = _assignSelected.has(p.id);
+    const total   = (p.qty_bv||0) + (p.qty_is||0) + (p.qty_sw||0);
+    return `<label style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+      border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;
+      background:${checked ? 'var(--gold-light)' : 'var(--surface)'}"
+      onmouseover="if(!this.querySelector('input').checked)this.style.background='var(--surface2)'"
+      onmouseout="this.style.background=this.querySelector('input').checked?'var(--gold-light)':'var(--surface)'">
+      <input type="checkbox" value="${p.id}" ${checked ? 'checked' : ''}
+        onchange="toggleAssignProduct('${p.id}',this.checked,this.closest('label'))"
+        style="width:17px;height:17px;cursor:pointer;flex-shrink:0">
+      <!-- Current photo thumbnail -->
+      <div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;border:1.5px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center">
+        ${p.photo_url
+          ? `<img src="${p.photo_url}" style="width:44px;height:44px;object-fit:cover">`
+          : `<span style="font-size:18px;opacity:.4">📦</span>`}
+      </div>
+      <!-- Product info -->
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:1px">
+          ${p.code ? `<span class="mono">${p.code}</span> · ` : ''}${p.material || ''} ${p.category || ''}
+        </div>
+      </div>
+      <!-- Stock + photo indicator -->
+      <div style="text-align:right;flex-shrink:0">
+        <div class="mono" style="font-size:12px;font-weight:600;color:var(--text)">${total}</div>
+        <div style="font-size:10px;margin-top:2px">
+          ${p.photo_url
+            ? '<span style="color:var(--green);font-weight:600">✓ Has photo</span>'
+            : '<span style="color:var(--text-muted)">No photo</span>'}
+        </div>
+      </div>
+    </label>`;
+  }).join('');
+
+  // Update select-all checkbox state
+  const allChecked = _assignVisible.every(p => _assignSelected.has(p.id));
+  const someChecked = _assignVisible.some(p => _assignSelected.has(p.id));
+  const allCb = document.getElementById('assign-select-all');
+  if (allCb) { allCb.checked = allChecked; allCb.indeterminate = !allChecked && someChecked; }
+}
+
+function toggleAssignProduct(id, checked, labelEl) {
+  if (checked) _assignSelected.add(id);
+  else         _assignSelected.delete(id);
+  if (labelEl) labelEl.style.background = checked ? 'var(--gold-light)' : 'var(--surface)';
+  updateAssignCount();
+}
+
+function updateAssignCount() {
+  const count = _assignSelected.size;
+  const el    = document.getElementById('assign-selected-count');
+  const btnEl = document.getElementById('assign-btn-count');
+  const btn   = document.getElementById('assign-confirm-btn');
+  if (el)    el.textContent = count;
+  if (btnEl) btnEl.textContent = count;
+  if (btn)   { btn.disabled = count === 0; btn.style.opacity = count === 0 ? '0.5' : '1'; }
+}
+
+function toggleAssignAll(cb) {
+  if (cb.checked) _assignVisible.forEach(p => _assignSelected.add(p.id));
+  else            _assignVisible.forEach(p => _assignSelected.delete(p.id));
+  renderAssignProductList();
+  updateAssignCount();
+}
+
+function selectAssignNoPhoto() {
+  _assignVisible.filter(p => !p.photo_url).forEach(p => _assignSelected.add(p.id));
+  _assignVisible.filter(p =>  p.photo_url).forEach(p => _assignSelected.delete(p.id));
+  renderAssignProductList();
+  updateAssignCount();
+}
+
+function selectAssignWithPhoto() {
+  _assignVisible.filter(p =>  p.photo_url).forEach(p => _assignSelected.add(p.id));
+  _assignVisible.filter(p => !p.photo_url).forEach(p => _assignSelected.delete(p.id));
+  renderAssignProductList();
+  updateAssignCount();
+}
+
+// ── CONFIRM & APPLY ASSIGNMENT ────────────────────────────────
+async function confirmAssignPhoto() {
+  const ids = [..._assignSelected];
+  if (!ids.length) return;
+
+  closeModal('modal-assign-photo');
+  showLoading(`ASSIGNING PHOTO TO ${ids.length} PRODUCTS...`);
+
+  let success = 0, failed = 0;
+  // Batch update in groups of 20
+  const batchSize = 20;
+  for (let i = 0; i < ids.length; i += batchSize) {
+    const batch = ids.slice(i, i + batchSize);
+    try {
+      const { error } = await sb.from('products')
+        .update({ photo_url: _assignPhotoUrl, updated_at: new Date().toISOString() })
+        .in('id', batch);
+
+      if (error) throw error;
+
+      // Update local cache
+      batch.forEach(id => {
+        const idx = allProducts.findIndex(p => p.id === id);
+        if (idx >= 0) allProducts[idx].photo_url = _assignPhotoUrl;
+      });
+      success += batch.length;
+    } catch(e) {
+      console.error('Batch assign failed:', e);
+      failed += batch.length;
+    }
+  }
+
+  hideLoading();
+  renderInventory();
+
+  if (failed > 0) {
+    showToast(`Assigned to ${success} products, ${failed} failed`, 'error');
+  } else {
+    showToast(`✓ Photo assigned to ${success} products!`);
+    addNotification('info', 'Photo Assigned', `"${_assignPhotoName}" assigned to ${success} products`);
+  }
+
+  // Reset
+  _assignSelected = new Set();
+  _assignPhotoUrl = '';
+}
+
 window.addEventListener('DOMContentLoaded', init);
 
 </script>
@@ -6278,6 +6583,74 @@ window.addEventListener('DOMContentLoaded', init);
         <button class="btn btn-outline" onclick="openAutoAssignModal()">Run Again</button>
         <button class="btn btn-gold" onclick="closeModal('modal-auto-assign');renderInventory()">Done ✓</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO ASSIGNMENT MODAL -->
+<div class="modal-overlay" id="modal-assign-photo">
+  <div class="modal" style="max-width:760px;width:95vw">
+    <div class="modal-title">📌 Assign Photo to Products</div>
+
+    <!-- Selected photo preview -->
+    <div style="display:flex;align-items:center;gap:16px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:18px">
+      <img id="assign-photo-preview" src="" alt="Selected photo"
+        style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid var(--gold);flex-shrink:0">
+      <div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:3px">Assigning this photo to selected products</div>
+        <div id="assign-photo-name" style="font-size:15px;font-weight:600;color:var(--text)"></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+          <span id="assign-selected-count" style="font-weight:700;color:var(--gold)">0</span> products selected
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input type="text" id="assign-search" placeholder="🔍 Search by name or code..."
+        style="flex:1;min-width:180px;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none"
+        oninput="renderAssignProductList()">
+      <select id="assign-filter-cat" onchange="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+        <option value="">All Categories</option>
+        <option>Valves</option><option>Pipes</option><option>Fittings</option>
+        <option>Flanges</option><option>Electrical</option><option>Safety Equipment</option>
+        <option>Instruments</option><option>Other</option>
+      </select>
+      <select id="assign-filter-mat" onchange="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+        <option value="">All Materials</option>
+        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
+        <option>Brass</option><option>Bronze</option><option>PVC</option><option>CPVC</option>
+        <option>PPR</option><option>HDPE</option>
+      </select>
+    </div>
+
+    <!-- Select all bar -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500">
+        <input type="checkbox" id="assign-select-all" onchange="toggleAssignAll(this)"
+          style="width:16px;height:16px;cursor:pointer">
+        Select all visible (<span id="assign-visible-count">0</span>)
+      </label>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" onclick="selectAssignWithPhoto()">Has Photo</button>
+        <button class="btn btn-sm btn-outline" onclick="selectAssignNoPhoto()">No Photo Only</button>
+      </div>
+    </div>
+
+    <!-- Product list -->
+    <div id="assign-product-list"
+      style="max-height:42vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);"></div>
+    <div id="assign-empty" style="display:none;text-align:center;padding:28px;color:var(--text-muted);font-size:13px">
+      No products match your filters
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-assign-photo')">Cancel</button>
+      <button class="btn btn-gold" id="assign-confirm-btn" onclick="confirmAssignPhoto()" disabled style="opacity:0.5">
+        📌 Assign to <span id="assign-btn-count">0</span> Products
+      </button>
     </div>
   </div>
 </div>
@@ -6588,6 +6961,74 @@ window.addEventListener('DOMContentLoaded', init);
     </div>
   </div>
 </div>
+
+<!-- PHOTO ASSIGNMENT MODAL -->
+<div class="modal-overlay" id="modal-assign-photo">
+  <div class="modal" style="max-width:760px;width:95vw">
+    <div class="modal-title">📌 Assign Photo to Products</div>
+
+    <!-- Selected photo preview -->
+    <div style="display:flex;align-items:center;gap:16px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:18px">
+      <img id="assign-photo-preview" src="" alt="Selected photo"
+        style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid var(--gold);flex-shrink:0">
+      <div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:3px">Assigning this photo to selected products</div>
+        <div id="assign-photo-name" style="font-size:15px;font-weight:600;color:var(--text)"></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+          <span id="assign-selected-count" style="font-weight:700;color:var(--gold)">0</span> products selected
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input type="text" id="assign-search" placeholder="🔍 Search by name or code..."
+        style="flex:1;min-width:180px;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none"
+        oninput="renderAssignProductList()">
+      <select id="assign-filter-cat" onchange="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+        <option value="">All Categories</option>
+        <option>Valves</option><option>Pipes</option><option>Fittings</option>
+        <option>Flanges</option><option>Electrical</option><option>Safety Equipment</option>
+        <option>Instruments</option><option>Other</option>
+      </select>
+      <select id="assign-filter-mat" onchange="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+        <option value="">All Materials</option>
+        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
+        <option>Brass</option><option>Bronze</option><option>PVC</option><option>CPVC</option>
+        <option>PPR</option><option>HDPE</option>
+      </select>
+    </div>
+
+    <!-- Select all bar -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500">
+        <input type="checkbox" id="assign-select-all" onchange="toggleAssignAll(this)"
+          style="width:16px;height:16px;cursor:pointer">
+        Select all visible (<span id="assign-visible-count">0</span>)
+      </label>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" onclick="selectAssignWithPhoto()">Has Photo</button>
+        <button class="btn btn-sm btn-outline" onclick="selectAssignNoPhoto()">No Photo Only</button>
+      </div>
+    </div>
+
+    <!-- Product list -->
+    <div id="assign-product-list"
+      style="max-height:42vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);"></div>
+    <div id="assign-empty" style="display:none;text-align:center;padding:28px;color:var(--text-muted);font-size:13px">
+      No products match your filters
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-assign-photo')">Cancel</button>
+      <button class="btn btn-gold" id="assign-confirm-btn" onclick="confirmAssignPhoto()" disabled style="opacity:0.5">
+        📌 Assign to <span id="assign-btn-count">0</span> Products
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
     <!-- PURCHASE ORDERS PAGE -->
@@ -6765,6 +7206,74 @@ window.addEventListener('DOMContentLoaded', init);
         <button class="btn btn-outline" onclick="openAutoAssignModal()">Run Again</button>
         <button class="btn btn-gold" onclick="closeModal('modal-auto-assign');renderInventory()">Done ✓</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO ASSIGNMENT MODAL -->
+<div class="modal-overlay" id="modal-assign-photo">
+  <div class="modal" style="max-width:760px;width:95vw">
+    <div class="modal-title">📌 Assign Photo to Products</div>
+
+    <!-- Selected photo preview -->
+    <div style="display:flex;align-items:center;gap:16px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:18px">
+      <img id="assign-photo-preview" src="" alt="Selected photo"
+        style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid var(--gold);flex-shrink:0">
+      <div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:3px">Assigning this photo to selected products</div>
+        <div id="assign-photo-name" style="font-size:15px;font-weight:600;color:var(--text)"></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+          <span id="assign-selected-count" style="font-weight:700;color:var(--gold)">0</span> products selected
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input type="text" id="assign-search" placeholder="🔍 Search by name or code..."
+        style="flex:1;min-width:180px;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none"
+        oninput="renderAssignProductList()">
+      <select id="assign-filter-cat" onchange="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+        <option value="">All Categories</option>
+        <option>Valves</option><option>Pipes</option><option>Fittings</option>
+        <option>Flanges</option><option>Electrical</option><option>Safety Equipment</option>
+        <option>Instruments</option><option>Other</option>
+      </select>
+      <select id="assign-filter-mat" onchange="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+        <option value="">All Materials</option>
+        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
+        <option>Brass</option><option>Bronze</option><option>PVC</option><option>CPVC</option>
+        <option>PPR</option><option>HDPE</option>
+      </select>
+    </div>
+
+    <!-- Select all bar -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500">
+        <input type="checkbox" id="assign-select-all" onchange="toggleAssignAll(this)"
+          style="width:16px;height:16px;cursor:pointer">
+        Select all visible (<span id="assign-visible-count">0</span>)
+      </label>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" onclick="selectAssignWithPhoto()">Has Photo</button>
+        <button class="btn btn-sm btn-outline" onclick="selectAssignNoPhoto()">No Photo Only</button>
+      </div>
+    </div>
+
+    <!-- Product list -->
+    <div id="assign-product-list"
+      style="max-height:42vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);"></div>
+    <div id="assign-empty" style="display:none;text-align:center;padding:28px;color:var(--text-muted);font-size:13px">
+      No products match your filters
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-assign-photo')">Cancel</button>
+      <button class="btn btn-gold" id="assign-confirm-btn" onclick="confirmAssignPhoto()" disabled style="opacity:0.5">
+        📌 Assign to <span id="assign-btn-count">0</span> Products
+      </button>
     </div>
   </div>
 </div>
