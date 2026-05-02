@@ -7697,12 +7697,18 @@ function renderCatfixTable() {
           ? `<span style="background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:4px;font-size:12px">${r.currentCat}</span>`
           : `<span style="color:var(--text-muted);font-size:12px;font-style:italic">None</span>`}
       </td>
-      <td style="padding:8px 10px">
-        ${isChanged
-          ? `<span style="background:var(--gold-light);border:1px solid var(--gold);color:var(--gold);padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600">
-              ${r.suggestedCat}
-            </span>`
-          : `<span style="color:var(--green);font-size:12px">✓ Same</span>`}
+      <td style="padding:8px 6px">
+        <select
+          onchange="updateCatfixSuggestion(${realIdx}, this.value)"
+          style="width:100%;padding:5px 8px;background:${isChanged?'var(--gold-light)':'var(--surface2)'};
+            border:1.5px solid ${isChanged?'var(--gold)':'var(--border)'};
+            color:${isChanged?'var(--gold)':'var(--text)'};
+            border-radius:6px;font-size:12px;font-weight:${isChanged?'700':'400'};
+            outline:none;cursor:pointer">
+          ${VALID_CATEGORIES.map(c =>
+            '<option value="' + c + '" ' + (c === r.suggestedCat ? 'selected' : '') + '>' + c + '</option>'
+          ).join('')}
+        </select>
       </td>
       <td style="padding:8px 10px">
         <span style="color:${confColors[r.confidence]||confColors.unknown};font-size:11px;font-weight:700;text-transform:uppercase">
@@ -7725,6 +7731,27 @@ function updateCatfixCount() {
 function catfixSelectAll()   { _catfixResults.forEach(r => { if(r.status!=='ok') r.selected=true;  }); renderCatfixTable(); updateCatfixCount(); }
 function catfixDeselectAll() { _catfixResults.forEach(r => { r.selected=false; }); renderCatfixTable(); updateCatfixCount(); }
 function catfixSelectWrong() { _catfixResults.forEach(r => { r.selected = r.status==='wrong'||r.status==='missing'; }); renderCatfixTable(); updateCatfixCount(); }
+
+function updateCatfixSuggestion(idx, newCat) {
+  if (!_catfixResults[idx]) return;
+  _catfixResults[idx].suggestedCat = newCat;
+  // Re-evaluate status
+  const r = _catfixResults[idx];
+  const isSame    = newCat === (r.product.category||'');
+  const isMissing = !r.product.category;
+  if (isSame && !isMissing) {
+    r.status   = 'ok';
+    r.selected = false;
+  } else {
+    r.status   = isMissing ? 'missing' : 'wrong';
+    r.selected = true;
+  }
+  // Update just this row's styling without full re-render
+  updateCatfixCount();
+  // Update the select styling
+  const selects = document.querySelectorAll('#catfix-tbody select');
+  // Just update count - no full re-render needed
+}
 
 // ── APPLY CORRECTIONS ────────────────────────────────────────
 async function applyCatfixCorrections() {
@@ -7855,7 +7882,7 @@ window.addEventListener('DOMContentLoaded', init);
               <th style="padding:8px 10px;width:36px;text-align:center">✓</th>
               <th style="padding:8px 10px;text-align:left">Product Name</th>
               <th style="padding:8px 10px;text-align:left;width:140px">Current Category</th>
-              <th style="padding:8px 10px;text-align:left;width:140px">AI Suggestion</th>
+              <th style="padding:8px 10px;text-align:left;width:160px">Category to Apply ✏️</th>
               <th style="padding:8px 10px;text-align:left;width:80px">Confidence</th>
               <th style="padding:8px 10px;text-align:left">Reason</th>
             </tr>
@@ -8037,7 +8064,7 @@ window.addEventListener('DOMContentLoaded', init);
               <th style="padding:8px 10px;width:36px;text-align:center">✓</th>
               <th style="padding:8px 10px;text-align:left">Product Name</th>
               <th style="padding:8px 10px;text-align:left;width:140px">Current Category</th>
-              <th style="padding:8px 10px;text-align:left;width:140px">AI Suggestion</th>
+              <th style="padding:8px 10px;text-align:left;width:160px">Category to Apply ✏️</th>
               <th style="padding:8px 10px;text-align:left;width:80px">Confidence</th>
               <th style="padding:8px 10px;text-align:left">Reason</th>
             </tr>
