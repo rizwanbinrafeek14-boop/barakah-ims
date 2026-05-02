@@ -1402,16 +1402,14 @@ window.onerror = function(msg, src, line, col, err) {
       <div class="field"><label>Size / Spec</label><input type="text" id="p-size" placeholder="e.g. 2 inch PN16"></div>
     </div>
     <div class="field"><label>Brand / Manufacturer</label><input type="text" id="p-brand" placeholder="e.g. Velan, Crane"></div>
-    <div class="field">
-      <label>Sub-type <span style="color:var(--text-muted);font-weight:400;text-transform:none;font-size:11px">(e.g. Gate Valve, Slip-On Flange, Tee)</span></label>
-      <div style="display:flex;gap:8px">
-        <select id="p-subtype-select" onchange="onSubtypeSelectChange()"
-          style="flex:1;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;outline:none">
-          <option value="">-- Select or type custom --</option>
-        </select>
-        <input type="text" id="p-subtype-custom" placeholder="Or type custom sub-type"
-          style="flex:1;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;outline:none;display:none">
-      </div>
+    <div class="field" id="p-subtype-wrapper">
+      <label>Sub-type <span style="color:var(--text-muted);font-weight:400;text-transform:none;font-size:11px" id="p-subtype-hint">— select a Category above first</span></label>
+      <select id="p-subtype-select" onchange="onSubtypeSelectChange()"
+        style="width:100%;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none;transition:border-color .2s">
+        <option value="">-- Select Category first --</option>
+      </select>
+      <input type="text" id="p-subtype-custom" placeholder="Type custom sub-type..."
+        style="width:100%;margin-top:8px;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--gold);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none;display:none">
       <input type="hidden" id="p-subtype">
     </div>
     <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
@@ -6597,17 +6595,43 @@ async function confirmAssignPhoto() {
 // Sub-type definitions per category
 const SUBTYPES = {
   'Valves': [
-    'Gate Valve','Ball Valve','Check Valve','Globe Valve','Butterfly Valve',
-    'Y Stainer','Air Vents','Storm Valve','Angle Valve','Hose Valve'
+    'Gate Valve','Ball Valve','Check Valve','Globe Valve',
+    'Butterfly Valve','Y Stainer','Air Vents','Storm Valve',
+    'Angle Valve','Hose Valve'
   ],
-  'Flanges': ['Slip-On','Socket Weld','Blind','Threaded','Lap Joint'],
+  'Pipes & Tubes': [
+    'Seamless Pipe (SMLS)','ERW Pipe','Welded Pipe',
+    'Square Tube','Rectangular Tube','Round Tube',
+    'Half Pipe','Line Pipe'
+  ],
   'Fittings': [
     'Coupling','Bush','End Cap','Sockolet','Weld Olet',
-    'Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'
+    'Tee','Elbow','Con Red','Ecc Red',
+    'Pipe Nipple','Swage Nipple'
   ],
   'Forged Steel Fittings': [
     'Coupling','Bush','End Cap','Sockolet','Weld Olet',
-    'Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'
+    'Tee','Elbow','Con Red','Ecc Red',
+    'Pipe Nipple','Swage Nipple'
+  ],
+  'Flanges': [
+    'Slip-On','Socket Weld','Blind','Threaded','Lap Joint','Weld Neck'
+  ],
+  'Rods / Bars / Beams': [
+    'Round Bar','Flat Bar','Hex Bar','Square Bar',
+    'Angle Bar','Channel Bar','I-Beam','H-Beam'
+  ],
+  'Electrical': [
+    'Cable','Conduit','Junction Box','Switch','MCB','Panel',
+    'Cable Tray','Gland','Socket'
+  ],
+  'Safety Equipment': [
+    'Helmet','Gloves','Safety Boots','Harness','Goggles',
+    'Ear Muffs','Hi-Vis Vest','Face Shield','Safety Net'
+  ],
+  'Instruments': [
+    'Pressure Gauge','Temperature Gauge','Flow Meter',
+    'Level Sensor','Transmitter','Valve Actuator','Control Valve'
   ],
 };
 
@@ -6617,14 +6641,36 @@ function populateSubtypeOptions() {
   const selEl  = document.getElementById('p-subtype-select');
   const custEl = document.getElementById('p-subtype-custom');
   const hidEl  = document.getElementById('p-subtype');
+  const hint   = document.getElementById('p-subtype-hint');
   if (!selEl) return;
 
   const options = SUBTYPES[cat] || [];
-  selEl.innerHTML = '<option value="">-- Select sub-type --</option>' +
-    options.map(o => `<option value="${o}">${o}</option>`).join('') +
-    '<option value="_custom">+ Add custom...</option>';
 
-  // Reset
+  if (!cat) {
+    selEl.innerHTML = '<option value="">-- Select Category first --</option>';
+    if (hint) hint.textContent = '— select a Category above first';
+    selEl.style.borderColor = 'var(--border)';
+    selEl.style.opacity = '0.6';
+    if (custEl) custEl.style.display = 'none';
+    return;
+  }
+
+  selEl.style.opacity = '1';
+  selEl.style.borderColor = options.length ? 'var(--gold)' : 'var(--border)';
+
+  if (options.length) {
+    if (hint) hint.textContent = '— ' + options.length + ' types available for ' + cat;
+    selEl.innerHTML =
+      '<option value="">-- Select sub-type --</option>' +
+      options.map(o => '<option value="' + o + '">' + o + '</option>').join('') +
+      '<option value="_custom">+ Add custom sub-type...</option>';
+  } else {
+    if (hint) hint.textContent = '— type a custom sub-type for ' + cat;
+    selEl.innerHTML =
+      '<option value="">-- No predefined sub-types --</option>' +
+      '<option value="_custom">+ Type custom sub-type...</option>';
+  }
+
   if (custEl) custEl.style.display = 'none';
   if (hidEl)  hidEl.value = '';
 }
@@ -7040,14 +7086,14 @@ const CATALOGUE_MATERIALS = {
 
 const CATALOGUE_CATEGORIES = [
   { id:'Valves',                icon:'🔧', subtypes:['Gate Valve','Ball Valve','Check Valve','Globe Valve','Butterfly Valve','Y Stainer','Air Vents','Storm Valve','Angle Valve','Hose Valve'] },
-  { id:'Pipes & Tubes',         icon:'🔩', subtypes:[] },
+  { id:'Pipes & Tubes',         icon:'🔩', subtypes:['Seamless Pipe (SMLS)','ERW Pipe','Welded Pipe','Square Tube','Rectangular Tube','Round Tube','Half Pipe','Line Pipe'] },
   { id:'Fittings',              icon:'⚙️', subtypes:['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'] },
   { id:'Forged Steel Fittings', icon:'🔨', subtypes:['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'] },
-  { id:'Flanges',               icon:'🟤', subtypes:['Slip-On','Socket Weld','Blind','Threaded','Lap Joint'] },
-  { id:'Rods / Bars / Beams',   icon:'📏', subtypes:[] },
-  { id:'Electrical',            icon:'⚡', subtypes:[] },
-  { id:'Safety Equipment',      icon:'🦺', subtypes:[] },
-  { id:'Instruments',           icon:'📊', subtypes:[] },
+  { id:'Flanges',               icon:'🟤', subtypes:['Slip-On','Socket Weld','Blind','Threaded','Lap Joint','Weld Neck'] },
+  { id:'Rods / Bars / Beams',   icon:'📏', subtypes:['Round Bar','Flat Bar','Hex Bar','Square Bar','Angle Bar','Channel Bar','I-Beam','H-Beam'] },
+  { id:'Electrical',            icon:'⚡', subtypes:['Cable','Conduit','Junction Box','Switch','MCB','Panel','Cable Tray','Gland','Socket'] },
+  { id:'Safety Equipment',      icon:'🦺', subtypes:['Helmet','Gloves','Safety Boots','Harness','Goggles','Ear Muffs','Hi-Vis Vest','Face Shield','Safety Net'] },
+  { id:'Instruments',           icon:'📊', subtypes:['Pressure Gauge','Temperature Gauge','Flow Meter','Level Sensor','Transmitter','Valve Actuator','Control Valve'] },
   { id:'Other',                 icon:'📦', subtypes:[] },
 ];
 
