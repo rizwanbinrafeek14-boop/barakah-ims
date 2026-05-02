@@ -908,6 +908,7 @@ window.onerror = function(msg, src, line, col, err) {
         <div class="page-header-title"><h1>Inventory</h1><p>All products across Barakah Group</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-outline" onclick="toggleView()" id="view-toggle">⊞ Grid</button>
+          <button class="btn btn-outline" onclick="toggleGroupedView()" id="grouped-toggle">⊟ Grouped</button>
           <button class="btn btn-outline manager-only" onclick="openImportModal()" style="border-color:rgba(61,186,122,0.4);color:#5ddfa0">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Import Excel
@@ -934,7 +935,7 @@ window.onerror = function(msg, src, line, col, err) {
           </select>
           <select class="filter-select" id="inv-filter-material" onchange="renderInventory()">
             <option value="">All Materials</option>
-            <option>SS</option><option>CS</option><option>GI</option><option>BMI</option><option>Brass</option><option>Bronze</option><option>PVC</option><option>CPVC</option><option>PPR</option><option>HDPE</option><option>Other</option>
+            <option>CS</option><option>SS</option><option>GI</option><option>BMI</option><option>Brass</option><option>Bronze</option><option>Copper</option><option>PVC</option><option>CPVC</option><option>PPR</option><option>HDPE</option><option>Other</option>
           </select>
           <select class="filter-select" id="inv-filter-stock" onchange="renderInventory()">
             <option value="">All Levels</option><option value="low">Low Stock</option><option value="ok">Normal</option>
@@ -957,6 +958,15 @@ window.onerror = function(msg, src, line, col, err) {
         </div>
       </div>
       <div id="inventory-container"></div>
+      <!-- GROUPED VIEW -->
+      <div id="grouped-view-container" style="display:none">
+        <!-- Level 1: Category tabs -->
+        <div id="grouped-cat-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:0;padding-bottom:0"></div>
+        <!-- Level 2: Material sub-tabs -->
+        <div id="grouped-mat-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:10px 0 16px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border)"></div>
+        <!-- Product table -->
+        <div id="grouped-products-container"></div>
+      </div>
     </div>
 
     <!-- STOCK MOVEMENTS -->
@@ -1265,11 +1275,22 @@ window.onerror = function(msg, src, line, col, err) {
     </div>
     <div class="grid-2">
       <div class="field"><label>Category</label>
-        <select id="p-category"><option>Valves</option><option>Pipes</option><option>Fittings</option><option>Flanges</option><option>Electrical</option><option>Safety Equipment</option><option>Instruments</option><option>Other</option></select>
+        <select id="p-category">
+                <option>Valves</option>
+                <option>Pipes &amp; Tubes</option>
+                <option>Fittings</option>
+                <option>Forged Steel Fittings</option>
+                <option>Flanges</option>
+                <option>Rods / Bars / Beams</option>
+                <option>Electrical</option>
+                <option>Safety Equipment</option>
+                <option>Instruments</option>
+                <option>Other</option>
+              </select>
       </div>
       <div class="field"><label>Material</label>
         <select id="p-material" onchange="checkOtherMaterial(this)">
-          <option value="SS">Stainless Steel (SS)</option><option value="CS">Carbon Steel (CS)</option><option value="GI">Galvanized Iron (GI)</option><option value="BMI">Black Malleable Iron (BMI)</option><option value="Brass">Brass</option><option value="Bronze">Bronze</option><option value="PVC">PVC</option><option value="CPVC">CPVC</option><option value="PPR">PPR</option><option value="HDPE">HDPE</option><option value="Other">Other (specify)</option>
+          <option value="CS">Carbon Steel (CS)</option><option value="SS">Stainless Steel (SS)</option><option value="GI">Galvanized Iron (GI)</option><option value="BMI">Black Malleable Iron (BMI)</option><option value="Brass">Brass</option><option value="Bronze">Bronze</option><option value="Copper">Copper</option><option value="PVC">PVC</option><option value="CPVC">CPVC</option><option value="PPR">PPR</option><option value="HDPE">HDPE</option><option value="Other">Other (specify)</option>
         </select>
       </div>
     </div>
@@ -6358,6 +6379,359 @@ async function confirmAssignPhoto() {
   _assignPhotoUrl = '';
 }
 
+// ═══════════════════════════════════════════════════════════════
+// GROUPED INVENTORY VIEW
+// Category tabs → Material sub-tabs → Product table
+// ═══════════════════════════════════════════════════════════════
+
+// All defined categories in display order
+const GROUPED_CATEGORIES = [
+  'Valves',
+  'Pipes & Tubes',
+  'Fittings',
+  'Forged Steel Fittings',
+  'Flanges',
+  'Rods / Bars / Beams',
+  'Electrical',
+  'Safety Equipment',
+  'Instruments',
+  'Other'
+];
+
+// Category icons
+const CAT_ICONS = {
+  'Valves':                '🔧',
+  'Pipes & Tubes':         '🔩',
+  'Fittings':              '⚙️',
+  'Forged Steel Fittings': '🔨',
+  'Flanges':               '🟤',
+  'Rods / Bars / Beams':   '📏',
+  'Electrical':            '⚡',
+  'Safety Equipment':      '🦺',
+  'Instruments':           '📊',
+  'Other':                 '📦',
+};
+
+// All materials in order
+const ALL_MATERIALS = ['CS','SS','GI','BMI','Brass','Bronze','Copper','PVC','CPVC','PPR','HDPE','Other'];
+
+// Material colors for tab badges
+const MAT_COLORS = {
+  CS:     { bg:'#f0f4ff', color:'#1e3a8a', border:'#bfdbfe' },
+  SS:     { bg:'#f0fdf4', color:'#166534', border:'#bbf7d0' },
+  GI:     { bg:'#fef9c3', color:'#854d0e', border:'#fde047' },
+  BMI:    { bg:'#1c1c1c', color:'#e5e5e5', border:'#404040' },
+  Brass:  { bg:'#fef3c7', color:'#92400e', border:'#fcd34d' },
+  Bronze: { bg:'#fff7ed', color:'#9a3412', border:'#fdba74' },
+  Copper: { bg:'#fdf2f0', color:'#b45309', border:'#fca5a5' },
+  PVC:    { bg:'#eff6ff', color:'#1d4ed8', border:'#93c5fd' },
+  CPVC:   { bg:'#f5f3ff', color:'#6d28d9', border:'#c4b5fd' },
+  PPR:    { bg:'#ecfdf5', color:'#065f46', border:'#6ee7b7' },
+  HDPE:   { bg:'#fdf4ff', color:'#7e22ce', border:'#e879f9' },
+  Other:  { bg:'#f8fafc', color:'#475569', border:'#cbd5e1' },
+};
+
+let groupedViewActive  = false;
+let groupedCurrentCat  = 'all';
+let groupedCurrentMat  = 'all';
+
+// ── TOGGLE GROUPED VIEW ───────────────────────────────────────
+function toggleGroupedView() {
+  groupedViewActive = !groupedViewActive;
+  const btn         = document.getElementById('grouped-toggle');
+  const invContainer = document.getElementById('inventory-container');
+  const groupedContainer = document.getElementById('grouped-view-container');
+  const viewToggle  = document.getElementById('view-toggle');
+
+  if (groupedViewActive) {
+    // Switch to grouped
+    if (invContainer) invContainer.style.display = 'none';
+    if (groupedContainer) groupedContainer.style.display = '';
+    if (btn) { btn.style.background = 'linear-gradient(135deg,var(--gold),var(--gold2))'; btn.style.color = '#0f1f3d'; btn.style.border = 'none'; }
+    if (viewToggle) viewToggle.disabled = true;
+    // Hide normal filters
+    const filterCard = document.querySelector('#page-inventory .card:first-of-type');
+    if (filterCard) filterCard.style.display = 'none';
+    renderGroupedView();
+  } else {
+    // Switch back to normal
+    if (invContainer) invContainer.style.display = '';
+    if (groupedContainer) groupedContainer.style.display = 'none';
+    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.border = ''; }
+    if (viewToggle) viewToggle.disabled = false;
+    const filterCard = document.querySelector('#page-inventory .card:first-of-type');
+    if (filterCard) filterCard.style.display = '';
+    renderInventory();
+  }
+}
+
+// ── RENDER GROUPED VIEW ───────────────────────────────────────
+function renderGroupedView() {
+  renderGroupedCatTabs();
+  renderGroupedMatTabs();
+  renderGroupedProducts();
+}
+
+function renderGroupedCatTabs() {
+  const container = document.getElementById('grouped-cat-tabs');
+  if (!container) return;
+
+  // Count products per category
+  const catCounts = {};
+  allProducts.forEach(p => {
+    const cat = normalizeCat(p.category);
+    catCounts[cat] = (catCounts[cat] || 0) + 1;
+  });
+
+  // "All" tab + category tabs (only show cats that have products)
+  const totalCount = allProducts.length;
+
+  let html = `<button class="grouped-cat-tab ${groupedCurrentCat === 'all' ? 'active' : ''}"
+    onclick="setGroupedCat('all')"
+    style="${groupedCurrentCat === 'all' ? 'background:var(--navy);color:#fff;' : ''}">
+    All <span style="opacity:.7">(${totalCount})</span>
+  </button>`;
+
+  GROUPED_CATEGORIES.forEach(cat => {
+    const count = catCounts[cat] || 0;
+    if (count === 0) return;
+    const isActive = groupedCurrentCat === cat;
+    const icon = CAT_ICONS[cat] || '📦';
+    html += `<button class="grouped-cat-tab ${isActive ? 'active' : ''}"
+      onclick="setGroupedCat('${cat.replace(/'/g, "\\'")}')"
+      style="${isActive ? 'background:var(--navy);color:#fff;border-color:var(--navy);' : ''}">
+      ${icon} ${cat} <span style="opacity:.7">(${count})</span>
+    </button>`;
+  });
+
+  container.innerHTML = html;
+
+  // Add tab styles
+  if (!document.getElementById('grouped-tab-style')) {
+    const style = document.createElement('style');
+    style.id = 'grouped-tab-style';
+    style.textContent = `
+      .grouped-cat-tab {
+        padding: 8px 14px; border-radius: 8px; cursor: pointer;
+        font-family: var(--font); font-size: 13px; font-weight: 500;
+        border: 1.5px solid var(--border); background: var(--surface);
+        color: var(--text); transition: all .18s; white-space: nowrap;
+      }
+      .grouped-cat-tab:hover { border-color: var(--gold); color: var(--gold); }
+      .grouped-mat-tab {
+        padding: 5px 12px; border-radius: 20px; cursor: pointer;
+        font-family: var(--font); font-size: 12px; font-weight: 600;
+        border: 1.5px solid; transition: all .18s; white-space: nowrap;
+      }
+      .grouped-mat-tab:hover { opacity: .8; transform: scale(1.04); }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+function renderGroupedMatTabs() {
+  const container = document.getElementById('grouped-mat-tabs');
+  if (!container) return;
+
+  // Filter products by current category
+  const catProducts = groupedCurrentCat === 'all'
+    ? allProducts
+    : allProducts.filter(p => normalizeCat(p.category) === groupedCurrentCat);
+
+  // Count per material
+  const matCounts = {};
+  catProducts.forEach(p => {
+    const mat = p.material || 'Other';
+    matCounts[mat] = (matCounts[mat] || 0) + 1;
+  });
+
+  const availableMats = ALL_MATERIALS.filter(m => matCounts[m] > 0);
+
+  if (!availableMats.length) { container.style.display = 'none'; return; }
+  container.style.display = 'flex';
+
+  let html = `<button class="grouped-mat-tab"
+    onclick="setGroupedMat('all')"
+    style="background:${groupedCurrentMat === 'all' ? 'var(--navy)' : 'var(--surface)'};
+           color:${groupedCurrentMat === 'all' ? '#fff' : 'var(--text)'};
+           border-color:${groupedCurrentMat === 'all' ? 'var(--navy)' : 'var(--border)'}">
+    All (${catProducts.length})
+  </button>`;
+
+  availableMats.forEach(mat => {
+    const mc = MAT_COLORS[mat] || MAT_COLORS.Other;
+    const isActive = groupedCurrentMat === mat;
+    html += `<button class="grouped-mat-tab"
+      onclick="setGroupedMat('${mat}')"
+      style="background:${isActive ? mc.color : mc.bg};
+             color:${isActive ? '#fff' : mc.color};
+             border-color:${mc.border}">
+      ${mat} (${matCounts[mat]})
+    </button>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function renderGroupedProducts() {
+  const container = document.getElementById('grouped-products-container');
+  if (!container) return;
+
+  // Get filtered products
+  let products = allProducts;
+  if (groupedCurrentCat !== 'all') {
+    products = products.filter(p => normalizeCat(p.category) === groupedCurrentCat);
+  }
+  if (groupedCurrentMat !== 'all') {
+    products = products.filter(p => (p.material || 'Other') === groupedCurrentMat);
+  }
+
+  if (!products.length) {
+    container.innerHTML = `<div class="card" style="text-align:center;padding:36px;color:var(--text-muted)">
+      <div style="font-size:36px;margin-bottom:10px">📦</div>
+      <div style="font-size:14px">No products in this category</div>
+    </div>`;
+    return;
+  }
+
+  const threshold = parseInt(settings.lowStockThreshold || 10);
+  const canEdit   = currentProfile?.role === 'admin' || currentProfile?.role === 'manager';
+
+  // Group by material if showing "all" materials, else show as flat table
+  if (groupedCurrentMat === 'all' && groupedCurrentCat !== 'all') {
+    // Group by material within category
+    const byMat = {};
+    products.forEach(p => {
+      const mat = p.material || 'Other';
+      if (!byMat[mat]) byMat[mat] = [];
+      byMat[mat].push(p);
+    });
+
+    container.innerHTML = ALL_MATERIALS
+      .filter(m => byMat[m]?.length)
+      .map(mat => {
+        const mc  = MAT_COLORS[mat] || MAT_COLORS.Other;
+        const rows = byMat[mat];
+        return `<div style="margin-bottom:18px">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;
+            background:${mc.bg};border:1.5px solid ${mc.border};
+            border-radius:var(--radius) var(--radius) 0 0;border-bottom:none">
+            <span style="background:${mc.color};color:#fff;padding:3px 10px;border-radius:20px;
+              font-size:11px;font-weight:700">${mat}</span>
+            <span style="font-size:13px;font-weight:600;color:${mc.color}">${groupedCurrentCat}</span>
+            <span style="font-size:12px;color:var(--text-muted);margin-left:auto">${rows.length} products</span>
+          </div>
+          <div class="card" style="border-radius:0 0 var(--radius) var(--radius);padding:0">
+            <div class="table-wrap">${buildGroupedTable(rows, threshold, canEdit)}</div>
+          </div>
+        </div>`;
+      }).join('');
+  } else {
+    // Flat table with header
+    const catLabel = groupedCurrentCat === 'all' ? 'All Categories' : groupedCurrentCat;
+    const matLabel = groupedCurrentMat === 'all' ? 'All Materials' : groupedCurrentMat;
+    const mc = groupedCurrentMat !== 'all' ? (MAT_COLORS[groupedCurrentMat] || MAT_COLORS.Other) : null;
+
+    container.innerHTML = `<div style="margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;
+        background:${mc ? mc.bg : 'var(--surface2)'};
+        border:1.5px solid ${mc ? mc.border : 'var(--border)'};
+        border-radius:var(--radius) var(--radius) 0 0;border-bottom:none">
+        ${mc ? `<span style="background:${mc.color};color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">${matLabel}</span>` : ''}
+        <span style="font-size:13px;font-weight:600;color:${mc ? mc.color : 'var(--text)'}">${catLabel}</span>
+        <span style="font-size:12px;color:var(--text-muted);margin-left:auto">${products.length} products</span>
+      </div>
+      <div class="card" style="border-radius:0 0 var(--radius) var(--radius);padding:0">
+        <div class="table-wrap">${buildGroupedTable(products, threshold, canEdit)}</div>
+      </div>
+    </div>`;
+  }
+}
+
+function buildGroupedTable(products, threshold, canEdit) {
+  return `<table>
+    <thead><tr>
+      <th style="width:50px">Photo</th>
+      <th>Name</th>
+      <th>Code</th>
+      <th>Material</th>
+      <th>Size</th>
+      <th style="text-align:center">BV</th>
+      <th style="text-align:center">IS</th>
+      <th style="text-align:center">SW</th>
+      <th>Price</th>
+      <th>Status</th>
+      ${canEdit ? '<th>Actions</th>' : ''}
+    </tr></thead>
+    <tbody>
+      ${products.map(p => {
+        const isLow = (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold;
+        const mc    = MAT_COLORS[p.material] || MAT_COLORS.Other;
+        return `<tr onclick="viewProduct('${p.id}')" style="${isLow ? 'background:#fff8f8;' : ''}">
+          <td>
+            <div style="width:40px;height:36px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center">
+              ${p.photo_url ? `<img src="${p.photo_url}" style="width:40px;height:36px;object-fit:cover">` : '<span style="font-size:16px;opacity:.3">📦</span>'}
+            </div>
+          </td>
+          <td><div style="font-weight:500;font-size:13px">${p.name}</div><div style="font-size:11px;color:var(--text-muted)">${p.brand||''}</div></td>
+          <td class="mono" style="font-size:11px">${p.code||'—'}</td>
+          <td><span style="background:${mc.bg};color:${mc.color};border:1px solid ${mc.border};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${p.material||'—'}</span></td>
+          <td style="font-size:12px">${p.size||'—'}</td>
+          <td class="mono" style="text-align:center;color:${(p.qty_bv||0)<threshold?'#dc2626':'inherit'};font-weight:600">${p.qty_bv||0}</td>
+          <td class="mono" style="text-align:center;color:${(p.qty_is||0)<threshold?'#dc2626':'inherit'};font-weight:600">${p.qty_is||0}</td>
+          <td class="mono" style="text-align:center;color:${(p.qty_sw||0)<threshold?'#dc2626':'inherit'};font-weight:600">${p.qty_sw||0}</td>
+          <td class="mono" style="font-size:12px">${p.price ? 'SAR '+Number(p.price).toFixed(2) : '—'}</td>
+          <td><span class="badge ${isLow ? 'badge-red' : 'badge-green'}" style="font-size:10px">${isLow ? 'LOW' : 'OK'}</span></td>
+          ${canEdit ? `<td onclick="event.stopPropagation()" style="white-space:nowrap">
+            <button class="btn btn-sm btn-outline" onclick="openStockUpdate('${p.id}')">📦</button>
+            <button class="btn btn-sm btn-outline" onclick="openEditProduct('${p.id}')">✏️</button>
+            ${currentProfile?.role==='admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">🗑️</button>` : ''}
+          </td>` : ''}
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ── TAB SETTERS ───────────────────────────────────────────────
+function setGroupedCat(cat) {
+  groupedCurrentCat = cat;
+  groupedCurrentMat = 'all'; // reset material when category changes
+  renderGroupedCatTabs();
+  renderGroupedMatTabs();
+  renderGroupedProducts();
+}
+
+function setGroupedMat(mat) {
+  groupedCurrentMat = mat;
+  renderGroupedMatTabs();
+  renderGroupedProducts();
+}
+
+// Normalize category names (handle legacy entries)
+function normalizeCat(cat) {
+  if (!cat) return 'Other';
+  const map = {
+    'Pipes': 'Pipes & Tubes',
+    'Pipe': 'Pipes & Tubes',
+    'Pipe & Tube': 'Pipes & Tubes',
+    'Forged Fittings': 'Forged Steel Fittings',
+    'Forged': 'Forged Steel Fittings',
+    'Rod': 'Rods / Bars / Beams',
+    'Rods': 'Rods / Bars / Beams',
+    'Bars': 'Rods / Bars / Beams',
+    'Beams': 'Rods / Bars / Beams',
+  };
+  return map[cat] || cat;
+}
+
+// Re-render grouped view when inventory data changes
+const _origCheckLowStock2 = checkLowStock;
+checkLowStock = function() {
+  _origCheckLowStock2();
+  if (groupedViewActive) renderGroupedProducts();
+};
+
 window.addEventListener('DOMContentLoaded', init);
 
 </script>
@@ -6613,9 +6987,10 @@ window.addEventListener('DOMContentLoaded', init);
       <select id="assign-filter-cat" onchange="renderAssignProductList()"
         style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
         <option value="">All Categories</option>
-        <option>Valves</option><option>Pipes</option><option>Fittings</option>
-        <option>Flanges</option><option>Electrical</option><option>Safety Equipment</option>
-        <option>Instruments</option><option>Other</option>
+        <option>Valves</option><option>Pipes &amp; Tubes</option><option>Fittings</option>
+        <option>Forged Steel Fittings</option><option>Flanges</option>
+        <option>Rods / Bars / Beams</option><option>Electrical</option>
+        <option>Safety Equipment</option><option>Instruments</option><option>Other</option>
       </select>
       <select id="assign-filter-mat" onchange="renderAssignProductList()"
         style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
@@ -6988,9 +7363,10 @@ window.addEventListener('DOMContentLoaded', init);
       <select id="assign-filter-cat" onchange="renderAssignProductList()"
         style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
         <option value="">All Categories</option>
-        <option>Valves</option><option>Pipes</option><option>Fittings</option>
-        <option>Flanges</option><option>Electrical</option><option>Safety Equipment</option>
-        <option>Instruments</option><option>Other</option>
+        <option>Valves</option><option>Pipes &amp; Tubes</option><option>Fittings</option>
+        <option>Forged Steel Fittings</option><option>Flanges</option>
+        <option>Rods / Bars / Beams</option><option>Electrical</option>
+        <option>Safety Equipment</option><option>Instruments</option><option>Other</option>
       </select>
       <select id="assign-filter-mat" onchange="renderAssignProductList()"
         style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
@@ -7236,9 +7612,10 @@ window.addEventListener('DOMContentLoaded', init);
       <select id="assign-filter-cat" onchange="renderAssignProductList()"
         style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
         <option value="">All Categories</option>
-        <option>Valves</option><option>Pipes</option><option>Fittings</option>
-        <option>Flanges</option><option>Electrical</option><option>Safety Equipment</option>
-        <option>Instruments</option><option>Other</option>
+        <option>Valves</option><option>Pipes &amp; Tubes</option><option>Fittings</option>
+        <option>Forged Steel Fittings</option><option>Flanges</option>
+        <option>Rods / Bars / Beams</option><option>Electrical</option>
+        <option>Safety Equipment</option><option>Instruments</option><option>Other</option>
       </select>
       <select id="assign-filter-mat" onchange="renderAssignProductList()"
         style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
