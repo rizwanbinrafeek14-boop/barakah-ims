@@ -796,6 +796,63 @@ window.onerror = function(msg, src, line, col, err) {
       <div class="nav-item" onclick="showPage('inventory')" id="nav-inventory">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4C2.9 7 2 7.9 2 9v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2z"/><path d="M16 3H8L6 7h12l-2-4z"/></svg>Inventory
       </div>
+      <div class="nav-section" id="nav-catalogue-section">CATALOGUE</div>
+      <div class="nav-item" onclick="showCataloguePage('CS')" id="nav-catalogue-cs" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#1e3a8a;flex-shrink:0;display:inline-block"></span>
+        <span>CS</span>
+        <span id="nav-badge-CS" style="margin-left:auto;font-size:10px;color:#1e3a8a;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('SS')" id="nav-catalogue-ss" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#166534;flex-shrink:0;display:inline-block"></span>
+        <span>SS</span>
+        <span id="nav-badge-SS" style="margin-left:auto;font-size:10px;color:#166534;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('GI')" id="nav-catalogue-gi" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#854d0e;flex-shrink:0;display:inline-block"></span>
+        <span>GI</span>
+        <span id="nav-badge-GI" style="margin-left:auto;font-size:10px;color:#854d0e;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('BMI')" id="nav-catalogue-bmi" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#3f3f46;flex-shrink:0;display:inline-block"></span>
+        <span>BMI</span>
+        <span id="nav-badge-BMI" style="margin-left:auto;font-size:10px;color:#3f3f46;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('Brass')" id="nav-catalogue-brass" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#92400e;flex-shrink:0;display:inline-block"></span>
+        <span>Brass</span>
+        <span id="nav-badge-Brass" style="margin-left:auto;font-size:10px;color:#92400e;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('Bronze')" id="nav-catalogue-bronze" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#9a3412;flex-shrink:0;display:inline-block"></span>
+        <span>Bronze</span>
+        <span id="nav-badge-Bronze" style="margin-left:auto;font-size:10px;color:#9a3412;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('Copper')" id="nav-catalogue-copper" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#b45309;flex-shrink:0;display:inline-block"></span>
+        <span>Copper</span>
+        <span id="nav-badge-Copper" style="margin-left:auto;font-size:10px;color:#b45309;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('PVC')" id="nav-catalogue-pvc" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#1d4ed8;flex-shrink:0;display:inline-block"></span>
+        <span>PVC</span>
+        <span id="nav-badge-PVC" style="margin-left:auto;font-size:10px;color:#1d4ed8;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('CPVC')" id="nav-catalogue-cpvc" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#6d28d9;flex-shrink:0;display:inline-block"></span>
+        <span>CPVC</span>
+        <span id="nav-badge-CPVC" style="margin-left:auto;font-size:10px;color:#6d28d9;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('PPR')" id="nav-catalogue-ppr" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#065f46;flex-shrink:0;display:inline-block"></span>
+        <span>PPR</span>
+        <span id="nav-badge-PPR" style="margin-left:auto;font-size:10px;color:#065f46;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('HDPE')" id="nav-catalogue-hdpe" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#7e22ce;flex-shrink:0;display:inline-block"></span>
+        <span>HDPE</span>
+        <span id="nav-badge-HDPE" style="margin-left:auto;font-size:10px;color:#7e22ce;font-weight:700;opacity:.8"></span>
+      </div>
+
       <div class="nav-item" onclick="showPage('movements')" id="nav-movements">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Stock Movements
       </div>
@@ -908,7 +965,7 @@ window.onerror = function(msg, src, line, col, err) {
         <div class="page-header-title"><h1>Inventory</h1><p>All products across Barakah Group</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-outline" onclick="toggleView()" id="view-toggle">⊞ Grid</button>
-          <button class="btn btn-outline" onclick="toggleGroupedView()" id="grouped-toggle">⊟ Grouped</button>
+
           <button class="btn btn-outline manager-only" onclick="openImportModal()" style="border-color:rgba(61,186,122,0.4);color:#5ddfa0">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Import Excel
@@ -6919,7 +6976,370 @@ function normalizeCat(cat) {
   return map[cat] || cat;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// MATERIAL CATALOGUE — Material → Category → Products
+// ═══════════════════════════════════════════════════════════════
+
+const CATALOGUE_MATERIALS = {
+  CS:     { label:'Carbon Steel',       color:'#1e3a8a', bg:'#eff6ff', border:'#bfdbfe' },
+  SS:     { label:'Stainless Steel',    color:'#166534', bg:'#f0fdf4', border:'#bbf7d0' },
+  GI:     { label:'Galvanized Iron',    color:'#854d0e', bg:'#fef9c3', border:'#fde047' },
+  BMI:    { label:'Black Malleable Iron',color:'#3f3f46',bg:'#f4f4f5', border:'#d4d4d8' },
+  Brass:  { label:'Brass',              color:'#92400e', bg:'#fef3c7', border:'#fcd34d' },
+  Bronze: { label:'Bronze',             color:'#9a3412', bg:'#fff7ed', border:'#fdba74' },
+  Copper: { label:'Copper',             color:'#b45309', bg:'#fff7ed', border:'#fca5a5' },
+  PVC:    { label:'PVC',                color:'#1d4ed8', bg:'#eff6ff', border:'#93c5fd' },
+  CPVC:   { label:'CPVC',               color:'#6d28d9', bg:'#f5f3ff', border:'#c4b5fd' },
+  PPR:    { label:'PPR',                color:'#065f46', bg:'#ecfdf5', border:'#6ee7b7' },
+  HDPE:   { label:'HDPE',               color:'#7e22ce', bg:'#fdf4ff', border:'#e879f9' },
+};
+
+const CATALOGUE_CATEGORIES = [
+  { id:'Valves',                icon:'🔧', subtypes:['Gate Valve','Ball Valve','Check Valve','Globe Valve','Butterfly Valve','Y Stainer','Air Vents','Storm Valve','Angle Valve','Hose Valve'] },
+  { id:'Pipes & Tubes',         icon:'🔩', subtypes:[] },
+  { id:'Fittings',              icon:'⚙️', subtypes:['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'] },
+  { id:'Forged Steel Fittings', icon:'🔨', subtypes:['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'] },
+  { id:'Flanges',               icon:'🟤', subtypes:['Slip-On','Socket Weld','Blind','Threaded','Lap Joint'] },
+  { id:'Rods / Bars / Beams',   icon:'📏', subtypes:[] },
+  { id:'Electrical',            icon:'⚡', subtypes:[] },
+  { id:'Safety Equipment',      icon:'🦺', subtypes:[] },
+  { id:'Instruments',           icon:'📊', subtypes:[] },
+  { id:'Other',                 icon:'📦', subtypes:[] },
+];
+
+let _catCurrentMat = null;
+let _catCurrentCat = null;
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function showCataloguePage(mat) {
+  _catCurrentMat = mat;
+  _catCurrentCat = null;
+  showPage('catalogue');
+  renderCatMaterialPage(mat);
+  updateCatNavBadges();
+}
+
+function showCatalogueHome() {
+  // go back to first material or just stay with back arrow
+  // just re-render current material
+  if (_catCurrentMat) renderCatMaterialPage(_catCurrentMat);
+}
+
+function backToCatMaterial() {
+  _catCurrentCat = null;
+  renderCatMaterialPage(_catCurrentMat);
+}
+
+// ── LEVEL 1: Material home ────────────────────────────────────
+function renderCatMaterialPage(mat) {
+  const mc = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
+
+  // Show material level, hide category level
+  document.getElementById('cat-level-material').style.display = '';
+  document.getElementById('cat-level-category').style.display = 'none';
+
+  // Breadcrumb
+  document.getElementById('cat-breadcrumb-mat').textContent = mat;
+  document.getElementById('cat-breadcrumb-sep').style.display = 'none';
+  document.getElementById('cat-breadcrumb-cat').style.display = 'none';
+
+  // Header
+  const header = document.getElementById('cat-mat-header');
+  header.style.borderColor   = mc.border;
+  header.style.background    = mc.bg;
+
+  const badge = document.getElementById('cat-mat-badge');
+  badge.textContent         = mat;
+  badge.style.background    = mc.color;
+  badge.style.fontSize      = mat.length > 3 ? '11px' : '14px';
+
+  document.getElementById('cat-mat-name').textContent     = mat;
+  document.getElementById('cat-mat-name').style.color     = mc.color;
+  document.getElementById('cat-mat-fullname').textContent = mc.label;
+
+  // Count products
+  const matProducts = allProducts.filter(p => (p.material||'Other') === mat);
+  document.getElementById('cat-mat-total-num').textContent  = matProducts.length;
+  document.getElementById('cat-mat-total-num').style.color  = mc.color;
+
+  // Build sub-category rows
+  const list = document.getElementById('cat-subcat-list');
+  list.innerHTML = CATALOGUE_CATEGORIES.map((cat, idx) => {
+    const catProds = matProducts.filter(p => normalizeCatName(p.category) === cat.id);
+    const count    = catProds.length;
+    const isEmpty  = count === 0;
+    const threshold = parseInt(settings.lowStockThreshold || 10);
+    const lowCount  = catProds.filter(p =>
+      (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold
+    ).length;
+
+    return `<div onclick="${isEmpty ? '' : `openCatCategory('${cat.id.replace(/'/g,"\\'")}','${mat}')`}"
+      style="display:flex;align-items:center;gap:14px;padding:14px 18px;
+        border-bottom:1px solid var(--border);
+        cursor:${isEmpty ? 'default' : 'pointer'};
+        opacity:${isEmpty ? '0.45' : '1'};
+        transition:background .15s"
+      ${isEmpty ? '' : `onmouseover="this.style.background='${mc.bg}'" onmouseout="this.style.background='transparent'"`}>
+
+      <!-- Icon -->
+      <div style="width:40px;height:40px;border-radius:10px;
+        background:${isEmpty ? 'var(--surface2)' : mc.bg};
+        border:1.5px solid ${isEmpty ? 'var(--border)' : mc.border};
+        display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">
+        ${cat.icon}
+      </div>
+
+      <!-- Name + sub-types preview -->
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px;color:${isEmpty ? 'var(--text-muted)' : 'var(--text)'}">${cat.id}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${cat.subtypes.length ? cat.subtypes.slice(0,4).join(' · ') + (cat.subtypes.length > 4 ? ' ...' : '') : 'General category'}
+        </div>
+      </div>
+
+      <!-- Count + low stock badge -->
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${isEmpty ? 'var(--text-muted)' : mc.color}">${count}</div>
+        <div style="font-size:10px;color:var(--text-muted)">products</div>
+        ${lowCount > 0 ? `<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:2px">⚠ ${lowCount} low</div>` : ''}
+      </div>
+
+      <!-- Arrow -->
+      ${isEmpty ? '' : `<div style="color:var(--text-muted);font-size:16px">›</div>`}
+    </div>`;
+  }).join('');
+}
+
+// ── LEVEL 2: Category products ────────────────────────────────
+function openCatCategory(catId, mat) {
+  _catCurrentCat = catId;
+  const mc  = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
+  const cat = CATALOGUE_CATEGORIES.find(c => c.id === catId);
+
+  // Show category level, hide material level
+  document.getElementById('cat-level-material').style.display = 'none';
+  document.getElementById('cat-level-category').style.display = '';
+
+  // Breadcrumb
+  document.getElementById('cat-breadcrumb-mat').textContent     = mat;
+  document.getElementById('cat-breadcrumb-sep').style.display   = '';
+  document.getElementById('cat-breadcrumb-cat').style.display   = '';
+  document.getElementById('cat-breadcrumb-cat').textContent     = catId;
+
+  // Title
+  document.getElementById('cat-cat-title').textContent    = `${cat?.icon || ''} ${catId}`;
+  document.getElementById('cat-cat-title').style.color    = mc.color;
+
+  // Populate sub-type filter
+  const subtypeSel = document.getElementById('cat-filter-subtype');
+  const subtypes   = cat?.subtypes || [];
+  // Also collect custom subtypes from actual products
+  const matProds   = allProducts.filter(p =>
+    (p.material||'Other') === mat && normalizeCatName(p.category) === catId
+  );
+  const customSubs = [...new Set(matProds.map(p => p.sub_type).filter(Boolean))];
+  const allSubs    = [...new Set([...subtypes, ...customSubs])];
+
+  subtypeSel.innerHTML = '<option value="">All Sub-types</option>' +
+    allSubs.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  // Clear search
+  const searchEl = document.getElementById('cat-search');
+  if (searchEl) searchEl.value = '';
+
+  renderCatProducts();
+}
+
+function renderCatProducts() {
+  if (!_catCurrentMat || !_catCurrentCat) return;
+
+  const search   = (document.getElementById('cat-search')?.value || '').toLowerCase();
+  const subFilter = document.getElementById('cat-filter-subtype')?.value || '';
+  const threshold = parseInt(settings.lowStockThreshold || 10);
+  const canEdit   = currentProfile?.role === 'admin' || currentProfile?.role === 'manager';
+  const mc        = CATALOGUE_MATERIALS[_catCurrentMat] || { color:'#64748b' };
+
+  let products = allProducts.filter(p =>
+    (p.material || 'Other') === _catCurrentMat &&
+    normalizeCatName(p.category) === _catCurrentCat
+  );
+
+  if (search)    products = products.filter(p =>
+    p.name.toLowerCase().includes(search) || (p.code||'').toLowerCase().includes(search)
+  );
+  if (subFilter) products = products.filter(p => p.sub_type === subFilter);
+
+  // Update subtitle
+  const subtitleEl = document.getElementById('cat-cat-subtitle');
+  if (subtitleEl) subtitleEl.textContent = `${products.length} products · ${_catCurrentMat} · ${_catCurrentCat}`;
+
+  const tbody = document.getElementById('cat-products-tbody');
+  if (!products.length) {
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-muted)">
+      <div style="font-size:32px;margin-bottom:8px">📦</div>
+      No products found
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = products.map(p => {
+    const isLow = (p.qty_bv||0)<threshold || (p.qty_is||0)<threshold || (p.qty_sw||0)<threshold;
+    return `<tr onclick="viewProduct('${p.id}')" style="${isLow ? 'background:#fff5f5' : ''}">
+      <td style="padding:8px 10px">
+        <div style="width:44px;height:40px;border-radius:8px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;border:1px solid var(--border)">
+          ${p.photo_url ? `<img src="${p.photo_url}" style="width:44px;height:40px;object-fit:cover">` : '<span style="font-size:18px;opacity:.3">📦</span>'}
+        </div>
+      </td>
+      <td style="padding:8px 10px">
+        <div style="font-weight:600;font-size:13px">${p.name}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${p.brand||''}</div>
+      </td>
+      <td class="mono" style="font-size:11px;padding:8px 10px">${p.code||'—'}</td>
+      <td style="font-size:12px;padding:8px 10px">${p.size||'—'}</td>
+      <td style="padding:8px 10px">
+        ${p.sub_type ? `<span style="background:${mc.bg||'var(--surface2)'};color:${mc.color};border:1px solid ${mc.border||'var(--border)'};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${p.sub_type}</span>` : '<span style="color:var(--text-muted);font-size:11px">—</span>'}
+      </td>
+      <td class="mono" style="text-align:center;padding:8px;font-weight:600;color:${(p.qty_bv||0)<threshold?'#dc2626':'var(--text)'}">${p.qty_bv||0}</td>
+      <td class="mono" style="text-align:center;padding:8px;font-weight:600;color:${(p.qty_is||0)<threshold?'#dc2626':'var(--text)'}">${p.qty_is||0}</td>
+      <td class="mono" style="text-align:center;padding:8px;font-weight:600;color:${(p.qty_sw||0)<threshold?'#dc2626':'var(--text)'}">${p.qty_sw||0}</td>
+      <td class="mono" style="font-size:12px;padding:8px 10px">${p.price ? 'SAR '+Number(p.price).toFixed(2) : '—'}</td>
+      <td style="padding:8px 10px">
+        <span class="badge ${isLow ? 'badge-red' : 'badge-green'}" style="font-size:10px">${isLow ? '⚠ LOW' : '✓ OK'}</span>
+      </td>
+      <td onclick="event.stopPropagation()" style="padding:8px 10px;white-space:nowrap">
+        ${canEdit ? `<button class="btn btn-sm btn-outline" onclick="openStockUpdate('${p.id}')" title="Update stock">📦</button>
+        <button class="btn btn-sm btn-outline" onclick="openEditProduct('${p.id}')" title="Edit">✏️</button>
+        ${currentProfile?.role==='admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')" title="Delete">🗑️</button>` : ''}` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── UPDATE NAV BADGES ─────────────────────────────────────────
+function updateCatNavBadges() {
+  Object.keys(CATALOGUE_MATERIALS).forEach(mat => {
+    const badge = document.getElementById(`nav-badge-${mat}`);
+    if (!badge) return;
+    const count = allProducts.filter(p => (p.material||'Other') === mat).length;
+    badge.textContent = count > 0 ? count : '';
+  });
+}
+
+// Normalize category names for matching
+function normalizeCatName(cat) {
+  if (!cat) return 'Other';
+  const map = {
+    'Pipes':'Pipes & Tubes', 'Pipe':'Pipes & Tubes',
+    'Pipe & Tube':'Pipes & Tubes', 'Pipe & Tubes':'Pipes & Tubes',
+    'Forged Fittings':'Forged Steel Fittings',
+    'Rod':'Rods / Bars / Beams', 'Rods':'Rods / Bars / Beams',
+    'Bars':'Rods / Bars / Beams', 'Beams':'Rods / Bars / Beams',
+  };
+  return map[cat] || cat;
+}
+
+// Update badges after data loads
+const _origLaunchApp4 = launchApp;
+launchApp = async function() {
+  await _origLaunchApp4();
+  updateCatNavBadges();
+};
+
+// Add 'catalogue' to PAGE_TITLES
+if (typeof PAGE_TITLES !== 'undefined') PAGE_TITLES['catalogue'] = 'Catalogue';
+
+// Hook showPage for catalogue
+const _origShowPage4 = showPage;
+showPage = function(id) {
+  _origShowPage4(id);
+  if (id === 'catalogue') {
+    // Set topbar title dynamically
+    const titleEl = document.getElementById('topbar-title');
+    if (titleEl && _catCurrentMat) titleEl.textContent = _catCurrentMat + ' Catalogue';
+  }
+};
+
 window.addEventListener('DOMContentLoaded', init);
 </script>
+</body>
+</html>
+    <!-- CATALOGUE MATERIAL PAGE -->
+    <div class="page" id="page-catalogue">
+
+      <!-- Breadcrumb -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">
+        <button onclick="showCatalogueHome()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:13px">
+          ← All Materials
+        </button>
+        <span id="cat-breadcrumb-mat" style="color:var(--text);font-weight:600"></span>
+        <span id="cat-breadcrumb-sep" style="display:none">›</span>
+        <span id="cat-breadcrumb-cat" style="color:var(--text);font-weight:600;display:none"></span>
+      </div>
+
+      <!-- LEVEL 1: Material home — shows sub-category list -->
+      <div id="cat-level-material" style="display:none">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:16px 20px;border-radius:var(--radius);border:2px solid" id="cat-mat-header">
+          <div id="cat-mat-badge" style="width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0"></div>
+          <div>
+            <div id="cat-mat-name" style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px"></div>
+            <div id="cat-mat-fullname" style="font-size:13px;color:var(--text-muted)"></div>
+          </div>
+          <div id="cat-mat-total" style="margin-left:auto;text-align:right">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:32px" id="cat-mat-total-num"></div>
+            <div style="font-size:11px;color:var(--text-muted)">total products</div>
+          </div>
+        </div>
+
+        <!-- Sub-category rows -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div id="cat-subcat-list"></div>
+        </div>
+      </div>
+
+      <!-- LEVEL 2: Category products — inventory list view -->
+      <div id="cat-level-category" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:24px" id="cat-cat-title"></div>
+            <div style="font-size:13px;color:var(--text-muted)" id="cat-cat-subtitle"></div>
+          </div>
+          <button onclick="backToCatMaterial()" class="btn btn-outline" style="font-size:13px">
+            ← Back
+          </button>
+        </div>
+
+        <!-- Search + filter for this view -->
+        <div class="card" style="margin-bottom:14px;padding:14px">
+          <div class="filter-bar">
+            <input type="text" class="search-input" id="cat-search" placeholder="Search products..." oninput="renderCatProducts()">
+            <select class="filter-select" id="cat-filter-subtype" onchange="renderCatProducts()">
+              <option value="">All Sub-types</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Product table -->
+        <div class="card" style="padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th style="width:50px">Photo</th>
+                <th>Name</th>
+                <th>Code</th>
+                <th>Size</th>
+                <th>Sub-type</th>
+                <th style="text-align:center">BV</th>
+                <th style="text-align:center">IS</th>
+                <th style="text-align:center">SW</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr></thead>
+              <tbody id="cat-products-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
 </body>
 </html>
