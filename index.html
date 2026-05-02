@@ -1275,7 +1275,7 @@ window.onerror = function(msg, src, line, col, err) {
     </div>
     <div class="grid-2">
       <div class="field"><label>Category</label>
-        <select id="p-category">
+        <select id="p-category" onchange="populateSubtypeOptions()">
                 <option>Valves</option>
                 <option>Pipes &amp; Tubes</option>
                 <option>Fittings</option>
@@ -1301,6 +1301,18 @@ window.onerror = function(msg, src, line, col, err) {
       <div class="field"><label>Size / Spec</label><input type="text" id="p-size" placeholder="e.g. 2 inch PN16"></div>
     </div>
     <div class="field"><label>Brand / Manufacturer</label><input type="text" id="p-brand" placeholder="e.g. Velan, Crane"></div>
+    <div class="field">
+      <label>Sub-type <span style="color:var(--text-muted);font-weight:400;text-transform:none;font-size:11px">(e.g. Gate Valve, Slip-On Flange, Tee)</span></label>
+      <div style="display:flex;gap:8px">
+        <select id="p-subtype-select" onchange="onSubtypeSelectChange()"
+          style="flex:1;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;outline:none">
+          <option value="">-- Select or type custom --</option>
+        </select>
+        <input type="text" id="p-subtype-custom" placeholder="Or type custom sub-type"
+          style="flex:1;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;outline:none;display:none">
+      </div>
+      <input type="hidden" id="p-subtype">
+    </div>
     <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
       <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px">Stock Quantities by Company</div>
       <div class="grid-3">
@@ -2198,6 +2210,7 @@ async function saveProduct() {
   const product = {
     name, code: document.getElementById('p-code').value.trim()||null,
     material, category: document.getElementById('p-category').value,
+    sub_type: getSubtypeValue() || null,
     unit: document.getElementById('p-unit').value,
     size: document.getElementById('p-size').value.trim()||null,
     brand: document.getElementById('p-brand').value.trim()||null,
@@ -6380,1279 +6393,435 @@ async function confirmAssignPhoto() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GROUPED INVENTORY VIEW
-// Category tabs → Material sub-tabs → Product table
+// GROUPED INVENTORY VIEW v2 — Material → Category → Sub-type
 // ═══════════════════════════════════════════════════════════════
 
-// All defined categories in display order
-const GROUPED_CATEGORIES = [
-  'Valves',
-  'Pipes & Tubes',
-  'Fittings',
-  'Forged Steel Fittings',
-  'Flanges',
-  'Rods / Bars / Beams',
-  'Electrical',
-  'Safety Equipment',
-  'Instruments',
-  'Other'
-];
-
-// Category icons
-const CAT_ICONS = {
-  'Valves':                '🔧',
-  'Pipes & Tubes':         '🔩',
-  'Fittings':              '⚙️',
-  'Forged Steel Fittings': '🔨',
-  'Flanges':               '🟤',
-  'Rods / Bars / Beams':   '📏',
-  'Electrical':            '⚡',
-  'Safety Equipment':      '🦺',
-  'Instruments':           '📊',
-  'Other':                 '📦',
+// Sub-type definitions per category
+const SUBTYPES = {
+  'Valves': [
+    'Gate Valve','Ball Valve','Check Valve','Globe Valve','Butterfly Valve',
+    'Y Stainer','Air Vents','Storm Valve','Angle Valve','Hose Valve'
+  ],
+  'Flanges': ['Slip-On','Socket Weld','Blind','Threaded','Lap Joint'],
+  'Fittings': [
+    'Coupling','Bush','End Cap','Sockolet','Weld Olet',
+    'Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'
+  ],
+  'Forged Steel Fittings': [
+    'Coupling','Bush','End Cap','Sockolet','Weld Olet',
+    'Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'
+  ],
 };
 
-// All materials in order
-const ALL_MATERIALS = ['CS','SS','GI','BMI','Brass','Bronze','Copper','PVC','CPVC','PPR','HDPE','Other'];
+// ── SUBTYPE FORM HELPERS ──────────────────────────────────────
+function populateSubtypeOptions() {
+  const cat    = document.getElementById('p-category')?.value || '';
+  const selEl  = document.getElementById('p-subtype-select');
+  const custEl = document.getElementById('p-subtype-custom');
+  const hidEl  = document.getElementById('p-subtype');
+  if (!selEl) return;
 
-// Material colors for tab badges
-const MAT_COLORS = {
-  CS:     { bg:'#f0f4ff', color:'#1e3a8a', border:'#bfdbfe' },
-  SS:     { bg:'#f0fdf4', color:'#166534', border:'#bbf7d0' },
-  GI:     { bg:'#fef9c3', color:'#854d0e', border:'#fde047' },
-  BMI:    { bg:'#1c1c1c', color:'#e5e5e5', border:'#404040' },
-  Brass:  { bg:'#fef3c7', color:'#92400e', border:'#fcd34d' },
-  Bronze: { bg:'#fff7ed', color:'#9a3412', border:'#fdba74' },
-  Copper: { bg:'#fdf2f0', color:'#b45309', border:'#fca5a5' },
-  PVC:    { bg:'#eff6ff', color:'#1d4ed8', border:'#93c5fd' },
-  CPVC:   { bg:'#f5f3ff', color:'#6d28d9', border:'#c4b5fd' },
-  PPR:    { bg:'#ecfdf5', color:'#065f46', border:'#6ee7b7' },
-  HDPE:   { bg:'#fdf4ff', color:'#7e22ce', border:'#e879f9' },
-  Other:  { bg:'#f8fafc', color:'#475569', border:'#cbd5e1' },
-};
+  const options = SUBTYPES[cat] || [];
+  selEl.innerHTML = '<option value="">-- Select sub-type --</option>' +
+    options.map(o => `<option value="${o}">${o}</option>`).join('') +
+    '<option value="_custom">+ Add custom...</option>';
 
-let groupedViewActive  = false;
-let groupedCurrentCat  = 'all';
-let groupedCurrentMat  = 'all';
+  // Reset
+  if (custEl) custEl.style.display = 'none';
+  if (hidEl)  hidEl.value = '';
+}
 
-// ── TOGGLE GROUPED VIEW ───────────────────────────────────────
-function toggleGroupedView() {
-  groupedViewActive = !groupedViewActive;
-  const btn         = document.getElementById('grouped-toggle');
-  const invContainer = document.getElementById('inventory-container');
-  const groupedContainer = document.getElementById('grouped-view-container');
-  const viewToggle  = document.getElementById('view-toggle');
+function onSubtypeSelectChange() {
+  const selEl  = document.getElementById('p-subtype-select');
+  const custEl = document.getElementById('p-subtype-custom');
+  const hidEl  = document.getElementById('p-subtype');
+  if (!selEl) return;
 
-  if (groupedViewActive) {
-    // Switch to grouped
-    if (invContainer) invContainer.style.display = 'none';
-    if (groupedContainer) groupedContainer.style.display = '';
-    if (btn) { btn.style.background = 'linear-gradient(135deg,var(--gold),var(--gold2))'; btn.style.color = '#0f1f3d'; btn.style.border = 'none'; }
-    if (viewToggle) viewToggle.disabled = true;
-    // Hide normal filters
-    const filterCard = document.querySelector('#page-inventory .card:first-of-type');
-    if (filterCard) filterCard.style.display = 'none';
-    renderGroupedView();
+  if (selEl.value === '_custom') {
+    if (custEl) { custEl.style.display = ''; custEl.value = ''; custEl.focus(); }
+    if (hidEl)  hidEl.value = '';
+    custEl?.addEventListener('input', () => { if (hidEl) hidEl.value = custEl.value.trim(); }, { once: false });
   } else {
-    // Switch back to normal
-    if (invContainer) invContainer.style.display = '';
-    if (groupedContainer) groupedContainer.style.display = 'none';
-    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.style.border = ''; }
-    if (viewToggle) viewToggle.disabled = false;
-    const filterCard = document.querySelector('#page-inventory .card:first-of-type');
-    if (filterCard) filterCard.style.display = '';
-    renderInventory();
+    if (custEl) custEl.style.display = 'none';
+    if (hidEl)  hidEl.value = selEl.value;
   }
 }
 
-// ── RENDER GROUPED VIEW ───────────────────────────────────────
-function renderGroupedView() {
-  renderGroupedCatTabs();
-  renderGroupedMatTabs();
-  renderGroupedProducts();
+function getSubtypeValue() {
+  const hidEl  = document.getElementById('p-subtype');
+  const selEl  = document.getElementById('p-subtype-select');
+  const custEl = document.getElementById('p-subtype-custom');
+  if (hidEl?.value) return hidEl.value;
+  if (selEl?.value && selEl.value !== '_custom') return selEl.value;
+  if (custEl?.value) return custEl.value.trim();
+  return null;
 }
 
-function renderGroupedCatTabs() {
-  const container = document.getElementById('grouped-cat-tabs');
-  if (!container) return;
+function setSubtypeValue(val) {
+  const selEl  = document.getElementById('p-subtype-select');
+  const custEl = document.getElementById('p-subtype-custom');
+  const hidEl  = document.getElementById('p-subtype');
 
-  // Count products per category
-  const catCounts = {};
-  allProducts.forEach(p => {
-    const cat = normalizeCat(p.category);
-    catCounts[cat] = (catCounts[cat] || 0) + 1;
-  });
-
-  // "All" tab + category tabs (only show cats that have products)
-  const totalCount = allProducts.length;
-
-  let html = `<button class="grouped-cat-tab ${groupedCurrentCat === 'all' ? 'active' : ''}"
-    onclick="setGroupedCat('all')"
-    style="${groupedCurrentCat === 'all' ? 'background:var(--navy);color:#fff;' : ''}">
-    All <span style="opacity:.7">(${totalCount})</span>
-  </button>`;
-
-  GROUPED_CATEGORIES.forEach(cat => {
-    const count = catCounts[cat] || 0;
-    if (count === 0) return;
-    const isActive = groupedCurrentCat === cat;
-    const icon = CAT_ICONS[cat] || '📦';
-    html += `<button class="grouped-cat-tab ${isActive ? 'active' : ''}"
-      onclick="setGroupedCat('${cat.replace(/'/g, "\\'")}')"
-      style="${isActive ? 'background:var(--navy);color:#fff;border-color:var(--navy);' : ''}">
-      ${icon} ${cat} <span style="opacity:.7">(${count})</span>
-    </button>`;
-  });
-
-  container.innerHTML = html;
-
-  // Add tab styles
-  if (!document.getElementById('grouped-tab-style')) {
-    const style = document.createElement('style');
-    style.id = 'grouped-tab-style';
-    style.textContent = `
-      .grouped-cat-tab {
-        padding: 8px 14px; border-radius: 8px; cursor: pointer;
-        font-family: var(--font); font-size: 13px; font-weight: 500;
-        border: 1.5px solid var(--border); background: var(--surface);
-        color: var(--text); transition: all .18s; white-space: nowrap;
-      }
-      .grouped-cat-tab:hover { border-color: var(--gold); color: var(--gold); }
-      .grouped-mat-tab {
-        padding: 5px 12px; border-radius: 20px; cursor: pointer;
-        font-family: var(--font); font-size: 12px; font-weight: 600;
-        border: 1.5px solid; transition: all .18s; white-space: nowrap;
-      }
-      .grouped-mat-tab:hover { opacity: .8; transform: scale(1.04); }
-    `;
-    document.head.appendChild(style);
+  if (!val) {
+    if (selEl) selEl.value = '';
+    if (custEl) custEl.style.display = 'none';
+    if (hidEl) hidEl.value = '';
+    return;
   }
+
+  populateSubtypeOptions();
+
+  // Check if val is in predefined options
+  const cat     = document.getElementById('p-category')?.value || '';
+  const options = SUBTYPES[cat] || [];
+  if (options.includes(val)) {
+    if (selEl) selEl.value = val;
+    if (custEl) custEl.style.display = 'none';
+  } else {
+    if (selEl) selEl.value = '_custom';
+    if (custEl) { custEl.style.display = ''; custEl.value = val; }
+  }
+  if (hidEl) hidEl.value = val;
 }
 
-function renderGroupedMatTabs() {
-  const container = document.getElementById('grouped-mat-tabs');
+// ── PATCH saveProduct TO INCLUDE SUB_TYPE ────────────────────
+
+
+// Patch the product object construction inside saveProduct
+// We hook into the Supabase insert/update by patching the product object
+// Patch openAddProduct to populate sub-type dropdown
+const _origOpenAddProduct = openAddProduct;
+openAddProduct = function() {
+  _origOpenAddProduct();
+  populateSubtypeOptions();
+  setSubtypeValue('');
+};
+
+// Patch openEditProduct to restore sub-type value
+const _origOpenEditProduct = openEditProduct;
+openEditProduct = function(id) {
+  _origOpenEditProduct(id);
+  const p = allProducts.find(x => x.id === id);
+  if (p) {
+    setTimeout(() => {
+      populateSubtypeOptions();
+      setSubtypeValue(p.sub_type || '');
+    }, 50);
+  }
+};
+
+// ── GROUPED VIEW STATE ────────────────────────────────────────
+// Override the existing grouped view variables and functions
+
+// Reset state
+groupedViewActive  = false;
+groupedCurrentCat  = 'all';
+groupedCurrentMat  = 'all'; // Now this is Level 1 (Material)
+let groupedCurrentCatL2 = 'all'; // Level 2 (Category)
+
+// ── FULL REWRITE: renderGroupedView ──────────────────────────
+renderGroupedView = function() {
+  renderGroupedMatTabsV2();    // Level 1: Materials
+  renderGroupedCatTabsV2();    // Level 2: Categories
+  renderGroupedProductsV2();   // Level 3: Sub-types + products
+};
+
+function renderGroupedMatTabsV2() {
+  const container = document.getElementById('grouped-cat-tabs'); // reuse existing containers
   if (!container) return;
 
-  // Filter products by current category
-  const catProducts = groupedCurrentCat === 'all'
-    ? allProducts
-    : allProducts.filter(p => normalizeCat(p.category) === groupedCurrentCat);
-
-  // Count per material
   const matCounts = {};
-  catProducts.forEach(p => {
+  allProducts.forEach(p => {
     const mat = p.material || 'Other';
     matCounts[mat] = (matCounts[mat] || 0) + 1;
   });
 
-  const availableMats = ALL_MATERIALS.filter(m => matCounts[m] > 0);
+  const availMats = ALL_MATERIALS.filter(m => matCounts[m] > 0);
 
-  if (!availableMats.length) { container.style.display = 'none'; return; }
-  container.style.display = 'flex';
-
-  let html = `<button class="grouped-mat-tab"
-    onclick="setGroupedMat('all')"
-    style="background:${groupedCurrentMat === 'all' ? 'var(--navy)' : 'var(--surface)'};
-           color:${groupedCurrentMat === 'all' ? '#fff' : 'var(--text)'};
-           border-color:${groupedCurrentMat === 'all' ? 'var(--navy)' : 'var(--border)'}">
-    All (${catProducts.length})
-  </button>`;
-
-  availableMats.forEach(mat => {
-    const mc = MAT_COLORS[mat] || MAT_COLORS.Other;
-    const isActive = groupedCurrentMat === mat;
-    html += `<button class="grouped-mat-tab"
-      onclick="setGroupedMat('${mat}')"
-      style="background:${isActive ? mc.color : mc.bg};
-             color:${isActive ? '#fff' : mc.color};
-             border-color:${mc.border}">
-      ${mat} (${matCounts[mat]})
-    </button>`;
-  });
-
-  container.innerHTML = html;
+  container.innerHTML = [
+    `<button class="grouped-cat-tab ${groupedCurrentMat === 'all' ? 'active' : ''}"
+      onclick="setGroupedMatV2('all')"
+      style="${groupedCurrentMat === 'all' ? 'background:var(--navy);color:#fff;border-color:var(--navy)' : ''}">
+      All <span style="opacity:.7">(${allProducts.length})</span>
+    </button>`,
+    ...availMats.map(mat => {
+      const mc = MAT_COLORS[mat] || MAT_COLORS.Other;
+      const isActive = groupedCurrentMat === mat;
+      return `<button class="grouped-cat-tab"
+        onclick="setGroupedMatV2('${mat}')"
+        style="background:${isActive ? mc.color : mc.bg};color:${isActive ? '#fff' : mc.color};border-color:${mc.border};font-weight:700">
+        ${mat} <span style="opacity:.7">(${matCounts[mat]})</span>
+      </button>`;
+    })
+  ].join('');
 }
 
-function renderGroupedProducts() {
-  const container = document.getElementById('grouped-products-container');
+function renderGroupedCatTabsV2() {
+  const container = document.getElementById('grouped-mat-tabs'); // reuse existing
   if (!container) return;
 
-  // Get filtered products
-  let products = allProducts;
-  if (groupedCurrentCat !== 'all') {
-    products = products.filter(p => normalizeCat(p.category) === groupedCurrentCat);
-  }
-  if (groupedCurrentMat !== 'all') {
-    products = products.filter(p => (p.material || 'Other') === groupedCurrentMat);
-  }
+  const filtered = groupedCurrentMat === 'all'
+    ? allProducts
+    : allProducts.filter(p => (p.material || 'Other') === groupedCurrentMat);
 
-  if (!products.length) {
-    container.innerHTML = `<div class="card" style="text-align:center;padding:36px;color:var(--text-muted)">
-      <div style="font-size:36px;margin-bottom:10px">📦</div>
-      <div style="font-size:14px">No products in this category</div>
-    </div>`;
-    return;
-  }
+  const catCounts = {};
+  filtered.forEach(p => {
+    const cat = normalizeCat(p.category);
+    catCounts[cat] = (catCounts[cat] || 0) + 1;
+  });
+
+  const availCats = GROUPED_CATEGORIES.filter(c => catCounts[c] > 0);
+
+  if (!availCats.length) { container.style.display = 'none'; return; }
+  container.style.display = 'flex';
+
+  container.innerHTML = [
+    `<button class="grouped-mat-tab"
+      onclick="setGroupedCatV2('all')"
+      style="background:${groupedCurrentCatL2 === 'all' ? 'var(--navy)' : 'var(--surface)'};
+             color:${groupedCurrentCatL2 === 'all' ? '#fff' : 'var(--text)'};
+             border-color:${groupedCurrentCatL2 === 'all' ? 'var(--navy)' : 'var(--border)'}">
+      All (${filtered.length})
+    </button>`,
+    ...availCats.map(cat => {
+      const isActive = groupedCurrentCatL2 === cat;
+      const icon     = CAT_ICONS[cat] || '📦';
+      return `<button class="grouped-mat-tab"
+        onclick="setGroupedCatV2('${cat.replace(/'/g,"\\'")}')"
+        style="background:${isActive ? 'var(--navy)' : 'var(--surface2)'};
+               color:${isActive ? '#fff' : 'var(--text)'};
+               border-color:${isActive ? 'var(--navy)' : 'var(--border)'}">
+        ${icon} ${cat} (${catCounts[cat]})
+      </button>`;
+    })
+  ].join('');
+}
+
+function renderGroupedProductsV2() {
+  const container = document.getElementById('grouped-products-container');
+  if (!container) return;
 
   const threshold = parseInt(settings.lowStockThreshold || 10);
   const canEdit   = currentProfile?.role === 'admin' || currentProfile?.role === 'manager';
 
-  // Group by material if showing "all" materials, else show as flat table
-  if (groupedCurrentMat === 'all' && groupedCurrentCat !== 'all') {
-    // Group by material within category
-    const byMat = {};
-    products.forEach(p => {
-      const mat = p.material || 'Other';
-      if (!byMat[mat]) byMat[mat] = [];
-      byMat[mat].push(p);
-    });
+  // Filter by material + category
+  let products = allProducts;
+  if (groupedCurrentMat !== 'all')
+    products = products.filter(p => (p.material || 'Other') === groupedCurrentMat);
+  if (groupedCurrentCatL2 !== 'all')
+    products = products.filter(p => normalizeCat(p.category) === groupedCurrentCatL2);
 
-    container.innerHTML = ALL_MATERIALS
-      .filter(m => byMat[m]?.length)
-      .map(mat => {
-        const mc  = MAT_COLORS[mat] || MAT_COLORS.Other;
-        const rows = byMat[mat];
-        return `<div style="margin-bottom:18px">
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;
-            background:${mc.bg};border:1.5px solid ${mc.border};
-            border-radius:var(--radius) var(--radius) 0 0;border-bottom:none">
-            <span style="background:${mc.color};color:#fff;padding:3px 10px;border-radius:20px;
-              font-size:11px;font-weight:700">${mat}</span>
-            <span style="font-size:13px;font-weight:600;color:${mc.color}">${groupedCurrentCat}</span>
-            <span style="font-size:12px;color:var(--text-muted);margin-left:auto">${rows.length} products</span>
-          </div>
-          <div class="card" style="border-radius:0 0 var(--radius) var(--radius);padding:0">
-            <div class="table-wrap">${buildGroupedTable(rows, threshold, canEdit)}</div>
-          </div>
-        </div>`;
-      }).join('');
-  } else {
-    // Flat table with header
-    const catLabel = groupedCurrentCat === 'all' ? 'All Categories' : groupedCurrentCat;
-    const matLabel = groupedCurrentMat === 'all' ? 'All Materials' : groupedCurrentMat;
-    const mc = groupedCurrentMat !== 'all' ? (MAT_COLORS[groupedCurrentMat] || MAT_COLORS.Other) : null;
+  if (!products.length) {
+    container.innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">
+      <div style="font-size:40px;margin-bottom:10px">📦</div>
+      <div>No products found for this selection</div>
+    </div>`;
+    return;
+  }
 
-    container.innerHTML = `<div style="margin-bottom:18px">
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;
-        background:${mc ? mc.bg : 'var(--surface2)'};
-        border:1.5px solid ${mc ? mc.border : 'var(--border)'};
-        border-radius:var(--radius) var(--radius) 0 0;border-bottom:none">
-        ${mc ? `<span style="background:${mc.color};color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700">${matLabel}</span>` : ''}
-        <span style="font-size:13px;font-weight:600;color:${mc ? mc.color : 'var(--text)'}">${catLabel}</span>
-        <span style="font-size:12px;color:var(--text-muted);margin-left:auto">${products.length} products</span>
+  // Group by Category → Sub-type
+  const byCat = {};
+  products.forEach(p => {
+    const cat = normalizeCat(p.category);
+    if (!byCat[cat]) byCat[cat] = {};
+    const sub = p.sub_type || '';
+    if (!byCat[cat][sub]) byCat[cat][sub] = [];
+    byCat[cat][sub].push(p);
+  });
+
+  const catsToShow = groupedCurrentCatL2 === 'all'
+    ? GROUPED_CATEGORIES.filter(c => byCat[c])
+    : [groupedCurrentCatL2].filter(c => byCat[c]);
+
+  const mc = groupedCurrentMat !== 'all' ? (MAT_COLORS[groupedCurrentMat] || MAT_COLORS.Other) : null;
+
+  container.innerHTML = catsToShow.map(cat => {
+    const subGroups = byCat[cat];
+    const catTotal  = Object.values(subGroups).reduce((a,v) => a+v.length, 0);
+    const catIcon   = CAT_ICONS[cat] || '📦';
+
+    // Sort sub-types: defined ones first, then custom, then blank last
+    const predefined = (SUBTYPES[cat] || []);
+    const allSubs = Object.keys(subGroups);
+    const sortedSubs = [
+      ...predefined.filter(s => allSubs.includes(s)),
+      ...allSubs.filter(s => s && !predefined.includes(s)).sort(),
+      ...allSubs.filter(s => !s)
+    ];
+
+    const subSections = sortedSubs.map(sub => {
+      const prods   = subGroups[sub];
+      const subName = sub || 'No Sub-type';
+      const hasNoSub = !sub;
+
+      return `<div style="margin-bottom:4px">
+        <!-- Sub-type header -->
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;
+          background:${hasNoSub ? '#fff8f0' : 'var(--surface2)'};
+          border-bottom:1px solid var(--border);cursor:pointer"
+          onclick="toggleSubGroup(this)">
+          <span style="font-size:11px;color:var(--text-muted);user-select:none" class="toggle-arrow">▼</span>
+          <span style="font-weight:600;font-size:13px;color:${hasNoSub ? 'var(--warn)' : 'var(--text)'}">
+            ${hasNoSub ? '⚠️ ' : ''}${subName}
+          </span>
+          <span class="badge badge-blue" style="font-size:10px">${prods.length} product${prods.length !== 1 ? 's' : ''}</span>
+          ${hasNoSub && canEdit ? `<button class="btn btn-sm btn-outline" style="margin-left:auto;font-size:11px;color:var(--gold);border-color:var(--gold)"
+            onclick="event.stopPropagation();openBulkSubTypeAssign('${cat}',${JSON.stringify(prods.map(p=>p.id))})">
+            Assign Sub-types
+          </button>` : '<span style="margin-left:auto"></span>'}
+        </div>
+        <!-- Product rows (collapsible) -->
+        <div class="subgroup-rows">
+          <table style="width:100%">
+            <tbody>
+              ${prods.map(p => {
+                const isLow = (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold;
+                return `<tr onclick="viewProduct('${p.id}')"
+                  style="border-bottom:1px solid var(--border);cursor:pointer;${isLow?'background:#fff5f5;':''}">
+                  <td style="padding:8px 10px;width:44px">
+                    <div style="width:40px;height:36px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center">
+                      ${p.photo_url?`<img src="${p.photo_url}" style="width:40px;height:36px;object-fit:cover">`:'<span style="font-size:14px;opacity:.25">📦</span>'}
+                    </div>
+                  </td>
+                  <td style="padding:8px 10px">
+                    <div style="font-weight:500;font-size:13px">${p.name}</div>
+                    <div style="font-size:11px;color:var(--text-muted)">${p.code||''} ${p.size||''}</div>
+                  </td>
+                  <td style="padding:8px 10px;font-size:12px;color:var(--text-muted)">${p.brand||''}</td>
+                  <td style="padding:8px 10px;text-align:center">
+                    <div style="display:flex;gap:4px;justify-content:center">
+                      <span class="qty-tag qty-bv" style="font-size:11px;color:${(p.qty_bv||0)<threshold?'#dc2626':'inherit'}">BV:${p.qty_bv||0}</span>
+                      <span class="qty-tag qty-is" style="font-size:11px;color:${(p.qty_is||0)<threshold?'#dc2626':'inherit'}">IS:${p.qty_is||0}</span>
+                      <span class="qty-tag qty-sw" style="font-size:11px;color:${(p.qty_sw||0)<threshold?'#dc2626':'inherit'}">SW:${p.qty_sw||0}</span>
+                    </div>
+                  </td>
+                  <td style="padding:8px 10px" onclick="event.stopPropagation()">
+                    ${canEdit ? `<div style="display:flex;gap:4px">
+                      <button class="btn btn-sm btn-outline" onclick="openStockUpdate('${p.id}')">📦</button>
+                      <button class="btn btn-sm btn-outline" onclick="openEditProduct('${p.id}')">✏️</button>
+                      ${currentProfile?.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">🗑️</button>`:''}
+                    </div>` : ''}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div style="margin-bottom:20px;border:1.5px solid ${mc ? mc.border : 'var(--border)'};border-radius:var(--radius);overflow:hidden">
+      <!-- Category header -->
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;
+        background:${mc ? mc.bg : 'var(--surface2)'};border-bottom:2px solid ${mc ? mc.border : 'var(--border)'}">
+        <span style="font-size:18px">${catIcon}</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${mc ? mc.color : 'var(--text)'};letter-spacing:.5px">${cat}</span>
+        ${groupedCurrentMat !== 'all' ? `<span style="background:${mc.color};color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;margin-left:4px">${groupedCurrentMat}</span>` : ''}
+        <span style="margin-left:auto;font-size:12px;color:var(--text-muted)">${catTotal} products · ${sortedSubs.filter(Boolean).length} sub-types</span>
       </div>
-      <div class="card" style="border-radius:0 0 var(--radius) var(--radius);padding:0">
-        <div class="table-wrap">${buildGroupedTable(products, threshold, canEdit)}</div>
+      <!-- Sub-type sections -->
+      <div style="background:var(--surface)">
+        ${subSections}
       </div>
     </div>`;
+  }).join('');
+}
+
+function toggleSubGroup(header) {
+  const rows = header.nextElementSibling;
+  const arrow = header.querySelector('.toggle-arrow');
+  if (!rows) return;
+  const collapsed = rows.style.display === 'none';
+  rows.style.display = collapsed ? '' : 'none';
+  if (arrow) arrow.textContent = collapsed ? '▼' : '▶';
+}
+
+function setGroupedMatV2(mat) {
+  groupedCurrentMat    = mat;
+  groupedCurrentCatL2  = 'all';
+  renderGroupedMatTabsV2();
+  renderGroupedCatTabsV2();
+  renderGroupedProductsV2();
+}
+
+function setGroupedCatV2(cat) {
+  groupedCurrentCatL2 = cat;
+  renderGroupedCatTabsV2();
+  renderGroupedProductsV2();
+}
+
+// Override old setters
+setGroupedCat = setGroupedCatV2;
+setGroupedMat = setGroupedMatV2;
+
+// ── BULK SUB-TYPE ASSIGN ──────────────────────────────────────
+function openBulkSubTypeAssign(category, productIds) {
+  const subtypes = SUBTYPES[category] || [];
+  const overlay  = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+
+  overlay.innerHTML = `<div style="background:var(--surface);border-radius:16px;padding:24px;max-width:440px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.4)">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--gold);margin-bottom:4px">Assign Sub-type</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Assign a sub-type to <strong>${productIds.length} products</strong> under <strong>${category}</strong></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      ${subtypes.map(s => `<button onclick="applyBulkSubType('${s}',${JSON.stringify(productIds)},this.closest('div[style*=fixed]'))"
+        style="padding:9px 10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;text-align:left;transition:all .15s"
+        onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">${s}</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input type="text" id="bulk-subtype-custom" placeholder="Or type custom sub-type..."
+        style="flex:1;padding:10px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
+      <button onclick="const v=document.getElementById('bulk-subtype-custom').value.trim();if(v)applyBulkSubType(v,${JSON.stringify(productIds)},this.closest('div[style*=fixed]'))"
+        style="padding:10px 16px;background:var(--gold);color:#0f1f3d;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Apply</button>
+    </div>
+    <button onclick="this.closest('div[style*=fixed]').remove()"
+      style="width:100%;padding:9px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:13px;cursor:pointer">Cancel</button>
+  </div>`;
+
+  document.body.appendChild(overlay);
+}
+
+async function applyBulkSubType(subType, productIds, overlayEl) {
+  if (overlayEl) overlayEl.remove();
+  showLoading(`ASSIGNING "${subType}" TO ${productIds.length} PRODUCTS...`);
+
+  try {
+    const { error } = await sb.from('products')
+      .update({ sub_type: subType, updated_at: new Date().toISOString() })
+      .in('id', productIds);
+
+    if (error) throw error;
+
+    // Update local cache
+    productIds.forEach(id => {
+      const p = allProducts.find(x => x.id === id);
+      if (p) p.sub_type = subType;
+    });
+
+    hideLoading();
+    showToast(`Sub-type "${subType}" assigned to ${productIds.length} products!`);
+    renderGroupedProductsV2();
+  } catch(e) {
+    hideLoading();
+    showToast('Failed: ' + e.message, 'error');
   }
 }
 
-function buildGroupedTable(products, threshold, canEdit) {
-  return `<table>
-    <thead><tr>
-      <th style="width:50px">Photo</th>
-      <th>Name</th>
-      <th>Code</th>
-      <th>Material</th>
-      <th>Size</th>
-      <th style="text-align:center">BV</th>
-      <th style="text-align:center">IS</th>
-      <th style="text-align:center">SW</th>
-      <th>Price</th>
-      <th>Status</th>
-      ${canEdit ? '<th>Actions</th>' : ''}
-    </tr></thead>
-    <tbody>
-      ${products.map(p => {
-        const isLow = (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold;
-        const mc    = MAT_COLORS[p.material] || MAT_COLORS.Other;
-        return `<tr onclick="viewProduct('${p.id}')" style="${isLow ? 'background:#fff8f8;' : ''}">
-          <td>
-            <div style="width:40px;height:36px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center">
-              ${p.photo_url ? `<img src="${p.photo_url}" style="width:40px;height:36px;object-fit:cover">` : '<span style="font-size:16px;opacity:.3">📦</span>'}
-            </div>
-          </td>
-          <td><div style="font-weight:500;font-size:13px">${p.name}</div><div style="font-size:11px;color:var(--text-muted)">${p.brand||''}</div></td>
-          <td class="mono" style="font-size:11px">${p.code||'—'}</td>
-          <td><span style="background:${mc.bg};color:${mc.color};border:1px solid ${mc.border};padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">${p.material||'—'}</span></td>
-          <td style="font-size:12px">${p.size||'—'}</td>
-          <td class="mono" style="text-align:center;color:${(p.qty_bv||0)<threshold?'#dc2626':'inherit'};font-weight:600">${p.qty_bv||0}</td>
-          <td class="mono" style="text-align:center;color:${(p.qty_is||0)<threshold?'#dc2626':'inherit'};font-weight:600">${p.qty_is||0}</td>
-          <td class="mono" style="text-align:center;color:${(p.qty_sw||0)<threshold?'#dc2626':'inherit'};font-weight:600">${p.qty_sw||0}</td>
-          <td class="mono" style="font-size:12px">${p.price ? 'SAR '+Number(p.price).toFixed(2) : '—'}</td>
-          <td><span class="badge ${isLow ? 'badge-red' : 'badge-green'}" style="font-size:10px">${isLow ? 'LOW' : 'OK'}</span></td>
-          ${canEdit ? `<td onclick="event.stopPropagation()" style="white-space:nowrap">
-            <button class="btn btn-sm btn-outline" onclick="openStockUpdate('${p.id}')">📦</button>
-            <button class="btn btn-sm btn-outline" onclick="openEditProduct('${p.id}')">✏️</button>
-            ${currentProfile?.role==='admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">🗑️</button>` : ''}
-          </td>` : ''}
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>`;
-}
-
-// ── TAB SETTERS ───────────────────────────────────────────────
-function setGroupedCat(cat) {
-  groupedCurrentCat = cat;
-  groupedCurrentMat = 'all'; // reset material when category changes
-  renderGroupedCatTabs();
-  renderGroupedMatTabs();
-  renderGroupedProducts();
-}
-
-function setGroupedMat(mat) {
-  groupedCurrentMat = mat;
-  renderGroupedMatTabs();
-  renderGroupedProducts();
-}
-
-// Normalize category names (handle legacy entries)
+// Compatibility helpers
 function normalizeCat(cat) {
   if (!cat) return 'Other';
   const map = {
-    'Pipes': 'Pipes & Tubes',
-    'Pipe': 'Pipes & Tubes',
-    'Pipe & Tube': 'Pipes & Tubes',
-    'Forged Fittings': 'Forged Steel Fittings',
-    'Forged': 'Forged Steel Fittings',
-    'Rod': 'Rods / Bars / Beams',
-    'Rods': 'Rods / Bars / Beams',
-    'Bars': 'Rods / Bars / Beams',
-    'Beams': 'Rods / Bars / Beams',
+    'Pipes': 'Pipes & Tubes', 'Pipe': 'Pipes & Tubes',
+    'Pipe & Tube': 'Pipes & Tubes', 'Pipe & Tubes': 'Pipes & Tubes',
+    'Forged Fittings': 'Forged Steel Fittings', 'Forged': 'Forged Steel Fittings',
+    'Rod': 'Rods / Bars / Beams', 'Rods': 'Rods / Bars / Beams',
+    'Bars': 'Rods / Bars / Beams', 'Beams': 'Rods / Bars / Beams',
   };
   return map[cat] || cat;
 }
 
-// Re-render grouped view when inventory data changes
-const _origCheckLowStock2 = checkLowStock;
-checkLowStock = function() {
-  _origCheckLowStock2();
-  if (groupedViewActive) renderGroupedProducts();
-};
-
 window.addEventListener('DOMContentLoaded', init);
-
 </script>
-
-<!-- QUOTATION DELETE CONFIRM -->
-<div class="modal-overlay" id="modal-delete-quot">
-  <div class="modal" style="max-width:380px;text-align:center">
-    <div style="font-size:48px;margin-bottom:12px">🗑️</div>
-    <div class="modal-title" style="text-align:center">Delete Quotation?</div>
-    <p style="color:var(--text-muted);font-size:14px;margin-bottom:8px">You are about to permanently delete:</p>
-    <div style="font-size:15px;color:var(--gold);font-weight:600;margin-bottom:16px" id="delete-quot-no"></div>
-    <div class="alert alert-danger" style="text-align:left">⚠️ This quotation and all its line items will be permanently deleted. This cannot be undone.</div>
-    <div class="modal-footer" style="justify-content:center;margin-top:20px">
-      <button class="btn btn-outline" onclick="closeModal('modal-delete-quot')" style="min-width:100px">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmDeleteQuotation()" style="min-width:100px">Yes, Delete</button>
-    </div>
-  </div>
-</div>
-
-<!-- NEW PO MODAL -->
-<div class="modal-overlay" id="modal-po">
-  <div class="modal" style="max-width:780px">
-    <div class="modal-title" id="po-modal-title">New Purchase Order</div>
-    <div class="grid-2">
-      <div class="field"><label>Company (from) *</label>
-        <select id="po-company">
-          <option value="bv">Barakah Valves Trading Co.</option>
-          <option value="is">Iron Spring Trading</option>
-          <option value="sw">Stable Way Trading</option>
-        </select>
-      </div>
-      <div class="field"><label>PO Date *</label><input type="date" id="po-date"></div>
-    </div>
-    <div class="field"><label>Supplier / Vendor Name *</label><input type="text" id="po-supplier" placeholder="Supplier company name"></div>
-    <div class="grid-2">
-      <div class="field"><label>Supplier Contact</label><input type="text" id="po-contact" placeholder="Contact person"></div>
-      <div class="field"><label>Delivery Date (Expected)</label><input type="date" id="po-delivery-date"></div>
-    </div>
-    <div class="field"><label>Delivery Address</label>
-      <input type="text" id="po-delivery-addr" placeholder="e.g. Prince Talal St, Al Khobar">
-    </div>
-    <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Line Items</div>
-        <button class="btn btn-outline btn-sm" onclick="addPOLine()">+ Add Item</button>
-      </div>
-      <table style="width:100%;font-size:13px" id="po-lines-table">
-        <thead><tr style="border-bottom:2px solid var(--border)">
-          <th style="padding:6px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Product / Description</th>
-          <th style="padding:6px;width:70px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Qty</th>
-          <th style="padding:6px;width:80px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Unit</th>
-          <th style="padding:6px;width:100px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Unit Price</th>
-          <th style="padding:6px;width:90px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Total</th>
-          <th style="width:30px"></th>
-        </tr></thead>
-        <tbody id="po-lines-body"></tbody>
-      </table>
-      <div id="po-totals" style="text-align:right;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>
-    </div>
-    <div class="field"><label>Notes / Terms</label><textarea id="po-notes" rows="2" placeholder="Payment terms, delivery instructions..."></textarea></div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
-      <button class="btn btn-outline" onclick="savePO('draft')">Save Draft</button>
-      <button class="btn btn-gold" onclick="savePO('sent')">Save & Print</button>
-    </div>
-  </div>
-</div>
-
-<!-- BULK DELETE CONFIRM MODAL -->
-<div class="modal-overlay" id="modal-bulk-delete">
-  <div class="modal" style="max-width:400px;text-align:center">
-    <div style="font-size:48px;margin-bottom:12px">⚠️</div>
-    <div class="modal-title" style="text-align:center">Delete Selected Products?</div>
-    <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px">You are about to permanently delete:</p>
-    <div style="font-size:28px;font-family:'Bebas Neue',sans-serif;color:#dc2626;margin-bottom:12px" id="bulk-delete-count"></div>
-    <div class="alert alert-danger" style="text-align:left;margin-bottom:16px">
-      ⚠️ All documents, movement history and quotation references for these products will also be deleted. This cannot be undone.
-    </div>
-    <div class="modal-footer" style="justify-content:center">
-      <button class="btn btn-outline" onclick="closeModal('modal-bulk-delete')" style="min-width:100px">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmBulkDelete()" style="min-width:100px" id="bulk-delete-btn">Delete All</button>
-    </div>
-  </div>
-</div>
-
-<!-- PHOTO LIBRARY PICKER MODAL -->
-<div class="modal-overlay" id="modal-lib-picker">
-  <div class="modal" style="max-width:720px">
-    <div class="modal-title">📚 Choose from Photo Library</div>
-
-    <!-- AI Suggestions strip -->
-    <div id="lib-picker-suggestions" style="display:none;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--steel);margin-bottom:8px;display:flex;align-items:center;gap:6px">
-        <span style="background:var(--steel-light);color:var(--steel);border-radius:20px;padding:2px 8px;font-size:10px">✨ AI Suggestions</span>
-        <span style="color:var(--text-muted);font-weight:400">Based on visual similarity to your product</span>
-      </div>
-      <div id="lib-picker-suggestions-grid" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-    </div>
-
-    <!-- AI loading state -->
-    <div id="lib-picker-ai-loading" style="display:none;padding:16px;text-align:center;background:var(--steel-light);border-radius:var(--radius-sm);margin-bottom:14px">
-      <div style="font-size:13px;color:var(--steel)">🤖 AI is finding visually similar photos...</div>
-    </div>
-
-    <!-- Category tabs -->
-    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">
-      <button class="btn btn-sm btn-gold" onclick="filterPickerCat('all',this)" id="picker-tab-all">All</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Valves',this)">Valves</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Pipes',this)">Pipes</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Fittings',this)">Fittings</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Flanges',this)">Flanges</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Electrical',this)">Electrical</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Safety Equipment',this)">Safety</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Other',this)">Other</button>
-    </div>
-
-    <!-- Search -->
-    <input type="text" id="lib-picker-search" placeholder="Search by tag or name..."
-      style="width:100%;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none;margin-bottom:14px"
-      oninput="renderPickerGrid()">
-
-    <!-- Photo grid -->
-    <div id="lib-picker-empty" style="display:none;text-align:center;padding:32px;color:var(--text-muted)">
-      <div style="font-size:36px;margin-bottom:8px">📷</div>
-      No photos in library yet. Ask admin to upload photos in Settings.
-    </div>
-    <div id="lib-picker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;max-height:50vh;overflow-y:auto;padding:4px"></div>
-
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-lib-picker')">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- AUTO-ASSIGN PHOTOS MODAL -->
-<div class="modal-overlay" id="modal-auto-assign">
-  <div class="modal" style="max-width:820px;width:95vw">
-    <div class="modal-title">🤖 AI Auto-Assign Photos</div>
-
-    <!-- Step 1: Configure -->
-    <div id="aa-step-1">
-      <div class="alert" style="background:var(--steel-light);border:1px solid #bfdbfe;color:var(--steel);margin-bottom:16px">
-        AI will compare library photos visually to your products and suggest matches. You review and confirm before anything is saved.
-      </div>
-      <div class="grid-2" style="margin-bottom:16px">
-        <div class="field">
-          <label>Which products to scan?</label>
-          <select id="aa-scope" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-            <option value="no-photo">Only products with NO photo (recommended)</option>
-            <option value="all">All products (including ones with photos)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Which library photos to use?</label>
-          <select id="aa-photo-scope" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-            <option value="all">All library photos</option>
-            <option value="category">Match by category only (faster)</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <label>Confidence threshold</label>
-        <select id="aa-confidence" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-          <option value="high">High — only very confident matches (fewer results, more accurate)</option>
-          <option value="medium" selected>Medium — balanced (recommended)</option>
-          <option value="low">Low — show all possible matches (more results, review carefully)</option>
-        </select>
-      </div>
-      <div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text-muted);margin-bottom:16px">
-        📊 <strong style="color:var(--text)">${allProducts.filter(p=>!p.photo_url).length}</strong> products without photos &nbsp;·&nbsp;
-        <strong style="color:var(--text)">${photoLibrary.length}</strong> photos in library
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeModal('modal-auto-assign')">Cancel</button>
-        <button class="btn btn-gold" onclick="startAutoAssign()">🤖 Start AI Scan</button>
-      </div>
-    </div>
-
-    <!-- Step 2: AI Scanning Progress -->
-    <div id="aa-step-2" style="display:none">
-      <div style="text-align:center;margin-bottom:20px">
-        <div class="spinner" style="margin:0 auto 14px"></div>
-        <div style="font-size:15px;font-weight:600" id="aa-status">Analysing products...</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:4px" id="aa-substatus"></div>
-      </div>
-      <div style="background:var(--surface2);border-radius:8px;height:8px;overflow:hidden;margin-bottom:16px">
-        <div id="aa-progress-bar" style="height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:0%;transition:width .4s;border-radius:8px"></div>
-      </div>
-      <div id="aa-log" style="max-height:180px;overflow-y:auto;font-size:12px;font-family:'JetBrains Mono',monospace;background:var(--surface2);border-radius:8px;padding:10px;line-height:1.8;color:var(--text-muted)"></div>
-    </div>
-
-    <!-- Step 3: Review Matches -->
-    <div id="aa-step-3" style="display:none">
-      <div id="aa-review-header" style="margin-bottom:14px">
-        <div style="font-size:15px;font-weight:600" id="aa-review-title"></div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="aa-review-sub"></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="btn btn-sm btn-outline" onclick="selectAllAA()">Select All</button>
-        <button class="btn btn-sm btn-outline" onclick="deselectAllAA()">Deselect All</button>
-        <button class="btn btn-sm btn-outline" onclick="selectOnlyNewAA()">Only New Photos</button>
-      </div>
-      <div id="aa-matches-list" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px"></div>
-      <div id="aa-no-matches" style="display:none;text-align:center;padding:32px;color:var(--text-muted)">
-        <div style="font-size:36px;margin-bottom:8px">🔍</div>
-        No confident matches found. Try uploading more photos or lowering the confidence threshold.
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="document.getElementById('aa-step-3').style.display='none';document.getElementById('aa-step-1').style.display=''">← Back</button>
-        <button class="btn btn-outline" onclick="closeModal('modal-auto-assign')">Cancel</button>
-        <button class="btn btn-gold" id="aa-apply-btn" onclick="applyAutoAssign()">
-          ✓ Apply Selected (<span id="aa-selected-count">0</span>)
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 4: Done -->
-    <div id="aa-step-4" style="display:none;text-align:center;padding:20px">
-      <div style="font-size:52px;margin-bottom:12px">✅</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--gold);margin-bottom:10px">Photos Assigned!</div>
-      <div id="aa-done-summary" style="background:var(--surface2);border-radius:10px;padding:16px;font-size:13px;margin-bottom:16px"></div>
-      <div class="modal-footer" style="justify-content:center">
-        <button class="btn btn-outline" onclick="openAutoAssignModal()">Run Again</button>
-        <button class="btn btn-gold" onclick="closeModal('modal-auto-assign');renderInventory()">Done ✓</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- PHOTO ASSIGNMENT MODAL -->
-<div class="modal-overlay" id="modal-assign-photo">
-  <div class="modal" style="max-width:760px;width:95vw">
-    <div class="modal-title">📌 Assign Photo to Products</div>
-
-    <!-- Selected photo preview -->
-    <div style="display:flex;align-items:center;gap:16px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:18px">
-      <img id="assign-photo-preview" src="" alt="Selected photo"
-        style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid var(--gold);flex-shrink:0">
-      <div>
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:3px">Assigning this photo to selected products</div>
-        <div id="assign-photo-name" style="font-size:15px;font-weight:600;color:var(--text)"></div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
-          <span id="assign-selected-count" style="font-weight:700;color:var(--gold)">0</span> products selected
-        </div>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <input type="text" id="assign-search" placeholder="🔍 Search by name or code..."
-        style="flex:1;min-width:180px;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none"
-        oninput="renderAssignProductList()">
-      <select id="assign-filter-cat" onchange="renderAssignProductList()"
-        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
-        <option value="">All Categories</option>
-        <option>Valves</option><option>Pipes &amp; Tubes</option><option>Fittings</option>
-        <option>Forged Steel Fittings</option><option>Flanges</option>
-        <option>Rods / Bars / Beams</option><option>Electrical</option>
-        <option>Safety Equipment</option><option>Instruments</option><option>Other</option>
-      </select>
-      <select id="assign-filter-mat" onchange="renderAssignProductList()"
-        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
-        <option value="">All Materials</option>
-        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
-        <option>Brass</option><option>Bronze</option><option>PVC</option><option>CPVC</option>
-        <option>PPR</option><option>HDPE</option>
-      </select>
-    </div>
-
-    <!-- Select all bar -->
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--border)">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500">
-        <input type="checkbox" id="assign-select-all" onchange="toggleAssignAll(this)"
-          style="width:16px;height:16px;cursor:pointer">
-        Select all visible (<span id="assign-visible-count">0</span>)
-      </label>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-outline" onclick="selectAssignWithPhoto()">Has Photo</button>
-        <button class="btn btn-sm btn-outline" onclick="selectAssignNoPhoto()">No Photo Only</button>
-      </div>
-    </div>
-
-    <!-- Product list -->
-    <div id="assign-product-list"
-      style="max-height:42vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);"></div>
-    <div id="assign-empty" style="display:none;text-align:center;padding:28px;color:var(--text-muted);font-size:13px">
-      No products match your filters
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-assign-photo')">Cancel</button>
-      <button class="btn btn-gold" id="assign-confirm-btn" onclick="confirmAssignPhoto()" disabled style="opacity:0.5">
-        📌 Assign to <span id="assign-btn-count">0</span> Products
-      </button>
-    </div>
-  </div>
-</div>
-</body>
-</html>
-<!-- DUPLICATES SCANNER MODAL -->
-<div class="modal-overlay" id="modal-duplicates">
-  <div class="modal" style="max-width:800px">
-    <div class="modal-title">🔍 AI Duplicate Product Scanner</div>
-
-    <!-- Step 1: Scan -->
-    <div id="dup-step-scan">
-      <div class="alert alert-warn" style="margin-bottom:18px">
-        AI will analyse all your products and find potential duplicates based on similar names, same codes, and matching material + size + category combinations.
-      </div>
-      <div style="text-align:center;padding:20px">
-        <div style="font-size:48px;margin-bottom:12px">🤖</div>
-        <div style="font-size:15px;font-weight:600;margin-bottom:6px">Ready to scan <span id="dup-product-count"></span> products</div>
-        <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px">This may take 10–20 seconds depending on your inventory size</div>
-        <button class="btn btn-gold" onclick="runDuplicateScan()" style="padding:12px 32px;font-size:15px">
-          🔍 Start AI Scan
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 2: Scanning progress -->
-    <div id="dup-step-scanning" style="display:none;text-align:center;padding:30px">
-      <div class="spinner" style="margin:0 auto 16px"></div>
-      <div style="font-size:15px;font-weight:600" id="dup-scanning-text">Sending data to AI...</div>
-      <div style="font-size:13px;color:var(--text-muted);margin-top:6px">Claude is analysing your products for duplicates</div>
-    </div>
-
-    <!-- Step 3: Results -->
-    <div id="dup-step-results" style="display:none">
-      <div id="dup-results-header" style="margin-bottom:16px"></div>
-      <div id="dup-results-list"></div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeModal('modal-duplicates')">Close</button>
-        <button class="btn btn-gold" onclick="runDuplicateScan()">↻ Rescan</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MERGE CONFIRM MODAL -->
-<div class="modal-overlay" id="modal-merge-confirm">
-  <div class="modal" style="max-width:560px">
-    <div class="modal-title">Merge Products</div>
-    <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">
-      Choose which product to <strong style="color:#5ddfa0">keep</strong> and which to <strong style="color:#ff8080">delete</strong>. The kept product's stock stays exactly as-is. The deleted product and all its data will be permanently removed.
-    </p>
-    <div id="merge-option-a" onclick="selectMergeKeep('a')" class="merge-option" style="border:2px solid var(--glass-border);border-radius:12px;padding:16px;cursor:pointer;margin-bottom:10px;transition:all .2s">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Option A — Keep this one</div>
-          <div id="merge-a-name" style="font-weight:700;font-size:15px"></div>
-          <div id="merge-a-code" class="mono" style="color:var(--gold);font-size:12px;margin-top:2px"></div>
-          <div id="merge-a-detail" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
-        </div>
-        <div style="text-align:right">
-          <div id="merge-a-stock" style="font-size:12px"></div>
-        </div>
-      </div>
-    </div>
-    <div style="text-align:center;font-size:12px;color:var(--text-muted);margin:4px 0">↕ swap</div>
-    <div id="merge-option-b" onclick="selectMergeKeep('b')" class="merge-option" style="border:2px solid var(--glass-border);border-radius:12px;padding:16px;cursor:pointer;margin-bottom:16px;transition:all .2s">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Option B — Keep this one</div>
-          <div id="merge-b-name" style="font-weight:700;font-size:15px"></div>
-          <div id="merge-b-code" class="mono" style="color:var(--gold);font-size:12px;margin-top:2px"></div>
-          <div id="merge-b-detail" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
-        </div>
-        <div style="text-align:right">
-          <div id="merge-b-stock" style="font-size:12px"></div>
-        </div>
-      </div>
-    </div>
-    <div id="merge-selection-note" style="display:none;padding:10px 14px;background:rgba(61,186,122,0.1);border:1px solid rgba(61,186,122,0.3);border-radius:8px;font-size:13px;margin-bottom:16px;color:#5ddfa0"></div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-merge-confirm')">Cancel</button>
-      <button class="btn btn-danger" id="merge-confirm-btn" onclick="executeMerge()" disabled style="opacity:0.5">Delete & Merge</button>
-    </div>
-  </div>
-</div>
-
-<!-- QUOTATION DELETE CONFIRM -->
-<div class="modal-overlay" id="modal-delete-quot">
-  <div class="modal" style="max-width:380px;text-align:center">
-    <div style="font-size:48px;margin-bottom:12px">🗑️</div>
-    <div class="modal-title" style="text-align:center">Delete Quotation?</div>
-    <p style="color:var(--text-muted);font-size:14px;margin-bottom:8px">You are about to permanently delete:</p>
-    <div style="font-size:15px;color:var(--gold);font-weight:600;margin-bottom:16px" id="delete-quot-no"></div>
-    <div class="alert alert-danger" style="text-align:left">⚠️ This quotation and all its line items will be permanently deleted. This cannot be undone.</div>
-    <div class="modal-footer" style="justify-content:center;margin-top:20px">
-      <button class="btn btn-outline" onclick="closeModal('modal-delete-quot')" style="min-width:100px">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmDeleteQuotation()" style="min-width:100px">Yes, Delete</button>
-    </div>
-  </div>
-</div>
-
-<!-- NEW PO MODAL -->
-<div class="modal-overlay" id="modal-po">
-  <div class="modal" style="max-width:780px">
-    <div class="modal-title" id="po-modal-title">New Purchase Order</div>
-    <div class="grid-2">
-      <div class="field"><label>Company (from) *</label>
-        <select id="po-company">
-          <option value="bv">Barakah Valves Trading Co.</option>
-          <option value="is">Iron Spring Trading</option>
-          <option value="sw">Stable Way Trading</option>
-        </select>
-      </div>
-      <div class="field"><label>PO Date *</label><input type="date" id="po-date"></div>
-    </div>
-    <div class="field"><label>Supplier / Vendor Name *</label><input type="text" id="po-supplier" placeholder="Supplier company name"></div>
-    <div class="grid-2">
-      <div class="field"><label>Supplier Contact</label><input type="text" id="po-contact" placeholder="Contact person"></div>
-      <div class="field"><label>Delivery Date (Expected)</label><input type="date" id="po-delivery-date"></div>
-    </div>
-    <div class="field"><label>Delivery Address</label>
-      <input type="text" id="po-delivery-addr" placeholder="e.g. Prince Talal St, Al Khobar">
-    </div>
-    <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Line Items</div>
-        <button class="btn btn-outline btn-sm" onclick="addPOLine()">+ Add Item</button>
-      </div>
-      <table style="width:100%;font-size:13px" id="po-lines-table">
-        <thead><tr style="border-bottom:2px solid var(--border)">
-          <th style="padding:6px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Product / Description</th>
-          <th style="padding:6px;width:70px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Qty</th>
-          <th style="padding:6px;width:80px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Unit</th>
-          <th style="padding:6px;width:100px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Unit Price</th>
-          <th style="padding:6px;width:90px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Total</th>
-          <th style="width:30px"></th>
-        </tr></thead>
-        <tbody id="po-lines-body"></tbody>
-      </table>
-      <div id="po-totals" style="text-align:right;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>
-    </div>
-    <div class="field"><label>Notes / Terms</label><textarea id="po-notes" rows="2" placeholder="Payment terms, delivery instructions..."></textarea></div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
-      <button class="btn btn-outline" onclick="savePO('draft')">Save Draft</button>
-      <button class="btn btn-gold" onclick="savePO('sent')">Save & Print</button>
-    </div>
-  </div>
-</div>
-
-<!-- BULK DELETE CONFIRM MODAL -->
-<div class="modal-overlay" id="modal-bulk-delete">
-  <div class="modal" style="max-width:400px;text-align:center">
-    <div style="font-size:48px;margin-bottom:12px">⚠️</div>
-    <div class="modal-title" style="text-align:center">Delete Selected Products?</div>
-    <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px">You are about to permanently delete:</p>
-    <div style="font-size:28px;font-family:'Bebas Neue',sans-serif;color:#dc2626;margin-bottom:12px" id="bulk-delete-count"></div>
-    <div class="alert alert-danger" style="text-align:left;margin-bottom:16px">
-      ⚠️ All documents, movement history and quotation references for these products will also be deleted. This cannot be undone.
-    </div>
-    <div class="modal-footer" style="justify-content:center">
-      <button class="btn btn-outline" onclick="closeModal('modal-bulk-delete')" style="min-width:100px">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmBulkDelete()" style="min-width:100px" id="bulk-delete-btn">Delete All</button>
-    </div>
-  </div>
-</div>
-
-<!-- PHOTO LIBRARY PICKER MODAL -->
-<div class="modal-overlay" id="modal-lib-picker">
-  <div class="modal" style="max-width:720px">
-    <div class="modal-title">📚 Choose from Photo Library</div>
-
-    <!-- AI Suggestions strip -->
-    <div id="lib-picker-suggestions" style="display:none;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--steel);margin-bottom:8px;display:flex;align-items:center;gap:6px">
-        <span style="background:var(--steel-light);color:var(--steel);border-radius:20px;padding:2px 8px;font-size:10px">✨ AI Suggestions</span>
-        <span style="color:var(--text-muted);font-weight:400">Based on visual similarity to your product</span>
-      </div>
-      <div id="lib-picker-suggestions-grid" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-    </div>
-
-    <!-- AI loading state -->
-    <div id="lib-picker-ai-loading" style="display:none;padding:16px;text-align:center;background:var(--steel-light);border-radius:var(--radius-sm);margin-bottom:14px">
-      <div style="font-size:13px;color:var(--steel)">🤖 AI is finding visually similar photos...</div>
-    </div>
-
-    <!-- Category tabs -->
-    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">
-      <button class="btn btn-sm btn-gold" onclick="filterPickerCat('all',this)" id="picker-tab-all">All</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Valves',this)">Valves</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Pipes',this)">Pipes</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Fittings',this)">Fittings</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Flanges',this)">Flanges</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Electrical',this)">Electrical</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Safety Equipment',this)">Safety</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Other',this)">Other</button>
-    </div>
-
-    <!-- Search -->
-    <input type="text" id="lib-picker-search" placeholder="Search by tag or name..."
-      style="width:100%;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none;margin-bottom:14px"
-      oninput="renderPickerGrid()">
-
-    <!-- Photo grid -->
-    <div id="lib-picker-empty" style="display:none;text-align:center;padding:32px;color:var(--text-muted)">
-      <div style="font-size:36px;margin-bottom:8px">📷</div>
-      No photos in library yet. Ask admin to upload photos in Settings.
-    </div>
-    <div id="lib-picker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;max-height:50vh;overflow-y:auto;padding:4px"></div>
-
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-lib-picker')">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- AUTO-ASSIGN PHOTOS MODAL -->
-<div class="modal-overlay" id="modal-auto-assign">
-  <div class="modal" style="max-width:820px;width:95vw">
-    <div class="modal-title">🤖 AI Auto-Assign Photos</div>
-
-    <!-- Step 1: Configure -->
-    <div id="aa-step-1">
-      <div class="alert" style="background:var(--steel-light);border:1px solid #bfdbfe;color:var(--steel);margin-bottom:16px">
-        AI will compare library photos visually to your products and suggest matches. You review and confirm before anything is saved.
-      </div>
-      <div class="grid-2" style="margin-bottom:16px">
-        <div class="field">
-          <label>Which products to scan?</label>
-          <select id="aa-scope" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-            <option value="no-photo">Only products with NO photo (recommended)</option>
-            <option value="all">All products (including ones with photos)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Which library photos to use?</label>
-          <select id="aa-photo-scope" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-            <option value="all">All library photos</option>
-            <option value="category">Match by category only (faster)</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <label>Confidence threshold</label>
-        <select id="aa-confidence" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-          <option value="high">High — only very confident matches (fewer results, more accurate)</option>
-          <option value="medium" selected>Medium — balanced (recommended)</option>
-          <option value="low">Low — show all possible matches (more results, review carefully)</option>
-        </select>
-      </div>
-      <div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text-muted);margin-bottom:16px">
-        📊 <strong style="color:var(--text)">${allProducts.filter(p=>!p.photo_url).length}</strong> products without photos &nbsp;·&nbsp;
-        <strong style="color:var(--text)">${photoLibrary.length}</strong> photos in library
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeModal('modal-auto-assign')">Cancel</button>
-        <button class="btn btn-gold" onclick="startAutoAssign()">🤖 Start AI Scan</button>
-      </div>
-    </div>
-
-    <!-- Step 2: AI Scanning Progress -->
-    <div id="aa-step-2" style="display:none">
-      <div style="text-align:center;margin-bottom:20px">
-        <div class="spinner" style="margin:0 auto 14px"></div>
-        <div style="font-size:15px;font-weight:600" id="aa-status">Analysing products...</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:4px" id="aa-substatus"></div>
-      </div>
-      <div style="background:var(--surface2);border-radius:8px;height:8px;overflow:hidden;margin-bottom:16px">
-        <div id="aa-progress-bar" style="height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:0%;transition:width .4s;border-radius:8px"></div>
-      </div>
-      <div id="aa-log" style="max-height:180px;overflow-y:auto;font-size:12px;font-family:'JetBrains Mono',monospace;background:var(--surface2);border-radius:8px;padding:10px;line-height:1.8;color:var(--text-muted)"></div>
-    </div>
-
-    <!-- Step 3: Review Matches -->
-    <div id="aa-step-3" style="display:none">
-      <div id="aa-review-header" style="margin-bottom:14px">
-        <div style="font-size:15px;font-weight:600" id="aa-review-title"></div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="aa-review-sub"></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="btn btn-sm btn-outline" onclick="selectAllAA()">Select All</button>
-        <button class="btn btn-sm btn-outline" onclick="deselectAllAA()">Deselect All</button>
-        <button class="btn btn-sm btn-outline" onclick="selectOnlyNewAA()">Only New Photos</button>
-      </div>
-      <div id="aa-matches-list" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px"></div>
-      <div id="aa-no-matches" style="display:none;text-align:center;padding:32px;color:var(--text-muted)">
-        <div style="font-size:36px;margin-bottom:8px">🔍</div>
-        No confident matches found. Try uploading more photos or lowering the confidence threshold.
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="document.getElementById('aa-step-3').style.display='none';document.getElementById('aa-step-1').style.display=''">← Back</button>
-        <button class="btn btn-outline" onclick="closeModal('modal-auto-assign')">Cancel</button>
-        <button class="btn btn-gold" id="aa-apply-btn" onclick="applyAutoAssign()">
-          ✓ Apply Selected (<span id="aa-selected-count">0</span>)
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 4: Done -->
-    <div id="aa-step-4" style="display:none;text-align:center;padding:20px">
-      <div style="font-size:52px;margin-bottom:12px">✅</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--gold);margin-bottom:10px">Photos Assigned!</div>
-      <div id="aa-done-summary" style="background:var(--surface2);border-radius:10px;padding:16px;font-size:13px;margin-bottom:16px"></div>
-      <div class="modal-footer" style="justify-content:center">
-        <button class="btn btn-outline" onclick="openAutoAssignModal()">Run Again</button>
-        <button class="btn btn-gold" onclick="closeModal('modal-auto-assign');renderInventory()">Done ✓</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- PHOTO ASSIGNMENT MODAL -->
-<div class="modal-overlay" id="modal-assign-photo">
-  <div class="modal" style="max-width:760px;width:95vw">
-    <div class="modal-title">📌 Assign Photo to Products</div>
-
-    <!-- Selected photo preview -->
-    <div style="display:flex;align-items:center;gap:16px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:18px">
-      <img id="assign-photo-preview" src="" alt="Selected photo"
-        style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid var(--gold);flex-shrink:0">
-      <div>
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:3px">Assigning this photo to selected products</div>
-        <div id="assign-photo-name" style="font-size:15px;font-weight:600;color:var(--text)"></div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
-          <span id="assign-selected-count" style="font-weight:700;color:var(--gold)">0</span> products selected
-        </div>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <input type="text" id="assign-search" placeholder="🔍 Search by name or code..."
-        style="flex:1;min-width:180px;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none"
-        oninput="renderAssignProductList()">
-      <select id="assign-filter-cat" onchange="renderAssignProductList()"
-        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
-        <option value="">All Categories</option>
-        <option>Valves</option><option>Pipes &amp; Tubes</option><option>Fittings</option>
-        <option>Forged Steel Fittings</option><option>Flanges</option>
-        <option>Rods / Bars / Beams</option><option>Electrical</option>
-        <option>Safety Equipment</option><option>Instruments</option><option>Other</option>
-      </select>
-      <select id="assign-filter-mat" onchange="renderAssignProductList()"
-        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
-        <option value="">All Materials</option>
-        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
-        <option>Brass</option><option>Bronze</option><option>PVC</option><option>CPVC</option>
-        <option>PPR</option><option>HDPE</option>
-      </select>
-    </div>
-
-    <!-- Select all bar -->
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--border)">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500">
-        <input type="checkbox" id="assign-select-all" onchange="toggleAssignAll(this)"
-          style="width:16px;height:16px;cursor:pointer">
-        Select all visible (<span id="assign-visible-count">0</span>)
-      </label>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-outline" onclick="selectAssignWithPhoto()">Has Photo</button>
-        <button class="btn btn-sm btn-outline" onclick="selectAssignNoPhoto()">No Photo Only</button>
-      </div>
-    </div>
-
-    <!-- Product list -->
-    <div id="assign-product-list"
-      style="max-height:42vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);"></div>
-    <div id="assign-empty" style="display:none;text-align:center;padding:28px;color:var(--text-muted);font-size:13px">
-      No products match your filters
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-assign-photo')">Cancel</button>
-      <button class="btn btn-gold" id="assign-confirm-btn" onclick="confirmAssignPhoto()" disabled style="opacity:0.5">
-        📌 Assign to <span id="assign-btn-count">0</span> Products
-      </button>
-    </div>
-  </div>
-</div>
-</body>
-</html>
-    <!-- PURCHASE ORDERS PAGE -->
-    <div class="page" id="page-purchase-orders">
-      <div class="page-header">
-        <div class="page-header-title"><h1>Purchase Orders</h1><p>Create and track purchase orders to suppliers</p></div>
-        <button class="btn btn-gold manager-only" onclick="openNewPO()">+ New PO</button>
-      </div>
-      <div class="card" style="margin-bottom:14px">
-        <div class="filter-bar">
-          <input class="search-input" type="text" placeholder="Search POs..." id="po-search" oninput="renderPOs()">
-          <select class="filter-select" id="po-filter-company" onchange="renderPOs()">
-            <option value="">All Companies</option>
-            <option value="bv">Barakah Valves</option>
-            <option value="is">Iron Spring</option>
-            <option value="sw">Stable Way</option>
-          </select>
-          <select class="filter-select" id="po-filter-status" onchange="renderPOs()">
-            <option value="">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="received">Received</option>
-            <option value="partial">Partial</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-      </div>
-      <div class="card">
-        <div class="table-wrap">
-          <table><thead><tr>
-            <th>PO No.</th><th>Date</th><th>Supplier</th><th>Company</th><th>Items</th><th>Total (SAR)</th><th>Status</th><th>Actions</th>
-          </tr></thead>
-          <tbody id="po-tbody"></tbody></table>
-        </div>
-      </div>
-    </div>
-
-<!-- PHOTO LIBRARY PICKER MODAL -->
-<div class="modal-overlay" id="modal-lib-picker">
-  <div class="modal" style="max-width:720px">
-    <div class="modal-title">📚 Choose from Photo Library</div>
-
-    <!-- AI Suggestions strip -->
-    <div id="lib-picker-suggestions" style="display:none;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--steel);margin-bottom:8px;display:flex;align-items:center;gap:6px">
-        <span style="background:var(--steel-light);color:var(--steel);border-radius:20px;padding:2px 8px;font-size:10px">✨ AI Suggestions</span>
-        <span style="color:var(--text-muted);font-weight:400">Based on visual similarity to your product</span>
-      </div>
-      <div id="lib-picker-suggestions-grid" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-    </div>
-
-    <!-- AI loading state -->
-    <div id="lib-picker-ai-loading" style="display:none;padding:16px;text-align:center;background:var(--steel-light);border-radius:var(--radius-sm);margin-bottom:14px">
-      <div style="font-size:13px;color:var(--steel)">🤖 AI is finding visually similar photos...</div>
-    </div>
-
-    <!-- Category tabs -->
-    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">
-      <button class="btn btn-sm btn-gold" onclick="filterPickerCat('all',this)" id="picker-tab-all">All</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Valves',this)">Valves</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Pipes',this)">Pipes</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Fittings',this)">Fittings</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Flanges',this)">Flanges</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Electrical',this)">Electrical</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Safety Equipment',this)">Safety</button>
-      <button class="btn btn-sm btn-outline" onclick="filterPickerCat('Other',this)">Other</button>
-    </div>
-
-    <!-- Search -->
-    <input type="text" id="lib-picker-search" placeholder="Search by tag or name..."
-      style="width:100%;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none;margin-bottom:14px"
-      oninput="renderPickerGrid()">
-
-    <!-- Photo grid -->
-    <div id="lib-picker-empty" style="display:none;text-align:center;padding:32px;color:var(--text-muted)">
-      <div style="font-size:36px;margin-bottom:8px">📷</div>
-      No photos in library yet. Ask admin to upload photos in Settings.
-    </div>
-    <div id="lib-picker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;max-height:50vh;overflow-y:auto;padding:4px"></div>
-
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-lib-picker')">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- AUTO-ASSIGN PHOTOS MODAL -->
-<div class="modal-overlay" id="modal-auto-assign">
-  <div class="modal" style="max-width:820px;width:95vw">
-    <div class="modal-title">🤖 AI Auto-Assign Photos</div>
-
-    <!-- Step 1: Configure -->
-    <div id="aa-step-1">
-      <div class="alert" style="background:var(--steel-light);border:1px solid #bfdbfe;color:var(--steel);margin-bottom:16px">
-        AI will compare library photos visually to your products and suggest matches. You review and confirm before anything is saved.
-      </div>
-      <div class="grid-2" style="margin-bottom:16px">
-        <div class="field">
-          <label>Which products to scan?</label>
-          <select id="aa-scope" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-            <option value="no-photo">Only products with NO photo (recommended)</option>
-            <option value="all">All products (including ones with photos)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Which library photos to use?</label>
-          <select id="aa-photo-scope" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-            <option value="all">All library photos</option>
-            <option value="category">Match by category only (faster)</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <label>Confidence threshold</label>
-        <select id="aa-confidence" style="width:100%;padding:11px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none">
-          <option value="high">High — only very confident matches (fewer results, more accurate)</option>
-          <option value="medium" selected>Medium — balanced (recommended)</option>
-          <option value="low">Low — show all possible matches (more results, review carefully)</option>
-        </select>
-      </div>
-      <div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text-muted);margin-bottom:16px">
-        📊 <strong style="color:var(--text)">${allProducts.filter(p=>!p.photo_url).length}</strong> products without photos &nbsp;·&nbsp;
-        <strong style="color:var(--text)">${photoLibrary.length}</strong> photos in library
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeModal('modal-auto-assign')">Cancel</button>
-        <button class="btn btn-gold" onclick="startAutoAssign()">🤖 Start AI Scan</button>
-      </div>
-    </div>
-
-    <!-- Step 2: AI Scanning Progress -->
-    <div id="aa-step-2" style="display:none">
-      <div style="text-align:center;margin-bottom:20px">
-        <div class="spinner" style="margin:0 auto 14px"></div>
-        <div style="font-size:15px;font-weight:600" id="aa-status">Analysing products...</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:4px" id="aa-substatus"></div>
-      </div>
-      <div style="background:var(--surface2);border-radius:8px;height:8px;overflow:hidden;margin-bottom:16px">
-        <div id="aa-progress-bar" style="height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:0%;transition:width .4s;border-radius:8px"></div>
-      </div>
-      <div id="aa-log" style="max-height:180px;overflow-y:auto;font-size:12px;font-family:'JetBrains Mono',monospace;background:var(--surface2);border-radius:8px;padding:10px;line-height:1.8;color:var(--text-muted)"></div>
-    </div>
-
-    <!-- Step 3: Review Matches -->
-    <div id="aa-step-3" style="display:none">
-      <div id="aa-review-header" style="margin-bottom:14px">
-        <div style="font-size:15px;font-weight:600" id="aa-review-title"></div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="aa-review-sub"></div>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="btn btn-sm btn-outline" onclick="selectAllAA()">Select All</button>
-        <button class="btn btn-sm btn-outline" onclick="deselectAllAA()">Deselect All</button>
-        <button class="btn btn-sm btn-outline" onclick="selectOnlyNewAA()">Only New Photos</button>
-      </div>
-      <div id="aa-matches-list" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px"></div>
-      <div id="aa-no-matches" style="display:none;text-align:center;padding:32px;color:var(--text-muted)">
-        <div style="font-size:36px;margin-bottom:8px">🔍</div>
-        No confident matches found. Try uploading more photos or lowering the confidence threshold.
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="document.getElementById('aa-step-3').style.display='none';document.getElementById('aa-step-1').style.display=''">← Back</button>
-        <button class="btn btn-outline" onclick="closeModal('modal-auto-assign')">Cancel</button>
-        <button class="btn btn-gold" id="aa-apply-btn" onclick="applyAutoAssign()">
-          ✓ Apply Selected (<span id="aa-selected-count">0</span>)
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 4: Done -->
-    <div id="aa-step-4" style="display:none;text-align:center;padding:20px">
-      <div style="font-size:52px;margin-bottom:12px">✅</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--gold);margin-bottom:10px">Photos Assigned!</div>
-      <div id="aa-done-summary" style="background:var(--surface2);border-radius:10px;padding:16px;font-size:13px;margin-bottom:16px"></div>
-      <div class="modal-footer" style="justify-content:center">
-        <button class="btn btn-outline" onclick="openAutoAssignModal()">Run Again</button>
-        <button class="btn btn-gold" onclick="closeModal('modal-auto-assign');renderInventory()">Done ✓</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- PHOTO ASSIGNMENT MODAL -->
-<div class="modal-overlay" id="modal-assign-photo">
-  <div class="modal" style="max-width:760px;width:95vw">
-    <div class="modal-title">📌 Assign Photo to Products</div>
-
-    <!-- Selected photo preview -->
-    <div style="display:flex;align-items:center;gap:16px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:18px">
-      <img id="assign-photo-preview" src="" alt="Selected photo"
-        style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid var(--gold);flex-shrink:0">
-      <div>
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:3px">Assigning this photo to selected products</div>
-        <div id="assign-photo-name" style="font-size:15px;font-weight:600;color:var(--text)"></div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
-          <span id="assign-selected-count" style="font-weight:700;color:var(--gold)">0</span> products selected
-        </div>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <input type="text" id="assign-search" placeholder="🔍 Search by name or code..."
-        style="flex:1;min-width:180px;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none"
-        oninput="renderAssignProductList()">
-      <select id="assign-filter-cat" onchange="renderAssignProductList()"
-        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
-        <option value="">All Categories</option>
-        <option>Valves</option><option>Pipes &amp; Tubes</option><option>Fittings</option>
-        <option>Forged Steel Fittings</option><option>Flanges</option>
-        <option>Rods / Bars / Beams</option><option>Electrical</option>
-        <option>Safety Equipment</option><option>Instruments</option><option>Other</option>
-      </select>
-      <select id="assign-filter-mat" onchange="renderAssignProductList()"
-        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
-        <option value="">All Materials</option>
-        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
-        <option>Brass</option><option>Bronze</option><option>PVC</option><option>CPVC</option>
-        <option>PPR</option><option>HDPE</option>
-      </select>
-    </div>
-
-    <!-- Select all bar -->
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--border)">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500">
-        <input type="checkbox" id="assign-select-all" onchange="toggleAssignAll(this)"
-          style="width:16px;height:16px;cursor:pointer">
-        Select all visible (<span id="assign-visible-count">0</span>)
-      </label>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-outline" onclick="selectAssignWithPhoto()">Has Photo</button>
-        <button class="btn btn-sm btn-outline" onclick="selectAssignNoPhoto()">No Photo Only</button>
-      </div>
-    </div>
-
-    <!-- Product list -->
-    <div id="assign-product-list"
-      style="max-height:42vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);"></div>
-    <div id="assign-empty" style="display:none;text-align:center;padding:28px;color:var(--text-muted);font-size:13px">
-      No products match your filters
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-assign-photo')">Cancel</button>
-      <button class="btn btn-gold" id="assign-confirm-btn" onclick="confirmAssignPhoto()" disabled style="opacity:0.5">
-        📌 Assign to <span id="assign-btn-count">0</span> Products
-      </button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
