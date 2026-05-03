@@ -893,6 +893,22 @@ window.onerror = function(msg, src, line, col, err) {
         <span>HDPE</span>
         <span id="nav-badge-HDPE" style="margin-left:auto;font-size:10px;color:#7e22ce;font-weight:700;opacity:.8"></span>
       </div>
+      <div class="nav-section" style="font-size:8px;padding-top:10px;padding-bottom:2px">SPECIALTY</div>
+      <div class="nav-item" onclick="showCataloguePage('Electrical')" id="nav-catalogue-electrical" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#b45309;flex-shrink:0;display:inline-block"></span>
+        <span>Electrical</span>
+        <span id="nav-badge-Electrical" style="margin-left:auto;font-size:10px;color:#b45309;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('Safety Equipment')" id="nav-catalogue-safety" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#dc2626;flex-shrink:0;display:inline-block"></span>
+        <span>Safety Equip.</span>
+        <span id="nav-badge-Safety Equipment" style="margin-left:auto;font-size:10px;color:#dc2626;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('Hardware & Tools')" id="nav-catalogue-hardware" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#0891b2;flex-shrink:0;display:inline-block"></span>
+        <span>Hardware</span>
+        <span id="nav-badge-Hardware & Tools" style="margin-left:auto;font-size:10px;color:#0891b2;font-weight:700;opacity:.8"></span>
+      </div>
 
       <div class="nav-item" onclick="showPage('movements')" id="nav-movements">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Stock Movements
@@ -1387,6 +1403,7 @@ window.onerror = function(msg, src, line, col, err) {
                 <option>Electrical</option>
                 <option>Safety Equipment</option>
                 <option>Instruments</option>
+                <option>Hardware &amp; Tools</option>
                 <option>Other</option>
               </select>
       </div>
@@ -4651,7 +4668,7 @@ function printPO(po) {
 // ── GROUPED VIEW CONSTANTS & STATE ───────────────────────────
 const GROUPED_CATEGORIES = [
   'Valves','Pipes & Tubes','Fittings','Forged Steel Fittings',
-  'Flanges','Rods / Bars / Beams','Electrical','Safety Equipment','Instruments','Other'
+  'Flanges','Rods / Bars / Beams','Electrical','Safety Equipment','Instruments','Hardware & Tools','Other'
 ];
 
 const CAT_ICONS = {
@@ -7083,6 +7100,9 @@ const CATALOGUE_MATERIALS = {
   CPVC:   { label:'CPVC',               color:'#6d28d9', bg:'#f5f3ff', border:'#c4b5fd' },
   PPR:    { label:'PPR',                color:'#065f46', bg:'#ecfdf5', border:'#6ee7b7' },
   HDPE:   { label:'HDPE',               color:'#7e22ce', bg:'#fdf4ff', border:'#e879f9' },
+  Electrical:       { label:'Electrical Items',       color:'#b45309', bg:'#fffbeb', border:'#fde68a', icon:'⚡' },
+  'Safety Equipment': { label:'Safety Equipment',     color:'#dc2626', bg:'#fef2f2', border:'#fecaca', icon:'🦺' },
+  'Hardware & Tools': { label:'Hardware & Tools',     color:'#0891b2', bg:'#ecfeff', border:'#a5f3fc', icon:'🔩' },
 };
 
 const CATALOGUE_CATEGORIES = [
@@ -7096,6 +7116,7 @@ const CATALOGUE_CATEGORIES = [
   { id:'Safety Equipment',      icon:'🦺', subtypes:['Helmet','Gloves','Safety Boots','Harness','Goggles','Ear Muffs','Hi-Vis Vest','Face Shield','Safety Net'] },
   { id:'Instruments',           icon:'📊', subtypes:['Pressure Gauge','Temperature Gauge','Flow Meter','Level Sensor','Transmitter','Valve Actuator','Control Valve'] },
   { id:'Other',                 icon:'📦', subtypes:[] },
+  { id:'Hardware & Tools',      icon:'🔩', subtypes:['Bolt & Nut','Washer','Stud Bolt','Anchor Bolt','Threaded Rod','Chain','Wire Rope','Clamp','Hanger','Support','Gasket','O-Ring','Seal'] },
 ];
 
 let _catCurrentMat = null;
@@ -7155,7 +7176,11 @@ function renderCatMaterialPage(mat) {
   const fullEl = document.getElementById('cat-mat-fullname');
   if (fullEl)   fullEl.textContent = mc.label;
 
-  const matProducts = allProducts.filter(p => (p.material||'Other') === mat);
+  // For Electrical, Safety Equipment, Hardware & Tools — filter by category not material
+  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools'];
+  const matProducts = CATEGORY_PAGES.includes(mat)
+    ? allProducts.filter(p => (p.category||'Other') === mat)
+    : allProducts.filter(p => (p.material||'Other') === mat);
   const totalEl = document.getElementById('cat-mat-total-num');
   if (totalEl) { totalEl.textContent = matProducts.length; totalEl.style.color = mc.color; }
 
@@ -7343,10 +7368,13 @@ function renderCatProducts() {
 
 // ── UPDATE NAV BADGES ─────────────────────────────────────────
 function updateCatNavBadges() {
+  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools'];
   Object.keys(CATALOGUE_MATERIALS).forEach(mat => {
     const badge = document.getElementById(`nav-badge-${mat}`);
     if (!badge) return;
-    const count = allProducts.filter(p => (p.material||'Other') === mat).length;
+    const count = CATEGORY_PAGES.includes(mat)
+      ? allProducts.filter(p => (p.category||'Other') === mat).length
+      : allProducts.filter(p => (p.material||'Other') === mat).length;
     badge.textContent = count > 0 ? count : '';
   });
 }
@@ -7515,7 +7543,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const VALID_CATEGORIES = [
   'Valves','Pipes & Tubes','Fittings','Forged Steel Fittings',
-  'Flanges','Rods / Bars / Beams','Electrical','Safety Equipment','Instruments','Other'
+  'Flanges','Rods / Bars / Beams','Electrical','Safety Equipment','Instruments','Hardware & Tools','Other'
 ];
 
 let _catfixResults    = [];  // [{product, currentCat, suggestedCat, confidence, reason, status, selected}]
@@ -7871,6 +7899,10 @@ const BULK_SUBTYPES = {
   'Flanges': ['Slip-On','Socket Weld','Blind','Threaded','Lap Joint'],
   'Fittings': ['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'],
   'Forged Steel Fittings': ['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'],
+  'Hardware & Tools': ['Bolt & Nut','Washer','Stud Bolt','Anchor Bolt','Threaded Rod','Chain','Wire Rope','Clamp','Hanger','Support','Gasket','O-Ring','Seal'],
+  'Electrical': ['Cable','Conduit','Junction Box','Switch','MCB','Panel','Cable Tray','Gland','Socket'],
+  'Safety Equipment': ['Helmet','Gloves','Safety Boots','Harness','Goggles','Ear Muffs','Hi-Vis Vest','Face Shield'],
+  'Instruments': ['Pressure Gauge','Temperature Gauge','Flow Meter','Level Sensor','Transmitter'],
 };
 
 function openBulkEditCategoryModal() {
@@ -8143,6 +8175,7 @@ window.addEventListener('DOMContentLoaded', init);
         <option>Electrical</option>
         <option>Safety Equipment</option>
         <option>Instruments</option>
+        <option>Hardware &amp; Tools</option>
         <option>Other</option>
       </select>
     </div>
@@ -8399,6 +8432,7 @@ window.addEventListener('DOMContentLoaded', init);
         <option>Electrical</option>
         <option>Safety Equipment</option>
         <option>Instruments</option>
+        <option>Hardware &amp; Tools</option>
         <option>Other</option>
       </select>
     </div>
