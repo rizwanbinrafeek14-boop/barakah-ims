@@ -1048,6 +1048,7 @@ window.onerror = function(msg, src, line, col, err) {
             <span id="selected-count" style="font-size:12px;font-weight:600;color:var(--text)"></span>
             <button class="btn btn-sm btn-outline" onclick="selectAllProducts()">Select All</button>
             <button class="btn btn-sm btn-outline" onclick="clearSelection()">Clear</button>
+            <button class="btn btn-sm btn-outline admin-only" onclick="openBulkEditCategoryModal()" style="border-color:rgba(37,99,235,0.4);color:var(--steel)">✏️ Edit Category</button>
             <button class="btn btn-sm btn-danger admin-only" onclick="bulkDeleteSelected()">🗑️ Delete Selected</button>
           </div>
         </div>
@@ -7860,6 +7861,163 @@ async function applyCatfixCorrections() {
   showToast(`${success} product categories updated!`);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// BULK EDIT CATEGORY + SUB-TYPE
+// ═══════════════════════════════════════════════════════════════
+
+// Sub-type options per category (matches SUBTYPES if defined, else fallback)
+const BULK_SUBTYPES = {
+  'Valves': ['Gate Valve','Ball Valve','Check Valve','Globe Valve','Butterfly Valve','Y Stainer','Air Vents','Storm Valve','Angle Valve','Hose Valve'],
+  'Flanges': ['Slip-On','Socket Weld','Blind','Threaded','Lap Joint'],
+  'Fittings': ['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'],
+  'Forged Steel Fittings': ['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'],
+};
+
+function openBulkEditCategoryModal() {
+  if (currentProfile?.role !== 'admin') { showToast('Admin only', 'error'); return; }
+  const ids = [...selectedProductIds];
+  if (!ids.length) { showToast('Select products first', 'error'); return; }
+
+  // Reset fields
+  document.getElementById('bulk-cat-select').value      = '';
+  document.getElementById('bulk-subtype-select').value  = '';
+  document.getElementById('bulk-material-select').value = '';
+  const custEl = document.getElementById('bulk-subtype-custom');
+  if (custEl) { custEl.style.display = 'none'; custEl.value = ''; }
+
+  // Reset sub-type options
+  const subSel = document.getElementById('bulk-subtype-select');
+  subSel.innerHTML = '<option value="">-- Keep existing sub-type --</option>';
+
+  // Update counts
+  document.getElementById('bulk-edit-count-label').textContent = ids.length;
+  document.getElementById('bulk-edit-apply-count').textContent = ids.length;
+
+  // Build preview list
+  const preview = document.getElementById('bulk-edit-preview');
+  const products = ids.map(id => allProducts.find(p => p.id === id)).filter(Boolean);
+  preview.innerHTML = products.map(p => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)">
+      <div style="width:36px;height:32px;border-radius:5px;overflow:hidden;background:var(--surface2);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+        ${p.photo_url ? `<img src="${p.photo_url}" style="width:36px;height:32px;object-fit:cover">` : '<span style="font-size:14px;opacity:.3">📦</span>'}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:1px">
+          <span style="color:var(--steel)">${p.category || '—'}</span>
+          ${p.sub_type ? ` · ${p.sub_type}` : ''}
+          ${p.material ? ` · ${p.material}` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+
+  openModal('modal-bulk-edit-cat');
+}
+
+function onBulkCatChange() {
+  const cat    = document.getElementById('bulk-cat-select').value;
+  const subSel = document.getElementById('bulk-subtype-select');
+  const custEl = document.getElementById('bulk-subtype-custom');
+
+  const subtypes = BULK_SUBTYPES[cat] || [];
+  subSel.innerHTML = '<option value="">-- Keep existing sub-type --</option>' +
+    (subtypes.length
+      ? subtypes.map(s => `<option value="${s}">${s}</option>`).join('') +
+        '<option value="_custom">+ Custom sub-type...</option>'
+      : '<option value="_custom">+ Type custom sub-type...</option>');
+
+  if (custEl) custEl.style.display = 'none';
+}
+
+function onBulkSubtypeChange() {
+  const subSel = document.getElementById('bulk-subtype-select');
+  const custEl = document.getElementById('bulk-subtype-custom');
+  if (!custEl) return;
+  if (subSel.value === '_custom') {
+    custEl.style.display = '';
+    custEl.focus();
+  } else {
+    custEl.style.display = 'none';
+  }
+}
+
+async function applyBulkEditCategory() {
+  const ids      = [...selectedProductIds];
+  if (!ids.length) return;
+
+  const catSel   = document.getElementById('bulk-cat-select').value;
+  const subSel   = document.getElementById('bulk-subtype-select').value;
+  const custEl   = document.getElementById('bulk-subtype-custom');
+  const matSel   = document.getElementById('bulk-material-select').value;
+
+  // Resolve sub-type value
+  let subTypeVal = subSel === '_custom' ? (custEl?.value.trim() || null) : (subSel || null);
+  const catVal   = catSel  || null;
+  const matVal   = matSel  || null;
+
+  // Check nothing selected
+  if (!catVal && !subTypeVal && !matVal) {
+    showToast('Select at least one field to update', 'error'); return;
+  }
+
+  // Build update object with only changed fields
+  const updates = {};
+  if (catVal)     updates.category   = catVal;
+  if (subTypeVal) updates.sub_type   = subTypeVal;
+  if (matVal)     updates.material   = matVal;
+  updates.updated_at = new Date().toISOString();
+
+  closeModal('modal-bulk-edit-cat');
+  showLoading(`UPDATING ${ids.length} PRODUCTS...`);
+
+  let success = 0, failed = 0;
+
+  // Batch update in groups of 20
+  for (let i = 0; i < ids.length; i += 20) {
+    const batch = ids.slice(i, i + 20);
+    try {
+      const { error } = await sb.from('products').update(updates).in('id', batch);
+      if (error) throw error;
+      // Update local cache
+      batch.forEach(id => {
+        const p = allProducts.find(x => x.id === id);
+        if (p) {
+          if (catVal)     p.category  = catVal;
+          if (subTypeVal) p.sub_type  = subTypeVal;
+          if (matVal)     p.material  = matVal;
+        }
+      });
+      success += batch.length;
+    } catch(e) {
+      console.error('Bulk edit failed:', e);
+      failed += batch.length;
+    }
+  }
+
+  hideLoading();
+
+  // Clear selection
+  selectedProductIds.clear();
+  selectModeActive = false;
+  const selectBtn = document.getElementById('select-mode-btn');
+  if (selectBtn) selectBtn.textContent = '☑️ Select';
+  const bulkBar = document.getElementById('bulk-actions');
+  if (bulkBar) bulkBar.style.display = 'none';
+  const selectHeader = document.getElementById('inv-select-header');
+  if (selectHeader) selectHeader.style.display = 'none';
+
+  renderInventory();
+
+  // Summary toast
+  const parts = [];
+  if (catVal)     parts.push(`category → ${catVal}`);
+  if (subTypeVal) parts.push(`sub-type → ${subTypeVal}`);
+  if (matVal)     parts.push(`material → ${matVal}`);
+
+  if (failed > 0) showToast(`Updated ${success}, failed ${failed}`, 'error');
+  else            showToast(`✓ ${success} products updated: ${parts.join(', ')}`);
+}
+
 window.addEventListener('DOMContentLoaded', init);
 </script>
 
@@ -7955,6 +8113,80 @@ window.addEventListener('DOMContentLoaded', init);
         <button class="btn btn-outline" onclick="openAICategoryFix()">Scan Again</button>
         <button class="btn btn-gold" onclick="closeModal('modal-ai-catfix');renderInventory()">Done ✓</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- BULK EDIT CATEGORY MODAL -->
+<div class="modal-overlay" id="modal-bulk-edit-cat">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">✏️ Bulk Edit Category & Sub-type</div>
+
+    <div class="alert" style="background:var(--steel-light);border:1px solid #bfdbfe;color:var(--steel);margin-bottom:18px;font-size:13px">
+      Updating <strong id="bulk-edit-count-label">0</strong> selected products. Leave a field unchanged to keep existing values.
+    </div>
+
+    <!-- Category -->
+    <div class="field">
+      <label>Category
+        <span style="font-weight:400;color:var(--text-muted);font-size:11px;text-transform:none;letter-spacing:0"> — leave blank to keep existing</span>
+      </label>
+      <select id="bulk-cat-select" onchange="onBulkCatChange()"
+        style="width:100%;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none">
+        <option value="">-- Keep existing category --</option>
+        <option>Valves</option>
+        <option>Pipes &amp; Tubes</option>
+        <option>Fittings</option>
+        <option>Forged Steel Fittings</option>
+        <option>Flanges</option>
+        <option>Rods / Bars / Beams</option>
+        <option>Electrical</option>
+        <option>Safety Equipment</option>
+        <option>Instruments</option>
+        <option>Other</option>
+      </select>
+    </div>
+
+    <!-- Sub-type -->
+    <div class="field">
+      <label>Sub-type
+        <span style="font-weight:400;color:var(--text-muted);font-size:11px;text-transform:none;letter-spacing:0"> — leave blank to keep existing</span>
+      </label>
+      <div style="display:flex;gap:8px">
+        <select id="bulk-subtype-select" onchange="onBulkSubtypeChange()"
+          style="flex:1;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none">
+          <option value="">-- Keep existing sub-type --</option>
+        </select>
+        <input type="text" id="bulk-subtype-custom" placeholder="Custom sub-type..."
+          style="flex:1;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none;display:none">
+      </div>
+    </div>
+
+    <!-- Material (bonus) -->
+    <div class="field">
+      <label>Material
+        <span style="font-weight:400;color:var(--text-muted);font-size:11px;text-transform:none;letter-spacing:0"> — leave blank to keep existing</span>
+      </label>
+      <select id="bulk-material-select"
+        style="width:100%;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none">
+        <option value="">-- Keep existing material --</option>
+        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
+        <option>Brass</option><option>Bronze</option><option>Copper</option>
+        <option>PVC</option><option>CPVC</option><option>PPR</option><option>HDPE</option><option>Other</option>
+      </select>
+    </div>
+
+    <!-- Preview of selected products -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px">Selected Products Preview</div>
+      <div id="bulk-edit-preview" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-bulk-edit-cat')">Cancel</button>
+      <button class="btn btn-gold" onclick="applyBulkEditCategory()" id="bulk-edit-apply-btn">
+        ✓ Apply to <span id="bulk-edit-apply-count">0</span> Products
+      </button>
     </div>
   </div>
 </div>
@@ -8137,6 +8369,80 @@ window.addEventListener('DOMContentLoaded', init);
         <button class="btn btn-outline" onclick="openAICategoryFix()">Scan Again</button>
         <button class="btn btn-gold" onclick="closeModal('modal-ai-catfix');renderInventory()">Done ✓</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- BULK EDIT CATEGORY MODAL -->
+<div class="modal-overlay" id="modal-bulk-edit-cat">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">✏️ Bulk Edit Category & Sub-type</div>
+
+    <div class="alert" style="background:var(--steel-light);border:1px solid #bfdbfe;color:var(--steel);margin-bottom:18px;font-size:13px">
+      Updating <strong id="bulk-edit-count-label">0</strong> selected products. Leave a field unchanged to keep existing values.
+    </div>
+
+    <!-- Category -->
+    <div class="field">
+      <label>Category
+        <span style="font-weight:400;color:var(--text-muted);font-size:11px;text-transform:none;letter-spacing:0"> — leave blank to keep existing</span>
+      </label>
+      <select id="bulk-cat-select" onchange="onBulkCatChange()"
+        style="width:100%;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none">
+        <option value="">-- Keep existing category --</option>
+        <option>Valves</option>
+        <option>Pipes &amp; Tubes</option>
+        <option>Fittings</option>
+        <option>Forged Steel Fittings</option>
+        <option>Flanges</option>
+        <option>Rods / Bars / Beams</option>
+        <option>Electrical</option>
+        <option>Safety Equipment</option>
+        <option>Instruments</option>
+        <option>Other</option>
+      </select>
+    </div>
+
+    <!-- Sub-type -->
+    <div class="field">
+      <label>Sub-type
+        <span style="font-weight:400;color:var(--text-muted);font-size:11px;text-transform:none;letter-spacing:0"> — leave blank to keep existing</span>
+      </label>
+      <div style="display:flex;gap:8px">
+        <select id="bulk-subtype-select" onchange="onBulkSubtypeChange()"
+          style="flex:1;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none">
+          <option value="">-- Keep existing sub-type --</option>
+        </select>
+        <input type="text" id="bulk-subtype-custom" placeholder="Custom sub-type..."
+          style="flex:1;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none;display:none">
+      </div>
+    </div>
+
+    <!-- Material (bonus) -->
+    <div class="field">
+      <label>Material
+        <span style="font-weight:400;color:var(--text-muted);font-size:11px;text-transform:none;letter-spacing:0"> — leave blank to keep existing</span>
+      </label>
+      <select id="bulk-material-select"
+        style="width:100%;padding:11px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;outline:none">
+        <option value="">-- Keep existing material --</option>
+        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
+        <option>Brass</option><option>Bronze</option><option>Copper</option>
+        <option>PVC</option><option>CPVC</option><option>PPR</option><option>HDPE</option><option>Other</option>
+      </select>
+    </div>
+
+    <!-- Preview of selected products -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px">Selected Products Preview</div>
+      <div id="bulk-edit-preview" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-bulk-edit-cat')">Cancel</button>
+      <button class="btn btn-gold" onclick="applyBulkEditCategory()" id="bulk-edit-apply-btn">
+        ✓ Apply to <span id="bulk-edit-apply-count">0</span> Products
+      </button>
     </div>
   </div>
 </div>
