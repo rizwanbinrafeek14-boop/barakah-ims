@@ -167,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
   /* Sidebar */
   --sidebar-bg: var(--blue-900);
   --sidebar-w: 240px;
+  --sidebar-hidden-x: -260px;
   --sidebar-collapsed-w: 56px;
   --sidebar-text: #94a3b8;
   --sidebar-active: var(--gold3);
@@ -330,8 +331,15 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing:-0.02em; }
 }
 .sidebar.collapsed { width: var(--sidebar-collapsed-w); }
 @media(max-width:768px) {
-  .sidebar { transform:translateX(-100%); width:var(--sidebar-w) !important; }
-  .sidebar.open { transform:translateX(0) !important; }
+  .sidebar {
+    transform: translateX(-260px) !important;
+    width: 240px !important;
+    box-shadow: none;
+  }
+  .sidebar.open {
+    transform: translateX(0) !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.35) !important;
+  }
 }
 
 .sidebar-logo {
@@ -952,9 +960,11 @@ input[type=file].photo-picker { position:absolute; width:1px; height:1px; opacit
   .grid-4 { grid-template-columns:repeat(4,1fr)!important; }
   .bottom-nav { display:none; }
   .fab-btn { display:none; }
+  .sidebar { transform:translateX(-260px)!important; }
+  .sidebar.open { transform:translateX(0)!important; }
 }
 @media(display-mode:standalone){
-  .sidebar { transform:translateX(-240px)!important; }
+  .sidebar { transform:translateX(-260px)!important; box-shadow:none!important; }
   .sidebar.open { transform:translateX(0)!important; }
   .hamburger-inline { display:flex!important; }
   .main { margin-left:0!important; }
@@ -967,7 +977,7 @@ input[type=file].photo-picker { position:absolute; width:1px; height:1px; opacit
   * { touch-action:manipulation; }
   .modal,.sidebar-nav { -webkit-overflow-scrolling:touch; }
 }
-.is-mobile .sidebar { transform:translateX(-240px)!important; width:240px!important; }
+.is-mobile .sidebar { transform:translateX(-260px)!important; width:240px!important; box-shadow:none!important; }
 .is-mobile .sidebar.open { transform:translateX(0)!important; }
 .is-mobile .main { margin-left:0!important; }
 .is-mobile .hamburger-inline { display:flex!important; }
