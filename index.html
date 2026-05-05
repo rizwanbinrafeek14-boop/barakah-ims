@@ -322,14 +322,38 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing:-0.02em; }
   width: var(--sidebar-w);
   background: var(--sidebar-bg);
   display: flex; flex-direction:column;
-  z-index: 150;
+  z-index: 100;
   transition: width var(--dur-slow) var(--ease-out),
               transform var(--dur-slow) var(--ease-out);
   will-change: transform, width;
   overflow: hidden;
   box-shadow: 4px 0 24px rgba(0,0,0,0.2);
 }
+@media(min-width:769px) {
+  .sidebar { z-index: 100; }
+  .sidebar.collapsed { width: 56px; }
+}
 .sidebar.collapsed { width: var(--sidebar-collapsed-w); }
+@media(max-width:768px) {
+  /* On mobile: collapsed mode doesn't apply - sidebar is always full width or fully hidden */
+  .sidebar.collapsed { width: 240px !important; }
+  .sidebar.collapsed .sidebar-logo-text { opacity:1 !important; width:auto !important; }
+  .sidebar.collapsed .nav-section { opacity:1 !important; }
+  .sidebar.collapsed .nav-item { padding:9px 16px !important; justify-content:flex-start !important; margin:1px 8px 1px 0 !important; border-left:2px solid transparent !important; }
+  .sidebar.collapsed .nav-item span.nav-label { opacity:1 !important; width:auto !important; }
+  .sidebar.collapsed .user-info { opacity:1 !important; width:auto !important; }
+  .sidebar.collapsed .sidebar-collapse-btn { display:none !important; }
+}
+/* On mobile: collapsed = fully hidden, never partially shown */
+@media(max-width:768px) {
+  .sidebar.collapsed {
+    width: 240px !important;
+    transform: translateX(-260px) !important;
+  }
+  .sidebar.collapsed.open {
+    transform: translateX(0) !important;
+  }
+}
 @media(max-width:768px) {
   .sidebar {
     transform: translateX(-260px) !important;
@@ -368,6 +392,7 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing:-0.02em; }
 }
 .sidebar-collapse-btn:hover { background:var(--gold); color:var(--blue-900); transform:scale(1.1); }
 @media(min-width:769px) { .sidebar-collapse-btn { display:flex; } }
+@media(max-width:768px) { .sidebar-collapse-btn { display:none !important; } }
 
 .sidebar-nav { flex:1; padding:10px 0; overflow-y:auto; overflow-x:hidden; }
 .sidebar-nav::-webkit-scrollbar { width:2px; }
@@ -473,6 +498,14 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing:-0.02em; }
 }
 .sidebar.collapsed ~ .main,
 .sidebar.collapsed + * + .main { margin-left:var(--sidebar-collapsed-w); }
+@media(max-width:768px) {
+  .sidebar.collapsed ~ .main,
+  .sidebar.collapsed + * + .main { margin-left:0 !important; }
+}
+@media(max-width:768px) {
+  .sidebar.collapsed ~ .main,
+  .sidebar.collapsed + * + .main { margin-left:0 !important; }
+}
 @media(max-width:768px) { .main { margin-left:0 !important; } }
 
 /* ── TOPBAR ── */
@@ -8798,23 +8831,33 @@ async function confirmMerge() {
 let sidebarCollapsed = false;
 
 function toggleSidebarCollapse() {
+  if (window.innerWidth <= 768) return; // No collapse on mobile
   sidebarCollapsed = !sidebarCollapsed;
   const sidebar = document.querySelector('.sidebar');
   const main    = document.querySelector('.main');
   const btn     = document.querySelector('.sidebar-collapse-btn');
 
   if (sidebar) sidebar.classList.toggle('collapsed', sidebarCollapsed);
-  localStorage.setItem('bims_sidebar_collapsed', sidebarCollapsed);
 
+  // Directly set main margin — don't rely on CSS sibling selector
+  if (main) {
+    main.style.marginLeft = sidebarCollapsed ? '56px' : '240px';
+  }
+
+  localStorage.setItem('bims_sidebar_collapsed', sidebarCollapsed);
   if (btn) btn.textContent = sidebarCollapsed ? '▶' : '◀';
 }
 
 function initSidebarCollapse() {
+  // Never collapse on mobile - only desktop
+  if (window.innerWidth <= 768) return;
   const saved = localStorage.getItem('bims_sidebar_collapsed') === 'true';
   if (saved) {
     sidebarCollapsed = true;
     const sidebar = document.querySelector('.sidebar');
+    const main    = document.querySelector('.main');
     if (sidebar) sidebar.classList.add('collapsed');
+    if (main)    main.style.marginLeft = '56px';
     const btn = document.querySelector('.sidebar-collapse-btn');
     if (btn) btn.textContent = '▶';
   }
