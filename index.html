@@ -22,9 +22,13 @@ function toggleSidebar() {
   const overlay = document.getElementById('sidebar-overlay');
   if (!sidebar) return;
   const isOpen = sidebar.classList.contains('open');
-  sidebar.classList.toggle('open', !isOpen);
-  overlay.classList.toggle('open', !isOpen);
-  document.body.style.overflow = !isOpen ? 'hidden' : '';
+  if (isOpen) {
+    closeSidebar();
+  } else {
+    sidebar.classList.add('open');
+    if (overlay) { overlay.style.display = 'block'; overlay.classList.add('open'); }
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function closeSidebar() {
@@ -32,7 +36,10 @@ function closeSidebar() {
   const overlay = document.getElementById('sidebar-overlay');
   if (!sidebar) return;
   sidebar.classList.remove('open');
-  if (overlay) overlay.classList.remove('open');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.style.display = 'none';
+  }
   document.body.style.overflow = '';
 }
 
@@ -448,6 +455,7 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing:-0.02em; }
   background:rgba(0,0,0,0.6); z-index:140;
   backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
 }
+.sidebar-overlay.open { display:block; }
 
 /* ── MAIN ── */
 .main {
@@ -2349,8 +2357,13 @@ const PAGE_TITLES = {
 
 function showPage(id) {
   currentPage = id;
-  // Close sidebar on mobile when navigating
-  if (window.innerWidth <= 768 || document.documentElement.classList.contains('is-mobile')) {
+  // Always close sidebar when navigating (mobile + standalone PWA)
+  const sidebar = document.querySelector('.sidebar');
+  const isMobileScreen = window.innerWidth <= 900 ||
+    document.documentElement.classList.contains('is-mobile') ||
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+  if (isMobileScreen && sidebar && sidebar.classList.contains('open')) {
     closeSidebar();
   }
   if ((id === 'users' || id === 'settings') && currentProfile?.role !== 'admin') { showPage('dashboard'); return; }
@@ -7370,6 +7383,7 @@ let _catCurrentCat = null;
 function showCataloguePage(mat) {
   _catCurrentMat = mat;
   _catCurrentCat = null;
+  closeSidebar();
   showPage('catalogue');
   // Update page title
   const mc = CATALOGUE_MATERIALS[mat] || {};
