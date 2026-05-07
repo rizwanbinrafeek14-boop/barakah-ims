@@ -430,7 +430,7 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 
 /* ── MAIN ── */
 .main {
-  margin-left: var(--sidebar-w);
+  margin-left: 240px; /* JS will override this immediately on load */
   min-height: 100vh;
   transition: margin-left 0.3s var(--ease);
 }
@@ -1862,6 +1862,16 @@ window.onerror = function(msg, src, line, col, err) {
 </div>
 
 <script>
+// ── RESET SIDEBAR STATE ON VERSION CHANGE ────────────────────
+(function() {
+  const APP_VERSION = 'v3.2';
+  const storedVer   = localStorage.getItem('bims_version');
+  if (storedVer !== APP_VERSION) {
+    localStorage.removeItem('bims_sidebar_collapsed');
+    localStorage.setItem('bims_version', APP_VERSION);
+  }
+})();
+
 // ── PWA / STANDALONE MODE DETECTION ─────────────────────────
 (function() {
   // Check if running as installed PWA (standalone)
@@ -2098,6 +2108,8 @@ async function doLogout() {
 async function launchApp() {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  // Re-apply sidebar state after app shows
+  setTimeout(initSidebarCollapse, 10);
   showLoading('LOADING DATA...');
 
   const p = currentProfile;
@@ -8632,18 +8644,20 @@ function toggleSidebarCollapse() {
 }
 
 function initSidebarCollapse() {
-  // Never collapse on mobile - only desktop
-  if (window.innerWidth <= 768) return;
-  const saved = localStorage.getItem('bims_sidebar_collapsed') === 'true';
-  if (saved) {
-    sidebarCollapsed = true;
-    const sidebar = document.querySelector('.sidebar');
-    const main    = document.querySelector('.main');
-    if (sidebar) sidebar.classList.add('collapsed');
-    if (main)    main.style.marginLeft = '56px';
-    const btn = document.querySelector('.sidebar-collapse-btn');
-    if (btn) btn.textContent = '▶';
+  const main = document.querySelector('.main');
+  // On mobile: always no margin
+  if (window.innerWidth <= 768) {
+    if (main) main.style.marginLeft = '0px';
+    return;
   }
+  // On desktop: read saved state and apply
+  const saved = localStorage.getItem('bims_sidebar_collapsed') === 'true';
+  sidebarCollapsed = saved;
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) sidebar.classList.toggle('collapsed', saved);
+  if (main) main.style.marginLeft = saved ? '56px' : '240px';
+  const btn = document.querySelector('.sidebar-collapse-btn');
+  if (btn) btn.textContent = saved ? '▶' : '◀';
 }
 
 // ── BOTTOM NAV ACTIVE STATE ───────────────────────────────────
@@ -8820,6 +8834,20 @@ function addNavTooltips() {
 }
 
 // ── INIT ─────────────────────────────────────────────────────
+// Run sidebar collapse immediately (before DOMContentLoaded)
+(function() {
+  const saved = localStorage.getItem('bims_sidebar_collapsed') === 'true';
+  if (saved && window.innerWidth > 768) {
+    // Add collapsed class immediately to prevent flash
+    document.addEventListener('DOMContentLoaded', () => {
+      const sidebar = document.querySelector('.sidebar');
+      const main = document.querySelector('.main');
+      if (sidebar) sidebar.classList.add('collapsed');
+      if (main) main.style.marginLeft = '56px';
+    });
+  }
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   initSidebarCollapse();
   addNavTooltips();
