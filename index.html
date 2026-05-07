@@ -2289,17 +2289,9 @@ function showPage(id) {
   if (id === 'reports') renderReports();
   if (id === 'ai-insights') generateAiInsights();
   if (id === 'users') renderUsers();
-  if (id === 'catalogue') {
-    // Wait for .active class + paint, then render content
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        if (_catCurrentMat) {
-          renderCatMaterialPage(_catCurrentMat);
-        } else {
-          showCatalogueHome();
-        }
-      }, 0);
-    });
+  if (id === 'catalogue' && !_catCurrentMat) {
+    // Only render if coming directly (not from showCataloguePage)
+    showCatalogueHome();
   }
   // settings renders on its own
   if (id === 'activity-log') { setTimeout(loadActivityLog, 20); }
@@ -2319,12 +2311,14 @@ function showPage(id) {
   if (window.innerWidth <= 900 || document.documentElement.classList.contains('is-mobile')) {
     closeSidebar();
   }
-  // Reset scroll IMMEDIATELY before any render
+  // Reset all scroll positions
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
   window.scrollTo(0, 0);
   const mainEl2 = document.querySelector('.main');
   if (mainEl2) mainEl2.scrollTop = 0;
+  // Extra reset for iOS
+  setTimeout(() => { window.scrollTo(0,0); }, 50);
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────
@@ -7296,8 +7290,10 @@ function showCataloguePage(mat) {
   _catCurrentMat = mat;
   _catCurrentCat = null;
   closeSidebar();
+  // Render content FIRST (into the inactive page - that's fine)
+  renderCatMaterialPage(mat);
+  // THEN show the page (content already rendered, no blank flash)
   showPage('catalogue');
-  // showPage handles the render via setTimeout after .active class applies
 }
 
 function showCatalogueHome() {
@@ -7319,7 +7315,7 @@ function backToCatMaterial() {
 function renderCatMaterialPage(mat) {
   const mc = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
 
-  document.getElementById('cat-level-material').style.display = 'none'; // hide until filled
+  document.getElementById('cat-level-material').style.display = 'block';
   document.getElementById('cat-level-category').style.display = 'none';
 
   document.getElementById('cat-breadcrumb-mat').textContent   = mat;
@@ -7426,8 +7422,6 @@ function renderCatMaterialPage(mat) {
     list.appendChild(row);
   });
 
-  // Show content AFTER populating (prevents blank flash)
-  document.getElementById('cat-level-material').style.display = 'block';
 }
 
 
