@@ -2296,11 +2296,7 @@ function showPage(id) {
       } else if (typeof showCatalogueHome === 'function') {
         showCatalogueHome();
       }
-      // Scroll page content to top after render
-      const catPage = document.getElementById('page-catalogue');
-      if (catPage) catPage.scrollTop = 0;
-      window.scrollTo(0, 0);
-    }, 30);
+    }, 50);
   }
   // settings renders on its own
   if (id === 'activity-log') { setTimeout(loadActivityLog, 20); }
@@ -7432,10 +7428,15 @@ function renderCatMaterialPage(mat) {
     list.appendChild(row);
   });
 
-  // Scroll to top after render
-  const mainEl = document.querySelector('.main');
-  if (mainEl) mainEl.scrollTop = 0;
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  // Show content AFTER populating (prevents blank flash)
+  document.getElementById('cat-level-material').style.display = 'block';
+
+  // Scroll to very top
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0);
+    const mainEl = document.querySelector('.main');
+    if (mainEl) mainEl.scrollTop = 0;
+  });
 }
 
 
@@ -7447,7 +7448,7 @@ function openCatCategory(catId, mat) {
 
   // Show category level, hide material level
   document.getElementById('cat-level-material').style.display = 'none';
-  document.getElementById('cat-level-category').style.display = '';
+  document.getElementById('cat-level-category').style.display = 'block';
 
   // Breadcrumb
   document.getElementById('cat-breadcrumb-mat').textContent     = mat;
@@ -9184,7 +9185,7 @@ window.addEventListener('DOMContentLoaded', init);
       </div>
 
       <!-- LEVEL 1: Material home — shows sub-category list -->
-      <div id="cat-level-material" style="display:block">
+      <div id="cat-level-material" style="display:none">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:18px 20px;background:var(--surface2);border-radius:var(--radius);border:2px solid var(--border)" id="cat-mat-header">
           <div id="cat-mat-badge" style="width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0"></div>
           <div>
