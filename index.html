@@ -504,8 +504,8 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 .notif-empty { padding: 28px; text-align: center; color: var(--text-muted); font-size: 13px; }
 
 /* ── PAGE ── */
-.page { display: none; padding: 24px; animation: pageIn 0.2s ease both; }
-.page.active { display: block; }
+.page { display: none; padding: 24px; }
+.page.active { display: block; animation: pageIn 0.2s ease both; }
 #page-catalogue { padding: 12px 20px 24px; }
 @keyframes pageIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
@@ -2319,9 +2319,12 @@ function showPage(id) {
   if (window.innerWidth <= 900 || document.documentElement.classList.contains('is-mobile')) {
     closeSidebar();
   }
-  // Scroll to top
+  // Reset scroll IMMEDIATELY before any render
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
   window.scrollTo(0, 0);
-  document.querySelector('.main')?.scrollTo(0, 0);
+  const mainEl2 = document.querySelector('.main');
+  if (mainEl2) mainEl2.scrollTop = 0;
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────
@@ -7425,13 +7428,6 @@ function renderCatMaterialPage(mat) {
 
   // Show content AFTER populating (prevents blank flash)
   document.getElementById('cat-level-material').style.display = 'block';
-
-  // Scroll to very top
-  requestAnimationFrame(() => {
-    window.scrollTo(0, 0);
-    const mainEl = document.querySelector('.main');
-    if (mainEl) mainEl.scrollTop = 0;
-  });
 }
 
 
