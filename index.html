@@ -2289,9 +2289,8 @@ function showPage(id) {
   if (id === 'reports') renderReports();
   if (id === 'ai-insights') generateAiInsights();
   if (id === 'users') renderUsers();
-  if (id === 'catalogue' && !_catCurrentMat) {
-    // Only render if coming directly (not from showCataloguePage)
-    showCatalogueHome();
+  if (id === 'catalogue') {
+    if (typeof initCatalogueIfEmpty === 'function') initCatalogueIfEmpty();
   }
   // settings renders on its own
   if (id === 'activity-log') { setTimeout(loadActivityLog, 20); }
@@ -7282,188 +7281,27 @@ const CATALOGUE_CATEGORIES = [
   { id:'Hardware & Tools',      icon:'🔩', subtypes:['Bolt & Nut','Washer','Stud Bolt','Anchor Bolt','Threaded Rod','Chain','Wire Rope','Clamp','Hanger','Support','Gasket','O-Ring','Seal'] },
 ];
 
-let _catCurrentMat = null;
-let _catCurrentCat = null;
+let _catCurrentMat = null; // legacy, use _catMat
+let _catCurrentCat = null; // legacy, use _catCat
 
 // ── NAVIGATION ────────────────────────────────────────────────
-function showCataloguePage(mat) {
-  _catCurrentMat = mat;
-  _catCurrentCat = null;
-  closeSidebar();
-  // Render content FIRST (into the inactive page - that's fine)
-  renderCatMaterialPage(mat);
-  // THEN show the page (content already rendered, no blank flash)
-  showPage('catalogue');
-}
+// showCataloguePage replaced by new catalogue system
 
-function showCatalogueHome() {
-  // Navigate to first available material, or CS by default
-  const firstMat = Object.keys(CATALOGUE_MATERIALS).find(m => 
-    allProducts.some(p => (p.material||'Other') === m || (p.category||'Other') === m)
-  ) || 'CS';
-  _catCurrentMat = firstMat;
-  _catCurrentCat = null;
-  renderCatMaterialPage(firstMat);
-}
 
-function backToCatMaterial() {
-  _catCurrentCat = null;
-  renderCatMaterialPage(_catCurrentMat);
-}
+// showCatalogueHome replaced by new catalogue system
+
+
+// backToCatMaterial replaced by new catalogue system
+
 
 // ── LEVEL 1: Material home ────────────────────────────────────
-function renderCatMaterialPage(mat) {
-  const mc = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
+// renderCatMaterialPage replaced by new catalogue system
 
-  document.getElementById('cat-level-material').style.display = 'block';
-  document.getElementById('cat-level-category').style.display = 'none';
-
-  document.getElementById('cat-breadcrumb-mat').textContent   = mat;
-  document.getElementById('cat-breadcrumb-sep').style.display = 'none';
-  document.getElementById('cat-breadcrumb-cat').style.display = 'none';
-
-  const header = document.getElementById('cat-mat-header');
-  if (header) {
-    header.style.borderColor = mc.border;
-    header.style.background  = mc.bg;
-  }
-  const badge = document.getElementById('cat-mat-badge');
-  if (badge) {
-    badge.textContent      = mat;
-    badge.style.background = mc.color;
-    badge.style.fontSize   = mat.length > 3 ? '11px' : '14px';
-  }
-
-  const nameEl = document.getElementById('cat-mat-name');
-  if (nameEl) { nameEl.textContent = mat; nameEl.style.color = mc.color; }
-  const fullEl = document.getElementById('cat-mat-fullname');
-  if (fullEl)   fullEl.textContent = mc.label;
-
-  // For Electrical, Safety Equipment, Hardware & Tools — filter by category not material
-  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools'];
-  const matProducts = CATEGORY_PAGES.includes(mat)
-    ? allProducts.filter(p => (p.category||'Other') === mat)
-    : allProducts.filter(p => (p.material||'Other') === mat);
-  const totalEl = document.getElementById('cat-mat-total-num');
-  if (totalEl) { totalEl.textContent = matProducts.length; totalEl.style.color = mc.color; }
-
-  const threshold = parseInt(settings.lowStockThreshold || 10);
-  const list = document.getElementById('cat-subcat-list');
-  if (!list) return;
-
-  list.innerHTML = '';
-  CATALOGUE_CATEGORIES.forEach((cat) => {
-    const catProds = matProducts.filter(p => normalizeCatName(p.category) === cat.id);
-    const count    = catProds.length;
-    const isEmpty  = count === 0;
-    const lowCount = catProds.filter(p =>
-      (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold
-    ).length;
-
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);transition:background .15s;' +
-      (isEmpty ? 'opacity:0.45;cursor:default;' : 'cursor:pointer;');
-
-    if (!isEmpty) {
-      row.addEventListener('mouseover', () => { row.style.background = mc.bg; });
-      row.addEventListener('mouseout',  () => { row.style.background = '';    });
-      row.addEventListener('click', () => openCatCategory(cat.id, mat));
-    }
-
-    // Icon box
-    const iconBox = document.createElement('div');
-    iconBox.style.cssText = 'width:44px;height:44px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;' +
-      'background:' + (isEmpty ? 'var(--surface2)' : mc.bg) + ';' +
-      'border:1.5px solid ' + (isEmpty ? 'var(--border)' : mc.border) + ';';
-    iconBox.textContent = cat.icon;
-
-    // Text block
-    const textBlock = document.createElement('div');
-    textBlock.style.cssText = 'flex:1;min-width:0;';
-    const catName = document.createElement('div');
-    catName.style.cssText = 'font-weight:600;font-size:14px;color:' + (isEmpty ? 'var(--text-muted)' : 'var(--text)') + ';';
-    catName.textContent = cat.id;
-    const subPreview = document.createElement('div');
-    subPreview.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-    subPreview.textContent = cat.subtypes.length
-      ? cat.subtypes.slice(0,5).join(' · ') + (cat.subtypes.length > 5 ? ' ...' : '')
-      : 'General category';
-    textBlock.appendChild(catName);
-    textBlock.appendChild(subPreview);
-
-    // Count block
-    const countBlock = document.createElement('div');
-    countBlock.style.cssText = 'text-align:right;flex-shrink:0;';
-    const countNum = document.createElement('div');
-    countNum.style.cssText = 'font-family:"Bebas Neue",sans-serif;font-size:24px;color:' + (isEmpty ? 'var(--text-muted)' : mc.color) + ';';
-    countNum.textContent = count;
-    const countLabel = document.createElement('div');
-    countLabel.style.cssText = 'font-size:10px;color:var(--text-muted);';
-    countLabel.textContent = 'products';
-    countBlock.appendChild(countNum);
-    countBlock.appendChild(countLabel);
-
-    if (lowCount > 0) {
-      const lowBadge = document.createElement('div');
-      lowBadge.style.cssText = 'font-size:10px;color:#dc2626;font-weight:600;margin-top:2px;';
-      lowBadge.textContent = '⚠ ' + lowCount + ' low';
-      countBlock.appendChild(lowBadge);
-    }
-
-    // Arrow
-    const arrow = document.createElement('div');
-    arrow.style.cssText = 'color:var(--text-muted);font-size:18px;flex-shrink:0;';
-    arrow.textContent = isEmpty ? '' : '›';
-
-    row.appendChild(iconBox);
-    row.appendChild(textBlock);
-    row.appendChild(countBlock);
-    row.appendChild(arrow);
-    list.appendChild(row);
-  });
-
-}
 
 
 // ── LEVEL 2: Category products ────────────────────────────────
-function openCatCategory(catId, mat) {
-  _catCurrentCat = catId;
-  const mc  = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
-  const cat = CATALOGUE_CATEGORIES.find(c => c.id === catId);
+// openCatCategory replaced by new catalogue system
 
-  // Show category level, hide material level
-  document.getElementById('cat-level-material').style.display = 'none';
-  document.getElementById('cat-level-category').style.display = 'block';
-
-  // Breadcrumb
-  document.getElementById('cat-breadcrumb-mat').textContent     = mat;
-  document.getElementById('cat-breadcrumb-sep').style.display   = '';
-  document.getElementById('cat-breadcrumb-cat').style.display   = '';
-  document.getElementById('cat-breadcrumb-cat').textContent     = catId;
-
-  // Title
-  document.getElementById('cat-cat-title').textContent    = `${cat?.icon || ''} ${catId}`;
-  document.getElementById('cat-cat-title').style.color    = mc.color;
-
-  // Populate sub-type filter
-  const subtypeSel = document.getElementById('cat-filter-subtype');
-  const subtypes   = cat?.subtypes || [];
-  // Also collect custom subtypes from actual products
-  const matProds   = allProducts.filter(p =>
-    (p.material||'Other') === mat && normalizeCatName(p.category) === catId
-  );
-  const customSubs = [...new Set(matProds.map(p => p.sub_type).filter(Boolean))];
-  const allSubs    = [...new Set([...subtypes, ...customSubs])];
-
-  subtypeSel.innerHTML = '<option value="">All Sub-types</option>' +
-    allSubs.map(s => `<option value="${s}">${s}</option>`).join('');
-
-  // Clear search
-  const searchEl = document.getElementById('cat-search');
-  if (searchEl) searchEl.value = '';
-
-  renderCatProducts();
-}
 
 function renderCatProducts() {
   if (!_catCurrentMat || !_catCurrentCat) return;
@@ -8900,6 +8738,249 @@ document.addEventListener('DOMContentLoaded', () => {
   addNavTooltips();
 });
 
+// ═══════════════════════════════════════════════════════════════
+// CATALOGUE — COMPLETE REWRITE
+// Simple, reliable: renders directly into #cat-root
+// No hide/show tricks. No scroll hacks. Just clean rendering.
+// ═══════════════════════════════════════════════════════════════
+
+let _catMat = null;  // selected material key
+let _catCat = null;  // selected category id
+
+// Entry point — called from sidebar nav item onclick
+function showCataloguePage(mat) {
+  _catMat = mat;
+  _catCat = null;
+  // Render BEFORE switching page so content is ready
+  _renderCatLevel1(mat);
+  // Switch page (scroll will be at top since content already rendered)
+  navigatePage('catalogue');
+}
+
+// Called from showPage when catalogue is activated without a mat
+function initCatalogueIfEmpty() {
+  const root = document.getElementById('cat-root');
+  if (!root || root.innerHTML.trim()) return; // already has content
+  // Show first material with products
+  const firstMat = Object.keys(CATALOGUE_MATERIALS).find(m =>
+    allProducts.some(p => (p.material || 'Other') === m || (p.category || 'Other') === m)
+  ) || 'CS';
+  _catMat = firstMat;
+  _renderCatLevel1(firstMat);
+}
+
+// ── LEVEL 1: Material page (category list) ───────────────────
+function _renderCatLevel1(mat) {
+  const root = document.getElementById('cat-root');
+  if (!root) return;
+
+  _catMat = mat;
+  _catCat = null;
+
+  const mc = CATALOGUE_MATERIALS[mat] || { label: mat, color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
+  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools'];
+  const matProducts = CATEGORY_PAGES.includes(mat)
+    ? allProducts.filter(p => (p.category || 'Other') === mat)
+    : allProducts.filter(p => (p.material || 'Other') === mat);
+
+  const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
+
+  // Build category rows
+  const rows = CATALOGUE_CATEGORIES.map(cat => {
+    const prods    = matProducts.filter(p => normalizeCatName(p.category) === cat.id);
+    const count    = prods.length;
+    const lowCount = prods.filter(p =>
+      (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold
+    ).length;
+    const empty = count === 0;
+
+    return `<div onclick="${empty ? '' : `_openCatCategory('${cat.id.replace(/'/g,"\\'")}','${mat.replace(/'/g,"\\'")}')` }"
+      style="display:flex;align-items:center;gap:14px;padding:14px 18px;
+             border-bottom:1px solid var(--border);
+             ${empty ? 'opacity:0.4;cursor:default;' : 'cursor:pointer;'}
+             transition:background .12s;"
+      onmouseover="${empty ? '' : "this.style.background='"+mc.bg+"'"}"
+      onmouseout="this.style.background=''">
+      <div style="width:44px;height:44px;border-radius:10px;flex-shrink:0;
+                  display:flex;align-items:center;justify-content:center;font-size:22px;
+                  background:${empty ? 'var(--surface2)' : mc.bg};
+                  border:1.5px solid ${empty ? 'var(--border)' : mc.border};">
+        ${cat.icon}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:14px;color:${empty ? 'var(--text-muted)' : 'var(--text)'};">
+          ${cat.id}
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          ${cat.subtypes.length ? cat.subtypes.slice(0,5).join(' · ') + (cat.subtypes.length > 5 ? ' ...' : '') : 'General category'}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;
+                    color:${empty ? 'var(--text-muted)' : mc.color};">${count}</div>
+        <div style="font-size:10px;color:var(--text-muted);">products</div>
+        ${lowCount > 0 ? `<div style="font-size:10px;color:#dc2626;font-weight:600;">⚠ ${lowCount} low</div>` : ''}
+      </div>
+      ${empty ? '' : `<div style="color:var(--text-muted);font-size:18px;flex-shrink:0;">›</div>`}
+    </div>`;
+  }).join('');
+
+  root.innerHTML = `
+    <!-- Breadcrumb -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--text-muted);">
+      <span style="font-weight:700;font-size:15px;color:${mc.color};">${mat}</span>
+      <span style="color:var(--text-muted);">·</span>
+      <span>${mc.label || mat}</span>
+    </div>
+
+    <!-- Material header card -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:16px 20px;
+                background:${mc.bg};border-radius:var(--radius);border:2px solid ${mc.border};">
+      <div style="width:48px;height:48px;border-radius:50%;display:flex;align-items:center;
+                  justify-content:center;font-size:18px;font-weight:800;color:#fff;
+                  background:${mc.color};flex-shrink:0;">${mat}</div>
+      <div>
+        <div style="font-family:var(--font-display);font-size:22px;color:${mc.color};">${mat}</div>
+        <div style="font-size:13px;color:var(--text-muted);">${mc.label || mat}</div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div style="font-family:var(--font-display);font-size:32px;color:${mc.color};">${matProducts.length}</div>
+        <div style="font-size:11px;color:var(--text-muted);">total products</div>
+      </div>
+    </div>
+
+    <!-- Category list -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      ${rows}
+    </div>`;
+}
+
+// ── LEVEL 2: Category products ────────────────────────────────
+function _openCatCategory(catId, mat) {
+  const root = document.getElementById('cat-root');
+  if (!root) return;
+
+  _catCat = catId;
+  const mc = CATALOGUE_MATERIALS[mat] || { label: mat, color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
+  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools'];
+  const matProducts = CATEGORY_PAGES.includes(mat)
+    ? allProducts.filter(p => (p.category || 'Other') === mat)
+    : allProducts.filter(p => (p.material || 'Other') === mat);
+
+  const catProds = matProducts.filter(p => normalizeCatName(p.category) === catId);
+  const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
+
+  // Group by sub-type
+  const bySubtype = {};
+  catProds.forEach(p => {
+    const sub = p.sub_type || 'General';
+    if (!bySubtype[sub]) bySubtype[sub] = [];
+    bySubtype[sub].push(p);
+  });
+
+  const productRows = catProds.map(p => {
+    const isLow = (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold;
+    return `<tr onclick="viewProduct('${p.id}')" style="cursor:pointer;${isLow ? 'background:#fff5f5;' : ''}">
+      <td style="padding:10px 14px;width:44px;">
+        <div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);
+                    display:flex;align-items:center;justify-content:center;">
+          ${p.photo_url ? `<img src="${p.photo_url}" style="width:38px;height:34px;object-fit:cover;">` : '<span style="font-size:14px;opacity:.3;">📦</span>'}
+        </div>
+      </td>
+      <td style="padding:10px 14px;">
+        <div style="font-weight:500;font-size:13px;">${p.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${p.code || ''} ${p.size ? '· '+p.size : ''}</div>
+      </td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--text-muted);">${p.sub_type || '—'}</td>
+      <td style="padding:10px 14px;">
+        <div style="display:flex;gap:4px;">
+          <span class="qty-tag qty-bv" style="color:${(p.qty_bv||0)<threshold?'#dc2626':''}">BV:${p.qty_bv||0}</span>
+          <span class="qty-tag qty-is" style="color:${(p.qty_is||0)<threshold?'#dc2626':''}">IS:${p.qty_is||0}</span>
+          <span class="qty-tag qty-sw" style="color:${(p.qty_sw||0)<threshold?'#dc2626':''}">SW:${p.qty_sw||0}</span>
+        </div>
+      </td>
+      <td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">${p.price ? 'SAR '+Number(p.price).toFixed(2) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  root.innerHTML = `
+    <!-- Breadcrumb with back button -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <button onclick="_renderCatLevel1('${mat}')" class="btn btn-outline" style="font-size:12px;padding:5px 12px;">
+        ← ${mat}
+      </button>
+      <span style="color:var(--text-muted);">›</span>
+      <span style="font-weight:600;color:var(--text);">${catId}</span>
+      <span class="badge badge-blue" style="margin-left:4px;">${catProds.length} products</span>
+    </div>
+
+    <!-- Products table -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      ${catProds.length === 0
+        ? `<div style="padding:40px;text-align:center;color:var(--text-muted);">
+             <div style="font-size:36px;margin-bottom:10px;">📦</div>
+             <div>No products in this category</div>
+           </div>`
+        : `<div class="table-wrap">
+             <table>
+               <thead><tr>
+                 <th style="width:50px;">Photo</th>
+                 <th>Name</th>
+                 <th>Sub-type</th>
+                 <th>Stock</th>
+                 <th>Price</th>
+               </tr></thead>
+               <tbody>${productRows}</tbody>
+             </table>
+           </div>`
+      }
+    </div>`;
+}
+
+// ── COMPATIBILITY ALIASES ─────────────────────────────────────
+// Keep old function names working
+function openCatCategory(catId, mat) { _openCatCategory(catId, mat); }
+function backToCatMaterial() { if (_catMat) _renderCatLevel1(_catMat); }
+function showCatalogueHome() {
+  const firstMat = Object.keys(CATALOGUE_MATERIALS).find(m =>
+    allProducts.some(p => (p.material||'Other') === m || (p.category||'Other') === m)
+  ) || 'CS';
+  showCataloguePage(firstMat);
+}
+
+// Alias old functions that may be called elsewhere
+function renderCatMaterialPage(mat) { _renderCatLevel1(mat); }
+
+// ── navigatePage: clean page switch ──────────────────────────
+function navigatePage(id) {
+  // Activate page
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const page = document.getElementById('page-' + id);
+  if (page) page.classList.add('active');
+
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const nav = document.getElementById('nav-' + id);
+  if (nav) nav.classList.add('active');
+
+  // Update topbar title
+  const titleEl = document.getElementById('topbar-title');
+  if (titleEl && typeof PAGE_TITLES !== 'undefined') {
+    titleEl.textContent = PAGE_TITLES[id] || id;
+    if (id === 'catalogue' && _catMat) {
+      titleEl.textContent = _catMat + ' Catalogue';
+    }
+  }
+
+  // Update bottom nav
+  if (typeof updateBottomNav === 'function') updateBottomNav(id);
+
+  // Scroll to top - synchronous
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  window.scrollTo(0, 0);
+}
+
 window.addEventListener('DOMContentLoaded', init);
 </script>
 
@@ -9159,80 +9240,7 @@ window.addEventListener('DOMContentLoaded', init);
 </html>
     <!-- CATALOGUE MATERIAL PAGE -->
     <div class="page" id="page-catalogue">
-      <!-- Compact breadcrumb nav — no large page header -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--text-muted);flex-wrap:wrap">
-        <button onclick="showCatalogueHome()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:13px;display:flex;align-items:center;gap:4px">
-          ← All Materials
-        </button>
-        <span id="cat-breadcrumb-mat" style="color:var(--text);font-weight:600"></span>
-        <span id="cat-breadcrumb-sep" style="display:none">›</span>
-        <span id="cat-breadcrumb-cat" style="color:var(--text);font-weight:600;display:none"></span>
-      </div>
-
-      <!-- LEVEL 1: Material home — shows sub-category list -->
-      <div id="cat-level-material" style="display:none">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:18px 20px;background:var(--surface2);border-radius:var(--radius);border:2px solid var(--border)" id="cat-mat-header">
-          <div id="cat-mat-badge" style="width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0"></div>
-          <div>
-            <div id="cat-mat-name" style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px"></div>
-            <div id="cat-mat-fullname" style="font-size:13px;color:var(--text-muted)"></div>
-          </div>
-          <div id="cat-mat-total" style="margin-left:auto;text-align:right">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:32px" id="cat-mat-total-num"></div>
-            <div style="font-size:11px;color:var(--text-muted)">total products</div>
-          </div>
-        </div>
-
-        <!-- Sub-category rows -->
-        <div class="card" style="padding:0;overflow:hidden">
-          <div id="cat-subcat-list"></div>
-        </div>
-      </div>
-
-      <!-- LEVEL 2: Category products — inventory list view -->
-      <div id="cat-level-category" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div>
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:24px" id="cat-cat-title"></div>
-            <div style="font-size:13px;color:var(--text-muted)" id="cat-cat-subtitle"></div>
-          </div>
-          <button onclick="backToCatMaterial()" class="btn btn-outline" style="font-size:13px">
-            ← Back
-          </button>
-        </div>
-
-        <!-- Search + filter for this view -->
-        <div class="card" style="margin-bottom:14px;padding:14px">
-          <div class="filter-bar">
-            <input type="text" class="search-input" id="cat-search" placeholder="Search products..." oninput="renderCatProducts()">
-            <select class="filter-select" id="cat-filter-subtype" onchange="renderCatProducts()">
-              <option value="">All Sub-types</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Product table -->
-        <div class="card" style="padding:0">
-          <div class="table-wrap">
-            <table>
-              <thead><tr>
-                <th style="width:50px">Photo</th>
-                <th>Name</th>
-                <th>Code</th>
-                <th>Size</th>
-                <th>Sub-type</th>
-                <th style="text-align:center">BV</th>
-                <th style="text-align:center">IS</th>
-                <th style="text-align:center">SW</th>
-                <th>Price</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr></thead>
-              <tbody id="cat-products-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      <div id="cat-root"></div>
     </div>
 
 <!-- AI CATEGORY FIX MODAL -->
