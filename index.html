@@ -442,7 +442,7 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
   border-bottom: 1px solid var(--border);
   padding: 0 24px; height: var(--topbar-h);
   display: flex; align-items: center; justify-content: space-between;
-  position: sticky; top: 0; z-index: 90;
+  position: sticky; top: 0; z-index: 95;
   box-shadow: var(--shadow-sm); gap: 8px; overflow: hidden;
 }
 @supports (-webkit-touch-callout: none) {
@@ -506,7 +506,7 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 /* ── PAGE ── */
 .page { display: none; padding: 24px; animation: pageIn 0.2s ease both; }
 .page.active { display: block; }
-#page-catalogue { padding: 16px 24px; }
+#page-catalogue { padding: 12px 20px 24px; }
 @keyframes pageIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
 .page-header-title h1 { font-size: 26px; color: var(--text); }
@@ -707,6 +707,19 @@ input[type=file].photo-picker { position: absolute; width: 1px; height: 1px; opa
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
+/* ── FAB BUTTON (MOBILE) ── */
+.fab-btn {
+  position: fixed; bottom: 76px; right: 20px; z-index: 190;
+  width: 50px; height: 50px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border: none; cursor: pointer; display: none;
+  align-items: center; justify-content: center;
+  font-size: 22px; box-shadow: var(--shadow-gold), var(--shadow-md);
+  transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+}
+.fab-btn:hover { transform: scale(1.08); }
+@media (max-width: 768px) { .fab-btn { display: flex; } }
+
 /* ── BOTTOM NAV (MOBILE) ── */
 .bottom-nav {
   display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
@@ -802,9 +815,10 @@ input[type=file].photo-picker { position: absolute; width: 1px; height: 1px; opa
 .is-mobile .grid-2.stack { grid-template-columns: 1fr !important; }
 .is-mobile .page { padding: 14px !important; padding-bottom: 76px !important; }
 
-/* Sidebar show button - desktop only */
+/* Sidebar show button - desktop only, shown via JS */
 #sidebar-show-btn { display: none; }
 @media (max-width: 768px) { #sidebar-show-btn { display: none !important; } }
+@media (min-width: 769px) { #sidebar-show-btn.visible { display: flex !important; } }
 </style>
 
 
@@ -2179,6 +2193,15 @@ async function launchApp() {
   clearTimeout(window._loadingTimeout);
   hideLoading();
   showPage('dashboard');
+
+  // Run post-launch tasks in parallel (non-blocking)
+  Promise.all([
+    loadPOs().catch(()=>{}),
+    loadPhotoLibrary().then(()=>{ renderLibraryGrid(); ensurePhotoLibraryTable(); }).catch(()=>{}),
+    loadActivityLog().catch(()=>{}),
+    Promise.resolve().then(()=>{ updateCatNavBadges(); }),
+    logActivity('login','Logged in').catch(()=>{}),
+  ]).catch(()=>{});
 }
 
 async function preloadData() {
@@ -2348,6 +2371,12 @@ function renderDashboard() {
   document.getElementById('dash-quotations').innerHTML = allQuotations.slice(0,4).length
     ? allQuotations.slice(0,4).map(q=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div><div style="font-size:13px;font-weight:500">${q.client}</div><div class="mono" style="font-size:11px;color:var(--text-muted)">${q.quot_no}</div></div><span class="badge ${statusColors[q.status]||'badge-blue'}">${(q.status||'').toUpperCase()}</span></div>`).join('')
     : '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">No quotations yet</div>';
+
+  // Render charts and notifications after DOM update
+  setTimeout(() => {
+    if (typeof renderDashboardCharts === 'function') renderDashboardCharts();
+    if (typeof generateInventoryNotifications === 'function') generateInventoryNotifications();
+  }, 80);
 }
 
 // ─── INVENTORY ────────────────────────────────────────────────
@@ -4153,14 +4182,7 @@ function renderCompanyBarChart() {
 }
 
 // Patch renderDashboard to include charts section
-const _origRenderDashboard2 = renderDashboard;
-renderDashboard = function() {
-  _origRenderDashboard2();
-  setTimeout(() => {
-    renderDashboardCharts();
-    generateInventoryNotifications();
-  }, 100);
-};
+
 
 // ═══════════════════════════════════════════════════════════════
 // LETTERHEADS — ALL 3 COMPANIES
@@ -5128,11 +5150,7 @@ document.title="";window.onbeforeprint=function(){document.title="";}<\/script>
 }
 
 // Load POs when app launches
-const _origLaunchApp2 = launchApp;
-launchApp = async function() {
-  await _origLaunchApp2();
-  loadPOs();
-};
+
 
 // ═══════════════════════════════════════════════════════════════
 // SMART AI EXCEL IMPORT — COMPLETE REBUILD
@@ -6090,12 +6108,7 @@ async function ensurePhotoLibraryTable() {
 }
 
 // Load library on app launch
-const _origLaunchApp3 = launchApp;
-launchApp = async function() {
-  await _origLaunchApp3();
-  await loadPhotoLibrary();
-  ensurePhotoLibraryTable();
-};
+
 
 // ═══════════════════════════════════════════════════════════════
 // AI AUTO-ASSIGN PHOTOS TO PRODUCTS
@@ -7294,9 +7307,13 @@ function showCataloguePage(mat) {
 }
 
 function showCatalogueHome() {
-  // go back to first material or just stay with back arrow
-  // just re-render current material
-  if (_catCurrentMat) renderCatMaterialPage(_catCurrentMat);
+  // Navigate to first available material, or CS by default
+  const firstMat = Object.keys(CATALOGUE_MATERIALS).find(m => 
+    allProducts.some(p => (p.material||'Other') === m || (p.category||'Other') === m)
+  ) || 'CS';
+  _catCurrentMat = firstMat;
+  _catCurrentCat = null;
+  renderCatMaterialPage(firstMat);
 }
 
 function backToCatMaterial() {
@@ -7308,7 +7325,7 @@ function backToCatMaterial() {
 function renderCatMaterialPage(mat) {
   const mc = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
 
-  document.getElementById('cat-level-material').style.display = '';
+  document.getElementById('cat-level-material').style.display = 'block';
   document.getElementById('cat-level-category').style.display = 'none';
 
   document.getElementById('cat-breadcrumb-mat').textContent   = mat;
@@ -7416,8 +7433,9 @@ function renderCatMaterialPage(mat) {
   });
 
   // Scroll to top after render
-  window.scrollTo(0,0);
-  document.querySelector('.main')?.scrollTo(0,0);
+  const mainEl = document.querySelector('.main');
+  if (mainEl) mainEl.scrollTop = 0;
+  window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
 
@@ -7553,11 +7571,7 @@ function normalizeCatName(cat) {
 }
 
 // Update badges after data loads
-const _origLaunchApp4 = launchApp;
-launchApp = async function() {
-  await _origLaunchApp4();
-  updateCatNavBadges();
-};
+
 
 // Add 'catalogue' to PAGE_TITLES
 if (typeof PAGE_TITLES !== 'undefined') PAGE_TITLES['catalogue'] = 'Catalogue';
@@ -8418,11 +8432,7 @@ updateQuotStatus = async function(id, status) {
 };
 
 // Hook launchApp to log login
-const _origLaunchAppLog = launchApp;
-launchApp = async function() {
-  await _origLaunchAppLog();
-  await logActivity('login', `Logged in`);
-};
+
 
 // Hook showPage for activity log
 
@@ -8676,17 +8686,15 @@ function toggleSidebarCollapse() {
   const showHide = document.getElementById('sidebar-show-btn');
 
   if (sidebarCollapsed) {
-    // Fully hide sidebar
     if (sidebar) { sidebar.style.transform = 'translateX(-260px)'; sidebar.classList.add('collapsed'); }
     if (main)    main.style.marginLeft = '0px';
     if (btn)     btn.textContent = '▶';
-    if (showHide) showHide.style.display = 'flex';
+    if (showHide) showHide.classList.add('visible');
   } else {
-    // Show sidebar
     if (sidebar) { sidebar.style.transform = 'translateX(0)'; sidebar.classList.remove('collapsed'); }
     if (main)    main.style.marginLeft = '240px';
     if (btn)     btn.textContent = '◀';
-    if (showHide) showHide.style.display = 'none';
+    if (showHide) showHide.classList.remove('visible');
   }
   localStorage.setItem('bims_sidebar_collapsed', sidebarCollapsed);
 }
@@ -8708,12 +8716,12 @@ function initSidebarCollapse() {
     if (sidebar) { sidebar.style.transform = 'translateX(-260px)'; sidebar.classList.add('collapsed'); }
     if (main)    main.style.marginLeft = '0px';
     if (btn)     btn.textContent = '▶';
-    if (showHide) showHide.style.display = 'flex';
+    if (showHide) showHide.classList.add('visible');
   } else {
     if (sidebar) { sidebar.style.transform = 'translateX(0)'; sidebar.classList.remove('collapsed'); }
     if (main)    main.style.marginLeft = '240px';
     if (btn)     btn.textContent = '◀';
-    if (showHide) showHide.style.display = 'none';
+    if (showHide) showHide.classList.remove('visible');
   }
 }
 
@@ -9176,7 +9184,7 @@ window.addEventListener('DOMContentLoaded', init);
       </div>
 
       <!-- LEVEL 1: Material home — shows sub-category list -->
-      <div id="cat-level-material" style="display:none">
+      <div id="cat-level-material" style="display:block">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:18px 20px;background:var(--surface2);border-radius:var(--radius);border:2px solid var(--border)" id="cat-mat-header">
           <div id="cat-mat-badge" style="width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0"></div>
           <div>
