@@ -506,6 +506,7 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 /* ── PAGE ── */
 .page { display: none; padding: 24px; animation: pageIn 0.2s ease both; }
 .page.active { display: block; }
+#page-catalogue { padding: 16px 24px; }
 @keyframes pageIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
 .page-header-title h1 { font-size: 26px; color: var(--text); }
@@ -2266,13 +2267,16 @@ function showPage(id) {
   if (id === 'ai-insights') generateAiInsights();
   if (id === 'users') renderUsers();
   if (id === 'catalogue') {
-    // Render catalogue - use _catCurrentMat if set, else show home
     setTimeout(() => {
       if (typeof _catCurrentMat !== 'undefined' && _catCurrentMat) {
         renderCatMaterialPage(_catCurrentMat);
       } else if (typeof showCatalogueHome === 'function') {
         showCatalogueHome();
       }
+      // Scroll page content to top after render
+      const catPage = document.getElementById('page-catalogue');
+      if (catPage) catPage.scrollTop = 0;
+      window.scrollTo(0, 0);
     }, 30);
   }
   // settings renders on its own
@@ -7410,6 +7414,10 @@ function renderCatMaterialPage(mat) {
     row.appendChild(arrow);
     list.appendChild(row);
   });
+
+  // Scroll to top after render
+  window.scrollTo(0,0);
+  document.querySelector('.main')?.scrollTo(0,0);
 }
 
 
@@ -9157,16 +9165,9 @@ window.addEventListener('DOMContentLoaded', init);
 </html>
     <!-- CATALOGUE MATERIAL PAGE -->
     <div class="page" id="page-catalogue">
-      <div class="page-header">
-        <div class="page-header-title">
-          <h1 id="cat-page-title">Catalogue</h1>
-          <p id="cat-page-subtitle">Browse products by material</p>
-        </div>
-      </div>
-
-      <!-- Breadcrumb -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">
-        <button onclick="showCatalogueHome()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:13px">
+      <!-- Compact breadcrumb nav — no large page header -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--text-muted);flex-wrap:wrap">
+        <button onclick="showCatalogueHome()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:13px;display:flex;align-items:center;gap:4px">
           ← All Materials
         </button>
         <span id="cat-breadcrumb-mat" style="color:var(--text);font-weight:600"></span>
