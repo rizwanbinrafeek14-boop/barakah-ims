@@ -2265,7 +2265,35 @@ function showPage(id) {
   if (id === 'reports') renderReports();
   if (id === 'ai-insights') generateAiInsights();
   if (id === 'users') renderUsers();
-  // Scroll to top on page change (important for iOS)
+  if (id === 'catalogue') {
+    // Render catalogue - use _catCurrentMat if set, else show home
+    setTimeout(() => {
+      if (typeof _catCurrentMat !== 'undefined' && _catCurrentMat) {
+        renderCatMaterialPage(_catCurrentMat);
+      } else if (typeof showCatalogueHome === 'function') {
+        showCatalogueHome();
+      }
+    }, 30);
+  }
+  // settings renders on its own
+  if (id === 'activity-log') { setTimeout(loadActivityLog, 20); }
+  if (id === 'purchase-orders') { setTimeout(renderPOs, 20); }
+  // Page-specific side effects
+  if (id === 'settings') {
+    setTimeout(() => {
+      if (typeof loadCompanySettings === 'function') loadCompanySettings();
+      if (typeof loadPhotoLibrary === 'function') loadPhotoLibrary().then(() => { if (typeof renderLibraryGrid === 'function') renderLibraryGrid(); });
+    }, 30);
+  }
+  if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
+  if (id === 'purchase-orders') { setTimeout(() => { if (typeof renderPOs === 'function') renderPOs(); }, 30); }
+  // Update bottom nav
+  if (typeof updateBottomNav === 'function') updateBottomNav(id);
+  // Close sidebar on mobile
+  if (window.innerWidth <= 900 || document.documentElement.classList.contains('is-mobile')) {
+    closeSidebar();
+  }
+  // Scroll to top
   window.scrollTo(0, 0);
   document.querySelector('.main')?.scrollTo(0, 0);
 }
@@ -3352,13 +3380,7 @@ loadSettings = async function() {
 };
 
 // ─── PATCH showPage TO LOAD COMPANY SETTINGS ON SETTINGS PAGE ─
-const _origShowPage = showPage;
-showPage = function(id) {
-  _origShowPage(id);
-  if (id === 'settings') {
-    loadCompanySettings();
-  }
-};
+
 
 // ─── UPGRADE DASHBOARD WITH COMPANY LOGO CARDS ───────────────
 const _origRenderDashboard = renderDashboard;
@@ -4550,11 +4572,7 @@ let _editingPOId = null;
 PAGE_TITLES['purchase-orders'] = 'Purchase Orders';
 
 // Hook into showPage
-const _origShowPage2 = showPage;
-showPage = function(id) {
-  _origShowPage2(id);
-  if (id === 'purchase-orders') renderPOs();
-};
+
 
 async function loadPOs() {
   try {
@@ -6049,13 +6067,7 @@ function getProductPhotoUrlForSave() {
 }
 
 // ── PATCH showPage to load library when settings opens ────────
-const _origShowPage3 = showPage;
-showPage = function(id) {
-  _origShowPage3(id);
-  if (id === 'settings') {
-    loadPhotoLibrary().then(() => renderLibraryGrid());
-  }
-};
+
 
 // ── CREATE photo_library TABLE NOTICE if missing ──────────────
 async function ensurePhotoLibraryTable() {
@@ -7266,8 +7278,7 @@ function showCataloguePage(mat) {
   _catCurrentCat = null;
   closeSidebar();
   showPage('catalogue');
-  // Must render AFTER showPage activates the page
-  setTimeout(() => renderCatMaterialPage(mat), 20);
+  // showPage now handles render via setTimeout, no need to call again
   // Update page title
   const mc = CATALOGUE_MATERIALS[mat] || {};
   const titleEl = document.getElementById('cat-page-title');
@@ -7543,16 +7554,7 @@ launchApp = async function() {
 // Add 'catalogue' to PAGE_TITLES
 if (typeof PAGE_TITLES !== 'undefined') PAGE_TITLES['catalogue'] = 'Catalogue';
 
-// Hook showPage for catalogue
-const _origShowPage4 = showPage;
-showPage = function(id) {
-  _origShowPage4(id);
-  if (id === 'catalogue') {
-    // Set topbar title dynamically
-    const titleEl = document.getElementById('topbar-title');
-    if (titleEl && _catCurrentMat) titleEl.textContent = _catCurrentMat + ' Catalogue';
-  }
-};
+
 
 // ═══════════════════════════════════════════════════════════════
 // SIDEBAR AUTO-HIDE — slides out when not in use
@@ -7664,14 +7666,7 @@ closeSidebar = function() {
 };
 
 // Override showPage to auto-close sidebar on mobile nav tap
-const _origShowPageAH = showPage;
-showPage = function(id) {
-  _origShowPageAH(id);
-  if (window.innerWidth <= 768 ||
-      document.documentElement.classList.contains('is-mobile')) {
-    closeSidebar();
-  }
-};
+
 
 // Init after DOM ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -8422,13 +8417,7 @@ launchApp = async function() {
 };
 
 // Hook showPage for activity log
-const _origShowPageLog = showPage;
-showPage = function(id) {
-  _origShowPageLog(id);
-  if (id === 'activity-log') {
-    loadActivityLog();
-  }
-};
+
 
 // ═══════════════════════════════════════════════════════════════
 // DUPLICATE PRODUCT MERGER (Enhanced)
@@ -8738,11 +8727,7 @@ function updateBottomNav(pageId) {
 }
 
 // Patch showPage to update bottom nav
-const _origShowPageRedesign = showPage;
-showPage = function(id) {
-  _origShowPageRedesign(id);
-  updateBottomNav(id);
-};
+
 
 // ── SORTABLE TABLE COLUMNS ────────────────────────────────────
 let _sortCol = null;
