@@ -800,6 +800,10 @@ input[type=file].photo-picker { position: absolute; width: 1px; height: 1px; opa
 .is-mobile .grid-3, .is-mobile .grid-4 { grid-template-columns: 1fr 1fr !important; }
 .is-mobile .grid-2.stack { grid-template-columns: 1fr !important; }
 .is-mobile .page { padding: 14px !important; padding-bottom: 76px !important; }
+
+/* Sidebar show button - desktop only */
+#sidebar-show-btn { display: none; }
+@media (max-width: 768px) { #sidebar-show-btn { display: none !important; } }
 </style>
 
 
@@ -980,6 +984,13 @@ window.onerror = function(msg, src, line, col, err) {
       <button class="hamburger-inline" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">
         <span></span><span></span><span></span>
       </button>
+      <!-- Show sidebar btn (desktop only, visible when sidebar hidden) -->
+      <button id="sidebar-show-btn" onclick="toggleSidebarCollapse()"
+        style="display:none;width:30px;height:30px;border-radius:6px;border:1.5px solid var(--border);
+               background:var(--surface2);cursor:pointer;align-items:center;justify-content:center;
+               font-size:13px;color:var(--text-muted);flex-shrink:0;margin-right:4px;
+               transition:all 0.15s"
+        title="Show sidebar">▶</button>
       <div class="topbar-title" id="topbar-title">Dashboard</div>
       <div class="topbar-right">
         <div class="topbar-logos" style="display:flex;gap:6px;align-items:center;flex-shrink:0">
@@ -1239,6 +1250,38 @@ window.onerror = function(msg, src, line, col, err) {
         </div>
         <button class="btn btn-outline" onclick="loadActivityLog()" style="font-size:12px">🔄 Refresh</button>
       </div>
+    <!-- PURCHASE ORDERS PAGE -->
+    <div class="page" id="page-purchase-orders">
+      <div class="page-header">
+        <div class="page-header-title"><h1>Purchase Orders</h1><p>Create and track supplier purchase orders</p></div>
+        <button class="btn btn-gold manager-only" onclick="openNewPO()">+ New PO</button>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="filter-bar">
+          <input class="search-input" type="text" placeholder="Search POs..." id="po-search" oninput="renderPOs()">
+          <select class="filter-select" id="po-filter-company" onchange="renderPOs()">
+            <option value="">All Companies</option>
+            <option value="bv">Barakah Valves</option>
+            <option value="is">Iron Spring</option>
+            <option value="sw">Stable Way</option>
+          </select>
+          <select class="filter-select" id="po-filter-status" onchange="renderPOs()">
+            <option value="">All Status</option>
+            <option value="draft">Draft</option><option value="sent">Sent</option>
+            <option value="received">Received</option><option value="partial">Partial</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table><thead><tr>
+            <th>PO No.</th><th>Date</th><th>Supplier</th><th>Company</th><th>Items</th><th>Total (SAR)</th><th>Status</th><th>Actions</th>
+          </tr></thead><tbody id="po-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
 
       <!-- Filters -->
       <div class="card" style="margin-bottom:14px">
@@ -7223,6 +7266,8 @@ function showCataloguePage(mat) {
   _catCurrentCat = null;
   closeSidebar();
   showPage('catalogue');
+  // Must render AFTER showPage activates the page
+  setTimeout(() => renderCatMaterialPage(mat), 20);
   // Update page title
   const mc = CATALOGUE_MATERIALS[mat] || {};
   const titleEl = document.getElementById('cat-page-title');
@@ -8626,38 +8671,53 @@ async function confirmMerge() {
 let sidebarCollapsed = false;
 
 function toggleSidebarCollapse() {
-  if (window.innerWidth <= 768) return; // No collapse on mobile
+  if (window.innerWidth <= 768) return;
   sidebarCollapsed = !sidebarCollapsed;
-  const sidebar = document.querySelector('.sidebar');
-  const main    = document.querySelector('.main');
-  const btn     = document.querySelector('.sidebar-collapse-btn');
+  const sidebar  = document.querySelector('.sidebar');
+  const main     = document.querySelector('.main');
+  const btn      = document.querySelector('.sidebar-collapse-btn');
+  const showHide = document.getElementById('sidebar-show-btn');
 
-  if (sidebar) sidebar.classList.toggle('collapsed', sidebarCollapsed);
-
-  // Directly set main margin — don't rely on CSS sibling selector
-  if (main) {
-    main.style.marginLeft = sidebarCollapsed ? '56px' : '240px';
+  if (sidebarCollapsed) {
+    // Fully hide sidebar
+    if (sidebar) { sidebar.style.transform = 'translateX(-260px)'; sidebar.classList.add('collapsed'); }
+    if (main)    main.style.marginLeft = '0px';
+    if (btn)     btn.textContent = '▶';
+    if (showHide) showHide.style.display = 'flex';
+  } else {
+    // Show sidebar
+    if (sidebar) { sidebar.style.transform = 'translateX(0)'; sidebar.classList.remove('collapsed'); }
+    if (main)    main.style.marginLeft = '240px';
+    if (btn)     btn.textContent = '◀';
+    if (showHide) showHide.style.display = 'none';
   }
-
   localStorage.setItem('bims_sidebar_collapsed', sidebarCollapsed);
-  if (btn) btn.textContent = sidebarCollapsed ? '▶' : '◀';
 }
 
 function initSidebarCollapse() {
-  const main = document.querySelector('.main');
-  // On mobile: always no margin
+  const main     = document.querySelector('.main');
+  const sidebar  = document.querySelector('.sidebar');
+  const btn      = document.querySelector('.sidebar-collapse-btn');
+  const showHide = document.getElementById('sidebar-show-btn');
+
   if (window.innerWidth <= 768) {
-    if (main) main.style.marginLeft = '0px';
+    if (main)    main.style.marginLeft = '0px';
+    if (sidebar) sidebar.style.transform = '';
     return;
   }
-  // On desktop: read saved state and apply
   const saved = localStorage.getItem('bims_sidebar_collapsed') === 'true';
   sidebarCollapsed = saved;
-  const sidebar = document.querySelector('.sidebar');
-  if (sidebar) sidebar.classList.toggle('collapsed', saved);
-  if (main) main.style.marginLeft = saved ? '56px' : '240px';
-  const btn = document.querySelector('.sidebar-collapse-btn');
-  if (btn) btn.textContent = saved ? '▶' : '◀';
+  if (saved) {
+    if (sidebar) { sidebar.style.transform = 'translateX(-260px)'; sidebar.classList.add('collapsed'); }
+    if (main)    main.style.marginLeft = '0px';
+    if (btn)     btn.textContent = '▶';
+    if (showHide) showHide.style.display = 'flex';
+  } else {
+    if (sidebar) { sidebar.style.transform = 'translateX(0)'; sidebar.classList.remove('collapsed'); }
+    if (main)    main.style.marginLeft = '240px';
+    if (btn)     btn.textContent = '◀';
+    if (showHide) showHide.style.display = 'none';
+  }
 }
 
 // ── BOTTOM NAV ACTIVE STATE ───────────────────────────────────
