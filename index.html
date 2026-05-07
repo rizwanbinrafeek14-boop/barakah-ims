@@ -2290,13 +2290,16 @@ function showPage(id) {
   if (id === 'ai-insights') generateAiInsights();
   if (id === 'users') renderUsers();
   if (id === 'catalogue') {
-    setTimeout(() => {
-      if (typeof _catCurrentMat !== 'undefined' && _catCurrentMat) {
-        renderCatMaterialPage(_catCurrentMat);
-      } else if (typeof showCatalogueHome === 'function') {
-        showCatalogueHome();
-      }
-    }, 50);
+    // Wait for .active class + paint, then render content
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (_catCurrentMat) {
+          renderCatMaterialPage(_catCurrentMat);
+        } else {
+          showCatalogueHome();
+        }
+      }, 0);
+    });
   }
   // settings renders on its own
   if (id === 'activity-log') { setTimeout(loadActivityLog, 20); }
@@ -7291,15 +7294,7 @@ function showCataloguePage(mat) {
   _catCurrentCat = null;
   closeSidebar();
   showPage('catalogue');
-  // showPage now handles render via setTimeout, no need to call again
-  // Update page title
-  const mc = CATALOGUE_MATERIALS[mat] || {};
-  const titleEl = document.getElementById('cat-page-title');
-  const subEl   = document.getElementById('cat-page-subtitle');
-  if (titleEl) titleEl.textContent = mat + ' Catalogue';
-  if (subEl)   subEl.textContent   = mc.label || mat;
-  renderCatMaterialPage(mat);
-  updateCatNavBadges();
+  // showPage handles the render via setTimeout after .active class applies
 }
 
 function showCatalogueHome() {
@@ -7321,7 +7316,7 @@ function backToCatMaterial() {
 function renderCatMaterialPage(mat) {
   const mc = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
 
-  document.getElementById('cat-level-material').style.display = 'block';
+  document.getElementById('cat-level-material').style.display = 'none'; // hide until filled
   document.getElementById('cat-level-category').style.display = 'none';
 
   document.getElementById('cat-breadcrumb-mat').textContent   = mat;
