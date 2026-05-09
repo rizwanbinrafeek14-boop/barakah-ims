@@ -4602,9 +4602,17 @@ PAGE_TITLES['purchase-orders'] = 'Purchase Orders';
 
 async function loadPOs() {
   try {
-    const { data } = await sb.from('purchase_orders').select('*, purchase_order_lines(*)').order('created_at', { ascending: false });
+    const { data, error } = await sb.from('purchase_orders')
+      .select('*, purchase_order_lines(*)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
     allPOs = data || [];
-  } catch(e) { allPOs = []; }
+    renderPOs();
+  } catch(e) {
+    console.warn('loadPOs error:', e.message);
+    allPOs = [];
+    renderPOs();
+  }
 }
 
 function openNewPO() {
@@ -9241,5 +9249,79 @@ window.addEventListener('DOMContentLoaded', init);
     </button>
   </div>
 </nav>
+
+<!-- PURCHASE ORDER MODAL -->
+<div class="modal-overlay" id="modal-po">
+  <div class="modal" style="max-width:820px;width:95vw">
+    <div class="modal-title" id="po-modal-title">New Purchase Order</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="field">
+        <label>PO Date</label>
+        <input type="date" id="po-date">
+      </div>
+      <div class="field">
+        <label>Company</label>
+        <select id="po-company">
+          <option value="bv">Barakah Valves (BV)</option>
+          <option value="is">Iron Spring (IS)</option>
+          <option value="sw">Stable Way (SW)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Supplier Name</label>
+        <input type="text" id="po-supplier" placeholder="Supplier company name">
+      </div>
+      <div class="field">
+        <label>Contact</label>
+        <input type="text" id="po-contact" placeholder="Contact person / phone">
+      </div>
+      <div class="field">
+        <label>Delivery Address</label>
+        <input type="text" id="po-delivery-addr" placeholder="Delivery address">
+      </div>
+      <div class="field">
+        <label>Expected Delivery Date</label>
+        <input type="date" id="po-delivery-date">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="po-notes" rows="2" placeholder="Additional notes..."></textarea>
+    </div>
+
+    <!-- Line items -->
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)">Line Items</label>
+        <button class="btn btn-sm btn-outline" onclick="addPOLine()">+ Add Line</button>
+      </div>
+      <div class="table-wrap" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--surface2)">
+              <th style="padding:8px 10px;text-align:left">Product / Description</th>
+              <th style="padding:8px 10px;width:60px">Qty</th>
+              <th style="padding:8px 10px;width:80px">Unit</th>
+              <th style="padding:8px 10px;width:100px">Unit Price</th>
+              <th style="padding:8px 10px;width:100px">Total</th>
+              <th style="padding:8px 10px;width:36px"></th>
+            </tr>
+          </thead>
+          <tbody id="po-lines-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Totals -->
+    <div id="po-totals" style="text-align:right;padding:10px 0;font-size:13px"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
+      <button class="btn btn-gold" onclick="savePO()">💾 Save PO</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
