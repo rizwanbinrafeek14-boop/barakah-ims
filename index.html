@@ -1270,16 +1270,18 @@ window.onerror = function(msg, src, line, col, err) {
       <div class="page-header">
         <div class="page-header-title">
           <h1>Purchase Orders</h1>
-          <p>Create and track supplier purchase orders</p>
+          <p>Manage supplier purchase orders</p>
         </div>
-        <button class="btn btn-gold manager-only" onclick="openNewPO()">+ New PO</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline" onclick="loadAndRenderPOs()" title="Refresh">🔄 Refresh</button>
+          <button class="btn btn-gold manager-only" onclick="openNewPO()">+ New PO</button>
+        </div>
       </div>
-
       <!-- Filters -->
       <div class="card" style="margin-bottom:14px;">
         <div class="filter-bar">
           <input class="search-input" type="text" id="po-search"
-            placeholder="🔍 Search by PO no. or supplier..." oninput="renderPOs()">
+            placeholder="🔍 Search PO number or supplier..." oninput="renderPOs()">
           <select class="filter-select" id="po-filter-company" onchange="renderPOs()">
             <option value="">All Companies</option>
             <option value="bv">Barakah Valves</option>
@@ -1296,39 +1298,29 @@ window.onerror = function(msg, src, line, col, err) {
           </select>
         </div>
       </div>
-
+      <!-- Stats row -->
+      <div class="grid-4" style="margin-bottom:14px;" id="po-stats-row"></div>
       <!-- Table -->
       <div class="card" style="padding:0;">
         <div class="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th>PO No.</th>
-                <th>Date</th>
-                <th>Supplier</th>
-                <th>Company</th>
-                <th>Items</th>
-                <th>Total (SAR)</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+            <thead><tr>
+              <th>PO No.</th>
+              <th>Date</th>
+              <th>Supplier</th>
+              <th>Company</th>
+              <th>Items</th>
+              <th>Total (SAR)</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr></thead>
             <tbody id="po-tbody">
-              <tr>
-                <td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">
-                  <div style="font-size:32px;margin-bottom:10px;">📋</div>
-                  <div style="font-size:14px;">Loading purchase orders...</div>
-                </td>
-              </tr>
+              <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted);">
+                Loading...
+              </td></tr>
             </tbody>
           </table>
         </div>
-      </div>
-
-      <!-- SQL notice -->
-      <div id="po-sql-notice" style="display:none;" class="alert alert-warn" style="margin-top:12px;">
-        ⚠️ Purchase Orders table not set up yet.
-        <button class="btn btn-sm btn-outline" onclick="showPOSchemaNotice()" style="margin-left:8px;">Show SQL</button>
       </div>
     </div>
 
@@ -2236,7 +2228,7 @@ async function launchApp() {
 
   // Run post-launch tasks in parallel (non-blocking)
   Promise.all([
-    loadAndRenderPOs().catch(()=>{}),
+    loadPOs().catch(()=>{}),
     loadPhotoLibrary().then(()=>{ renderLibraryGrid(); ensurePhotoLibraryTable(); }).catch(()=>{}),
     loadActivityLog().catch(()=>{}),
     Promise.resolve().then(()=>{ updateCatNavBadges(); }),
@@ -2342,10 +2334,7 @@ function showPage(id) {
   }
   if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
   if (id === 'purchase-orders') {
-    // Small delay to ensure page is active, then load + render
-    setTimeout(async () => {
-      await loadAndRenderPOs();
-    }, 80);
+    setTimeout(() => { loadAndRenderPOs(); }, 60);
   }
   // Update bottom nav
   if (typeof updateBottomNav === 'function') updateBottomNav(id);
@@ -4636,8 +4625,6 @@ renderProductRow = function(p, threshold, canEdit) {
 // ═══════════════════════════════════════════════════════════════
 // PURCHASE ORDER MODULE
 // ═══════════════════════════════════════════════════════════════
-let allPOs = [];
-let poLineIdx = 0;
 let _editingPOId = null;
 
 // Add 'purchase-orders' to PAGE_TITLES
@@ -4646,300 +4633,61 @@ PAGE_TITLES['purchase-orders'] = 'Purchase Orders';
 // Hook into showPage
 
 
-async function loadPOs() {
-  try {
-    const { data, error } = await sb.from('purchase_orders')
-      .select('*, purchase_order_lines(*)')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    allPOs = data || [];
-  } catch(e) {
-    console.warn('loadPOs error:', e.message);
-    allPOs = [];
-  }
-}
 
-async function loadAndRenderPOs() {
-  await loadPOs();
-  renderPOs();
-}
+// loadPOs rebuilt below
 
-function openNewPO() {
-  _editingPOId = null;
-  poLineIdx = 0;
-  document.getElementById('po-modal-title').textContent = 'New Purchase Order';
-  document.getElementById('po-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('po-delivery-date').value = '';
-  ['po-supplier','po-contact','po-delivery-addr','po-notes'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.value = '';
-  });
-  document.getElementById('po-lines-body').innerHTML = '';
-  document.getElementById('po-totals').innerHTML = '';
-  addPOLine();
-  openModal('modal-po');
-}
 
-function addPOLine() {
-  const idx = poLineIdx++;
-  const tr = document.createElement('tr');
-  tr.id = 'pol-' + idx;
-  tr.innerHTML = `
-    <td style="padding:4px">
-      <div style="position:relative;">
-        <input type="text" id="pol-search-${idx}" placeholder="Type to search product..."
-          autocomplete="off"
-          style="width:100%;padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;outline:none;"
-          oninput="filterPolProducts(${idx},this.value)"
-          onfocus="filterPolProducts(${idx},this.value)"
-          onblur="setTimeout(()=>hidePolDropdown(${idx}),200)">
-        <input type="hidden" id="pol-pid-${idx}" value="">
-        <div id="pol-drop-${idx}"
-          style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--gold);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:9999;max-height:220px;overflow-y:auto;margin-top:2px;">
-        </div>
-      </div>
-      <input type="text" id="pol-custom-${idx}" placeholder="Custom item description" style="display:none;width:100%;margin-top:3px;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px" oninput="recalcPOL(${idx})">
-    </td>
-    <td style="padding:4px"><input type="number" id="pol-qty-${idx}" value="1" min="1" style="width:70px;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;text-align:center" oninput="recalcPOL(${idx})"></td>
-    <td style="padding:4px"><input type="number" id="pol-price-${idx}" value="0" step="0.01" style="width:85px;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px" oninput="recalcPOL(${idx})"></td>
-    <td style="padding:4px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600" id="pol-total-${idx}">0.00</td>
-    <td><button class="btn btn-sm btn-danger" onclick="removePOL(${idx})">×</button></td>`;
-  document.getElementById('po-lines-body').appendChild(tr);
-  updatePOTotals();
-}
 
-function onPOLProductChange(idx, sel) {
-  const custom = document.getElementById('pol-custom-'+idx);
-  if (sel.value === '_custom') { custom.style.display = ''; }
-  else { custom.style.display = 'none'; }
-  recalcPOL(idx);
-}
+// loadAndRenderPOs rebuilt below
 
-function recalcPOL(idx) {
-  const qty = parseFloat(document.getElementById('pol-qty-'+idx)?.value) || 0;
-  const price = parseFloat(document.getElementById('pol-price-'+idx)?.value) || 0;
-  const el = document.getElementById('pol-total-'+idx);
-  if (el) el.textContent = (qty*price).toFixed(2);
-  updatePOTotals();
-}
 
-function removePOL(idx) {
-  document.getElementById('pol-'+idx)?.remove();
-  updatePOTotals();
-}
 
-function updatePOTotals() {
-  let sub = 0;
-  document.querySelectorAll('[id^="pol-total-"]').forEach(el => { sub += parseFloat(el.textContent)||0; });
-  const vr = parseFloat(settings.vatRate||15)/100;
-  document.getElementById('po-totals').innerHTML = `
-    <div style="font-size:13px;color:var(--text-muted)">Subtotal: SAR ${sub.toFixed(2)}</div>
-    <div style="font-size:13px;color:var(--text-muted)">VAT (${Math.round(vr*100)}%): SAR ${(sub*vr).toFixed(2)}</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold)">Total: SAR ${(sub*(1+vr)).toFixed(2)}</div>`;
-}
+// openNewPO rebuilt below
 
-async function savePO(status) {
-  const supplier = document.getElementById('po-supplier').value.trim();
-  if (!supplier) { showToast('Supplier name required', 'error'); return; }
-  const company = document.getElementById('po-company').value;
 
-  // Collect lines
-  const lines = [];
-  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
-    const idx = tr.id.replace('pol-','');
-    const sel = tr.querySelector('select');
-    const custom = document.getElementById('pol-custom-'+idx);
-    const qty = parseFloat(document.getElementById('pol-qty-'+idx)?.value)||0;
-    const unitPrice = parseFloat(document.getElementById('pol-price-'+idx)?.value)||0;
-    if (qty <= 0) return;
-    const hiddenPid2 = document.getElementById('pol-pid-'+idx)?.value;
-    const pid = (hiddenPid2 && hiddenPid2 !== '_custom') ? hiddenPid2 : (sel?.value === '_custom' ? null : sel?.value || null);
-    const pObj = pid ? allProducts.find(x=>x.id===pid) : null;
-    lines.push({ product_id:pid, custom_desc:custom?.value||'', qty, unit:pObj?.unit||'PCS', unit_price:unitPrice, total:qty*unitPrice, product_name:pObj?pObj.name:(custom?.value||'Item') });
-  });
 
-  const sub = lines.reduce((a,l)=>a+l.total,0);
-  const vr = parseFloat(settings.vatRate||15)/100;
-  const poNo = `PO-${company.toUpperCase()}-${Date.now().toString().slice(-6)}`;
+// addPOLine rebuilt below
 
-  // Try to save to Supabase (create table if first use)
-  showLoading('SAVING PO...');
-  try {
-    const { data: poData, error } = await sb.from('purchase_orders').insert({
-      po_no: poNo, company, supplier, status,
-      contact: document.getElementById('po-contact').value,
-      delivery_addr: document.getElementById('po-delivery-addr').value,
-      delivery_date: document.getElementById('po-delivery-date').value || null,
-      notes: document.getElementById('po-notes').value,
-      po_date: document.getElementById('po-date').value,
-      subtotal: sub, vat: sub*vr, total: sub*(1+vr),
-      created_by: currentProfile.id
-    }).select().single();
 
-    if (!error && poData) {
-      const lineInserts = lines.map((l,i) => ({ po_id:poData.id, product_id:l.product_id, custom_desc:l.custom_desc, qty:l.qty, unit:l.unit, unit_price:l.unit_price, total:l.total, sort_order:i }));
-      if (lineInserts.length) await sb.from('purchase_order_lines').insert(lineInserts);
-      allPOs = [{ ...poData, purchase_order_lines: lines }, ...allPOs];
-      hideLoading();
-      closeModal('modal-po');
-      renderPOs();
-      showToast('Purchase Order saved!');
-      if (status === 'sent') printPO({ ...poData, lines });
-    } else {
-      throw error || new Error('Save failed');
-    }
-  } catch(e) {
-    hideLoading();
-    // Table may not exist yet — show SQL to create it
-    if (e.message?.includes('relation') || e.message?.includes('does not exist') || e.code === '42P01') {
-      showToast('Run PO schema SQL first — see instructions below', 'error');
-      showPOSchemaNotice();
-    } else {
-      showToast('Save failed: ' + e.message, 'error');
-    }
-  }
-}
 
-function showPOSchemaNotice() {
-  const sql = `-- Run this in Supabase SQL Editor:
-CREATE TABLE IF NOT EXISTS purchase_orders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  po_no TEXT UNIQUE NOT NULL,
-  company TEXT NOT NULL,
-  supplier TEXT NOT NULL,
-  contact TEXT, delivery_addr TEXT, delivery_date DATE,
-  status TEXT DEFAULT 'draft',
-  subtotal NUMERIC(12,2) DEFAULT 0,
-  vat NUMERIC(12,2) DEFAULT 0,
-  total NUMERIC(12,2) DEFAULT 0,
-  notes TEXT, po_date DATE,
-  created_by UUID, created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS purchase_order_lines (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  po_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-  product_id UUID REFERENCES products(id),
-  custom_desc TEXT, qty NUMERIC(10,2) DEFAULT 1,
-  unit TEXT DEFAULT 'PCS', unit_price NUMERIC(12,2) DEFAULT 0,
-  total NUMERIC(12,2) DEFAULT 0, sort_order INTEGER DEFAULT 0
-);
-CREATE POLICY "po_all" ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "pol_all" ON purchase_order_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);
-ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_order_lines ENABLE ROW LEVEL SECURITY;`;
+// onPOLProductChange rebuilt below
 
-  // Show in an alert-style overlay
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
-  overlay.innerHTML = `<div style="background:var(--surface);border-radius:14px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto">
-    <div style="font-family:var(--font-display);font-size:20px;color:var(--gold);margin-bottom:8px">One-time Setup Required</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Purchase Orders need two new database tables. Copy and run this SQL in Supabase → SQL Editor:</p>
-    <pre style="background:var(--surface2);border-radius:8px;padding:14px;font-size:11px;overflow-x:auto;color:var(--text);line-height:1.6">${sql}</pre>
-    <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
-      <button class="btn btn-outline" onclick="navigator.clipboard.writeText(\`${sql}\`).then(()=>showToast('Copied!'))">📋 Copy SQL</button>
-      <button class="btn btn-gold" onclick="this.closest('div[style*=fixed]').remove()">Close</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
-}
 
-function renderPOs() {
-  const tbody = document.getElementById('po-tbody');
-  if (!tbody) return;
 
-  const search  = (document.getElementById('po-search')?.value || '').toLowerCase();
-  const fc      = document.getElementById('po-filter-company')?.value || '';
-  const fs      = document.getElementById('po-filter-status')?.value || '';
-  const isAdmin = currentProfile?.role === 'admin';
-  const isMgr   = currentProfile?.role === 'admin' || currentProfile?.role === 'manager';
+// recalcPOL rebuilt below
 
-  const statusColors = {
-    draft:'badge-warn', sent:'badge-blue', received:'badge-green',
-    partial:'badge-gold', cancelled:'badge-red'
-  };
 
-  const list = (allPOs || []).filter(po => {
-    if (!po) return false;
-    return (!search || (po.supplier||'').toLowerCase().includes(search) || (po.po_no||'').toLowerCase().includes(search))
-        && (!fc || po.company === fc)
-        && (!fs || po.status === fs);
-  });
 
-  if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">'
-      + '<div style="font-size:32px;margin-bottom:10px;">📋</div>'
-      + '<div style="font-weight:600;font-size:15px;margin-bottom:6px;">No Purchase Orders</div>'
-      + '<div style="font-size:13px;">Click <strong>+ New PO</strong> to create one.</div>'
-      + '</td></tr>';
-    return;
-  }
+// removePOL rebuilt below
 
-  tbody.innerHTML = '';
 
-  list.forEach(po => {
-    const tr = document.createElement('tr');
-    tr.style.cursor = 'pointer';
-    tr.addEventListener('click', () => printPO(po));
 
-    const date   = (po.po_date || po.created_at) ? new Date(po.po_date || po.created_at).toLocaleDateString('en-SA') : '—';
-    const lines  = (po.purchase_order_lines || []).length;
-    const total  = Number(po.total || 0).toFixed(2);
-    const badge  = statusColors[po.status] || 'badge-blue';
-    const coName = (typeof COMPANY_NAMES !== 'undefined' && COMPANY_NAMES[po.company]) || po.company || '—';
+// updatePOTotals rebuilt below
 
-    tr.innerHTML = '<td class="mono" style="font-size:12px;color:var(--gold);font-weight:700;">' + (po.po_no||'—') + '</td>'
-      + '<td style="font-size:13px;">' + date + '</td>'
-      + '<td><div style="font-weight:500;">' + (po.supplier||'—') + '</div><div style="font-size:11px;color:var(--text-muted);">' + (po.contact||'') + '</div></td>'
-      + '<td><span class="badge badge-blue" style="font-size:10px;">' + coName + '</span></td>'
-      + '<td>' + lines + ' items</td>'
-      + '<td class="mono" style="font-weight:600;">SAR ' + total + '</td>'
-      + '<td><span class="badge ' + badge + '">' + (po.status||'draft').toUpperCase() + '</span></td>'
-      + '<td style="white-space:nowrap;">'
-      + '<div style="display:flex;gap:4px;" onclick="event.stopPropagation();">'
-      + '<button class="btn btn-sm btn-outline" title="Print">🖨️</button>'
-      + (po.status !== 'received' && isMgr ? '<button class="btn btn-sm btn-success" title="Mark Received">✓ Recv</button>' : '')
-      + (isAdmin ? '<button class="btn btn-sm btn-danger" title="Delete">🗑️</button>' : '')
-      + '</div></td>';
 
-    // Attach button events
-    const btns = tr.querySelectorAll('td:last-child button');
-    let bi = 0;
-    btns[bi++].addEventListener('click', e => { e.stopPropagation(); printPO(po); });
-    if (po.status !== 'received' && isMgr && btns[bi]) {
-      btns[bi++].addEventListener('click', e => { e.stopPropagation(); updatePOStatus(po.id, 'received'); });
-    }
-    if (isAdmin && btns[bi]) {
-      btns[bi].addEventListener('click', e => { e.stopPropagation(); deletePO(po.id, po.po_no||''); });
-    }
 
-    tbody.appendChild(tr);
-  });
-}
+// savePO rebuilt below
 
-function openViewPO(id) { printPO(id); }
 
-async function updatePOStatus(id, status) {
-  try {
-    await sb.from('purchase_orders').update({ status }).eq('id', id);
-    const po = allPOs.find(x=>x.id===id); if(po) po.status=status;
-    renderPOs();
-    if (status === 'received') {
-      addNotification('stock_in', 'PO Received', `Purchase order ${po?.po_no} marked as received`);
-    }
-    showToast(`PO marked as ${status}`);
-  } catch(e) { showToast('Update failed: '+e.message,'error'); }
-}
 
-async function deletePO(id, poNo) {
-  if (currentProfile?.role !== 'admin') { showToast('Admin only', 'error'); return; }
-  if (!confirm(`Delete PO ${poNo}?`)) return;
-  showLoading('DELETING...');
-  try {
-    await sb.from('purchase_order_lines').delete().eq('po_id', id);
-    await sb.from('purchase_orders').delete().eq('id', id);
-    allPOs = allPOs.filter(x=>x.id!==id);
-    hideLoading(); renderPOs(); showToast('PO deleted');
-  } catch(e) { hideLoading(); showToast('Delete failed: '+e.message,'error'); }
-}
+// showPOSchemaNotice rebuilt below
+
+
+
+// renderPOs rebuilt below
+
+
+
+// openViewPO rebuilt below
+
+
+
+// updatePOStatus rebuilt below
+
+
+
+// deletePO rebuilt below
+
 
 function printPO(po) {
   if (!po) return;
@@ -9243,6 +8991,489 @@ function hidePolDropdown(idx) {
   const drop = document.getElementById('pol-drop-' + idx);
   if (drop) drop.style.display = 'none';
 }
+// ═══════════════════════════════════════════════════════════════
+// PURCHASE ORDERS — COMPLETE REWRITE
+// ═══════════════════════════════════════════════════════════════
+
+let allPOs     = [];
+let poLineIdx  = 0;
+let _editPOId  = null;
+
+// ── LOAD ─────────────────────────────────────────────────────
+async function loadPOs() {
+  try {
+    const { data, error } = await sb
+      .from('purchase_orders')
+      .select('*, purchase_order_lines(*)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    allPOs = data || [];
+  } catch(e) {
+    console.warn('loadPOs:', e.message);
+    allPOs = [];
+  }
+}
+
+async function loadAndRenderPOs() {
+  await loadPOs();
+  renderPOs();
+}
+
+// ── RENDER LIST ───────────────────────────────────────────────
+function renderPOs() {
+  const tbody = document.getElementById('po-tbody');
+  if (!tbody) return;
+
+  const search  = (document.getElementById('po-search')?.value || '').toLowerCase();
+  const fc      = document.getElementById('po-filter-company')?.value || '';
+  const fs      = document.getElementById('po-filter-status')?.value || '';
+  const isAdmin = currentProfile?.role === 'admin';
+  const isMgr   = isAdmin || currentProfile?.role === 'manager';
+
+  const STATUS_BADGE = {
+    draft:'badge-warn', sent:'badge-blue', received:'badge-green',
+    partial:'badge-gold', cancelled:'badge-red'
+  };
+
+  const list = allPOs.filter(po => {
+    if (!po) return false;
+    return (!search || (po.supplier||'').toLowerCase().includes(search) || (po.po_no||'').toLowerCase().includes(search))
+        && (!fc || po.company === fc)
+        && (!fs || po.status === fs);
+  });
+
+  // Stats
+  const statsEl = document.getElementById('po-stats-row');
+  if (statsEl) {
+    const total   = allPOs.length;
+    const pending = allPOs.filter(p => p.status === 'sent').length;
+    const recv    = allPOs.filter(p => p.status === 'received').length;
+    const value   = allPOs.reduce((s,p) => s + Number(p.total||0), 0);
+    statsEl.innerHTML = [
+      {icon:'📋', label:'Total POs',     val: total,                  cls:'blue'},
+      {icon:'📤', label:'Pending',        val: pending,                cls:'warn'},
+      {icon:'✅', label:'Received',       val: recv,                   cls:'green'},
+      {icon:'💰', label:'Total Value',    val:'SAR '+value.toFixed(0), cls:'gold'},
+    ].map(s => `<div class="stat-card">
+      <div class="stat-icon-box ${s.cls}"><span style="font-size:18px;">${s.icon}</span></div>
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value" style="font-size:22px;">${s.val}</div>
+    </div>`).join('');
+  }
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:48px;color:var(--text-muted);">'
+      + '<div style="font-size:40px;margin-bottom:12px;">📋</div>'
+      + '<div style="font-weight:700;font-size:16px;margin-bottom:6px;">No Purchase Orders</div>'
+      + '<div style="font-size:13px;">' + (search||fc||fs ? 'No results match your filters.' : 'Click <strong>+ New PO</strong> to create your first purchase order.') + '</div>'
+      + '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  list.forEach(po => {
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => printPO(po));
+
+    const date  = (po.po_date || po.created_at) ? new Date(po.po_date || po.created_at).toLocaleDateString('en-SA') : '—';
+    const lines = (po.purchase_order_lines || []).length;
+    const total = Number(po.total || 0).toFixed(2);
+    const badge = STATUS_BADGE[po.status] || 'badge-blue';
+    const coName = (typeof COMPANY_NAMES !== 'undefined' && COMPANY_NAMES[po.company]) || po.company || '—';
+
+    tr.innerHTML =
+        '<td class="mono" style="font-size:12px;color:var(--gold);font-weight:700;">' + (po.po_no||'—') + '</td>'
+      + '<td style="font-size:13px;">' + date + '</td>'
+      + '<td><div style="font-weight:500;">' + (po.supplier||'—') + '</div>'
+        + (po.contact ? '<div style="font-size:11px;color:var(--text-muted);">' + po.contact + '</div>' : '')
+        + '</td>'
+      + '<td><span class="badge badge-blue" style="font-size:10px;">' + coName + '</span></td>'
+      + '<td style="text-align:center;">' + lines + '</td>'
+      + '<td class="mono" style="font-weight:600;">SAR ' + total + '</td>'
+      + '<td><span class="badge ' + badge + '">' + (po.status||'draft').toUpperCase() + '</span></td>'
+      + '<td><div style="display:flex;gap:4px;" onclick="event.stopPropagation();"></div></td>';
+
+    const actionsDiv = tr.querySelector('td:last-child div');
+
+    // Print button — all roles
+    const printBtn = document.createElement('button');
+    printBtn.className = 'btn btn-sm btn-outline';
+    printBtn.innerHTML = '🖨️';
+    printBtn.title = 'Print PO';
+    printBtn.addEventListener('click', e => { e.stopPropagation(); printPO(po); });
+    actionsDiv.appendChild(printBtn);
+
+    // Edit button — manager+
+    if (isMgr && po.status === 'draft') {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn btn-sm btn-outline';
+      editBtn.innerHTML = '✏️';
+      editBtn.title = 'Edit PO';
+      editBtn.addEventListener('click', e => { e.stopPropagation(); openEditPO(po); });
+      actionsDiv.appendChild(editBtn);
+    }
+
+    // Mark received — manager+
+    if (isMgr && !['received','cancelled'].includes(po.status)) {
+      const recvBtn = document.createElement('button');
+      recvBtn.className = 'btn btn-sm btn-success';
+      recvBtn.innerHTML = '✓';
+      recvBtn.title = 'Mark as Received';
+      recvBtn.addEventListener('click', e => { e.stopPropagation(); updatePOStatus(po.id, 'received'); });
+      actionsDiv.appendChild(recvBtn);
+    }
+
+    // Delete — admin only
+    if (isAdmin) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-sm btn-danger';
+      delBtn.innerHTML = '🗑️';
+      delBtn.title = 'Delete PO';
+      delBtn.addEventListener('click', e => { e.stopPropagation(); deletePO(po.id, po.po_no||''); });
+      actionsDiv.appendChild(delBtn);
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+// ── OPEN NEW PO ───────────────────────────────────────────────
+function openNewPO() {
+  _editPOId = null;
+  poLineIdx = 0;
+  document.getElementById('po-modal-title').textContent = 'New Purchase Order';
+  document.getElementById('po-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('po-delivery-date').value = '';
+  document.getElementById('po-status').value = 'draft';
+  ['po-supplier','po-contact','po-delivery-addr','po-notes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('po-lines-body').innerHTML = '';
+  document.getElementById('po-totals').innerHTML = '';
+  addPOLine();
+  openModal('modal-po');
+}
+
+// ── OPEN EDIT PO ──────────────────────────────────────────────
+function openEditPO(po) {
+  if (!po) return;
+  _editPOId = po.id;
+  poLineIdx = 0;
+  document.getElementById('po-modal-title').textContent = 'Edit PO — ' + (po.po_no||'');
+  document.getElementById('po-date').value = po.po_date || '';
+  document.getElementById('po-company').value = po.company || 'bv';
+  document.getElementById('po-status').value = po.status || 'draft';
+  document.getElementById('po-supplier').value = po.supplier || '';
+  document.getElementById('po-contact').value = po.contact || '';
+  document.getElementById('po-delivery-date').value = po.delivery_date || '';
+  document.getElementById('po-delivery-addr').value = po.delivery_addr || '';
+  document.getElementById('po-notes').value = po.notes || '';
+  document.getElementById('po-lines-body').innerHTML = '';
+  document.getElementById('po-totals').innerHTML = '';
+  const lines = po.purchase_order_lines || [];
+  if (lines.length) {
+    lines.forEach(l => addPOLine(l));
+  } else {
+    addPOLine();
+  }
+  openModal('modal-po');
+}
+
+// ── ADD LINE ──────────────────────────────────────────────────
+function addPOLine(existingLine) {
+  const idx = poLineIdx++;
+  const tr = document.createElement('tr');
+  tr.id = 'pol-' + idx;
+  tr.style.borderBottom = '1px solid var(--border)';
+
+  // Product search cell
+  const tdProd = document.createElement('td');
+  tdProd.style.padding = '6px 8px';
+  tdProd.innerHTML = '<div style="position:relative;">'
+    + '<input type="text" id="pol-search-' + idx + '" placeholder="Type to search product..." autocomplete="off"'
+    + ' style="width:100%;padding:6px 10px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;outline:none;"'
+    + ' oninput="filterPolProducts(' + idx + ',this.value)" onfocus="filterPolProducts(' + idx + ',this.value)"'
+    + ' onblur="setTimeout(()=>hidePolDropdown(' + idx + '),200)">'
+    + '<input type="hidden" id="pol-pid-' + idx + '" value="">'
+    + '<div id="pol-drop-' + idx + '" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);'
+    + 'border:1.5px solid var(--gold);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:9999;max-height:200px;overflow-y:auto;margin-top:2px;"></div>'
+    + '</div>'
+    + '<input type="text" id="pol-custom-' + idx + '" placeholder="Custom description..." '
+    + ' style="display:none;width:100%;margin-top:4px;padding:6px 10px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;outline:none;"'
+    + ' oninput="recalcPOL(' + idx + ')">';
+  tr.appendChild(tdProd);
+
+  // Qty
+  const tdQty = document.createElement('td');
+  tdQty.style.padding = '6px 4px';
+  tdQty.innerHTML = '<input type="number" id="pol-qty-' + idx + '" value="' + (existingLine?.qty||1) + '" min="0.01" step="0.01"'
+    + ' style="width:76px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:13px;text-align:center;"'
+    + ' oninput="recalcPOL(' + idx + ')">';
+  tr.appendChild(tdQty);
+
+  // Unit
+  const tdUnit = document.createElement('td');
+  tdUnit.style.padding = '6px 4px';
+  tdUnit.innerHTML = '<select id="pol-unit-' + idx + '"'
+    + ' style="width:86px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;">'
+    + ['PCS','MTR','KG','SET','BOX','ROLL','LENGTH','LOT'].map(u =>
+        '<option' + ((existingLine?.unit||'PCS')===u?' selected':'') + '>' + u + '</option>').join('')
+    + '</select>';
+  tr.appendChild(tdUnit);
+
+  // Unit price
+  const tdPrice = document.createElement('td');
+  tdPrice.style.padding = '6px 4px';
+  tdPrice.innerHTML = '<input type="number" id="pol-price-' + idx + '" value="' + (existingLine?.unit_price||0) + '" step="0.01"'
+    + ' style="width:100px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:13px;"'
+    + ' oninput="recalcPOL(' + idx + ')">';
+  tr.appendChild(tdPrice);
+
+  // Total
+  const tdTotal = document.createElement('td');
+  tdTotal.id = 'pol-total-' + idx;
+  tdTotal.style.cssText = 'padding:6px 8px;font-family:var(--font-mono);font-size:13px;font-weight:600;text-align:right;';
+  tdTotal.textContent = Number((existingLine?.qty||1)*(existingLine?.unit_price||0)).toFixed(2);
+  tr.appendChild(tdTotal);
+
+  // Remove btn
+  const tdDel = document.createElement('td');
+  tdDel.style.padding = '6px 4px';
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'btn btn-sm btn-danger';
+  removeBtn.innerHTML = '×';
+  removeBtn.addEventListener('click', () => { tr.remove(); updatePOTotals(); });
+  tdDel.appendChild(removeBtn);
+  tr.appendChild(tdDel);
+
+  document.getElementById('po-lines-body').appendChild(tr);
+
+  // Pre-fill if editing existing line
+  if (existingLine) {
+    const searchEl = document.getElementById('pol-search-' + idx);
+    const pidEl    = document.getElementById('pol-pid-' + idx);
+    if (existingLine.product_id) {
+      const p = allProducts.find(x => x.id === existingLine.product_id);
+      if (searchEl && p) searchEl.value = p.name + (p.code ? ' (' + p.code + ')' : '');
+      if (pidEl) pidEl.value = existingLine.product_id;
+    } else if (existingLine.custom_desc) {
+      if (pidEl) pidEl.value = '_custom';
+      const custEl = document.getElementById('pol-custom-' + idx);
+      if (custEl) { custEl.style.display = ''; custEl.value = existingLine.custom_desc; }
+    }
+  }
+
+  updatePOTotals();
+}
+
+function recalcPOL(idx) {
+  const qty   = parseFloat(document.getElementById('pol-qty-' + idx)?.value) || 0;
+  const price = parseFloat(document.getElementById('pol-price-' + idx)?.value) || 0;
+  const el    = document.getElementById('pol-total-' + idx);
+  if (el) el.textContent = (qty * price).toFixed(2);
+  updatePOTotals();
+}
+
+function removePOL(idx) {
+  const tr = document.getElementById('pol-' + idx);
+  if (tr) tr.remove();
+  updatePOTotals();
+}
+
+function updatePOTotals() {
+  const el = document.getElementById('po-totals');
+  if (!el) return;
+  let sub = 0;
+  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
+    const id = tr.id.replace('pol-','');
+    const qty   = parseFloat(document.getElementById('pol-qty-'+id)?.value) || 0;
+    const price = parseFloat(document.getElementById('pol-price-'+id)?.value) || 0;
+    sub += qty * price;
+  });
+  const vr  = parseFloat((settings && settings.vatRate) || 15) / 100;
+  const vat = sub * vr;
+  const tot = sub + vat;
+  el.innerHTML = '<div style="display:inline-block;text-align:right;min-width:220px;">'
+    + '<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:3px;">'
+    + '<span style="color:var(--text-muted);">Subtotal</span>'
+    + '<span class="mono">SAR ' + sub.toFixed(2) + '</span></div>'
+    + '<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:3px;">'
+    + '<span style="color:var(--text-muted);">VAT (' + Math.round(vr*100) + '%)</span>'
+    + '<span class="mono">SAR ' + vat.toFixed(2) + '</span></div>'
+    + '<div style="display:flex;justify-content:space-between;gap:24px;font-weight:700;font-size:15px;border-top:2px solid var(--border);padding-top:4px;">'
+    + '<span>Total</span>'
+    + '<span class="mono">SAR ' + tot.toFixed(2) + '</span></div>'
+    + '</div>';
+}
+
+// ── SAVE PO ───────────────────────────────────────────────────
+async function savePO(statusOverride) {
+  const supplier = document.getElementById('po-supplier')?.value.trim();
+  if (!supplier) { showToast('Supplier name required', 'error'); return; }
+
+  const company  = document.getElementById('po-company')?.value || 'bv';
+  const status   = statusOverride || document.getElementById('po-status')?.value || 'draft';
+
+  // Collect lines
+  const lines = [];
+  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
+    const id       = tr.id.replace('pol-','');
+    const pidEl    = document.getElementById('pol-pid-' + id);
+    const custEl   = document.getElementById('pol-custom-' + id);
+    const qty      = parseFloat(document.getElementById('pol-qty-' + id)?.value) || 0;
+    const price    = parseFloat(document.getElementById('pol-price-' + id)?.value) || 0;
+    if (qty <= 0) return;
+    const pidVal = pidEl?.value || '';
+    const pid    = (pidVal && pidVal !== '_custom') ? pidVal : null;
+    const pObj   = pid ? allProducts.find(x => x.id === pid) : null;
+    lines.push({
+      product_id:   pid,
+      custom_desc:  (!pid && custEl ? custEl.value.trim() : '') || (pObj ? '' : ''),
+      qty, unit:    document.getElementById('pol-unit-' + id)?.value || 'PCS',
+      unit_price:   price,
+      total:        qty * price,
+      sort_order:   lines.length
+    });
+  });
+
+  const sub = lines.reduce((a,l) => a + l.total, 0);
+  const vr  = parseFloat((settings && settings.vatRate) || 15) / 100;
+  const now = Date.now().toString().slice(-6);
+  const poNo = _editPOId ? null : 'PO-' + company.toUpperCase() + '-' + now;
+
+  showLoading('SAVING PO...');
+  try {
+    let poId = _editPOId;
+
+    if (_editPOId) {
+      // Update existing
+      const { error } = await sb.from('purchase_orders').update({
+        company, supplier, status,
+        contact:       document.getElementById('po-contact')?.value || '',
+        delivery_addr: document.getElementById('po-delivery-addr')?.value || '',
+        delivery_date: document.getElementById('po-delivery-date')?.value || null,
+        notes:         document.getElementById('po-notes')?.value || '',
+        po_date:       document.getElementById('po-date')?.value || null,
+        subtotal: sub, vat: sub*vr, total: sub*(1+vr)
+      }).eq('id', _editPOId);
+      if (error) throw error;
+      await sb.from('purchase_order_lines').delete().eq('po_id', _editPOId);
+    } else {
+      // Insert new
+      const { data: poData, error } = await sb.from('purchase_orders').insert({
+        po_no: poNo, company, supplier, status,
+        contact:       document.getElementById('po-contact')?.value || '',
+        delivery_addr: document.getElementById('po-delivery-addr')?.value || '',
+        delivery_date: document.getElementById('po-delivery-date')?.value || null,
+        notes:         document.getElementById('po-notes')?.value || '',
+        po_date:       document.getElementById('po-date')?.value || null,
+        subtotal: sub, vat: sub*vr, total: sub*(1+vr),
+        created_by: currentProfile?.id || null
+      }).select().single();
+      if (error) throw error;
+      poId = poData.id;
+    }
+
+    // Insert lines
+    if (lines.length) {
+      const lineInserts = lines.map(l => ({ ...l, po_id: poId }));
+      const { error: lErr } = await sb.from('purchase_order_lines').insert(lineInserts);
+      if (lErr) console.warn('Lines insert error:', lErr.message);
+    }
+
+    hideLoading();
+    closeModal('modal-po');
+    showToast(_editPOId ? 'PO updated!' : 'Purchase Order saved!');
+    _editPOId = null;
+    await loadAndRenderPOs();
+
+    if (status === 'sent') {
+      const po = allPOs.find(p => p.po_no === poNo || p.id === poId);
+      if (po) printPO(po);
+    }
+  } catch(e) {
+    hideLoading();
+    if (e.message?.includes('relation') || e.code === '42P01') {
+      showToast('Run the PO SQL schema first!', 'error');
+      showPOSchemaNotice();
+    } else {
+      showToast('Save failed: ' + e.message, 'error');
+    }
+  }
+}
+
+// ── UPDATE STATUS ─────────────────────────────────────────────
+async function updatePOStatus(id, status) {
+  try {
+    const { error } = await sb.from('purchase_orders').update({ status }).eq('id', id);
+    if (error) throw error;
+    const po = allPOs.find(x => x.id === id);
+    if (po) po.status = status;
+    renderPOs();
+    showToast('Status updated to ' + status + '!');
+  } catch(e) {
+    showToast('Update failed: ' + e.message, 'error');
+  }
+}
+
+// ── DELETE PO ─────────────────────────────────────────────────
+async function deletePO(id, poNo) {
+  if (currentProfile?.role !== 'admin') { showToast('Admin only', 'error'); return; }
+  if (!confirm('Delete PO ' + poNo + '? This cannot be undone.')) return;
+  showLoading('DELETING...');
+  try {
+    await sb.from('purchase_order_lines').delete().eq('po_id', id);
+    const { error } = await sb.from('purchase_orders').delete().eq('id', id);
+    if (error) throw error;
+    allPOs = allPOs.filter(p => p.id !== id);
+    hideLoading();
+    renderPOs();
+    showToast('PO deleted.');
+  } catch(e) {
+    hideLoading();
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── SCHEMA NOTICE ─────────────────────────────────────────────
+function showPOSchemaNotice() {
+  const sql = `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_no TEXT UNIQUE NOT NULL, company TEXT NOT NULL, supplier TEXT NOT NULL,
+  contact TEXT, delivery_addr TEXT, delivery_date DATE, status TEXT DEFAULT 'draft',
+  subtotal NUMERIC(12,2) DEFAULT 0, vat NUMERIC(12,2) DEFAULT 0, total NUMERIC(12,2) DEFAULT 0,
+  notes TEXT, po_date DATE, created_by UUID, created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS purchase_order_lines (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id), custom_desc TEXT,
+  qty NUMERIC(10,2) DEFAULT 1, unit TEXT DEFAULT 'PCS',
+  unit_price NUMERIC(12,2) DEFAULT 0, total NUMERIC(12,2) DEFAULT 0, sort_order INTEGER DEFAULT 0
+);
+ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_order_lines ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "po_all" ON purchase_orders;
+DROP POLICY IF EXISTS "pol_all" ON purchase_order_lines;
+CREATE POLICY "po_all" ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "pol_all" ON purchase_order_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;">'
+    + '<div style="font-family:var(--font-display);font-size:20px;color:var(--gold);margin-bottom:10px;">PO Table SQL Setup</div>'
+    + '<p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Run this in Supabase → SQL Editor → click Run:</p>'
+    + '<pre style="background:var(--surface2);border-radius:8px;padding:14px;font-size:11px;overflow-x:auto;color:var(--text);white-space:pre-wrap;">' + sql + '</pre>'
+    + '<div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">'
+    + '<button class="btn btn-outline" onclick="navigator.clipboard.writeText(this.closest(\'div[style*=fixed]\').querySelector(\'pre\').textContent).then(()=>showToast(\'Copied!\'))">📋 Copy</button>'
+    + '<button class="btn btn-gold" onclick="this.closest(\'div[style*=fixed]\').remove()">Close</button>'
+    + '</div></div>';
+  document.body.appendChild(overlay);
+}
+
 window.addEventListener('DOMContentLoaded', init);
 </script>
 
@@ -9501,10 +9732,11 @@ window.addEventListener('DOMContentLoaded', init);
 
 <!-- PURCHASE ORDER MODAL -->
 <div class="modal-overlay" id="modal-po">
-  <div class="modal" style="max-width:820px;width:95vw">
+  <div class="modal" style="max-width:860px;width:96vw;max-height:92vh;overflow-y:auto;">
     <div class="modal-title" id="po-modal-title">New Purchase Order</div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <!-- Header fields -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
       <div class="field">
         <label>PO Date</label>
         <input type="date" id="po-date">
@@ -9518,44 +9750,53 @@ window.addEventListener('DOMContentLoaded', init);
         </select>
       </div>
       <div class="field">
-        <label>Supplier Name</label>
-        <input type="text" id="po-supplier" placeholder="Supplier company name">
+        <label>Status</label>
+        <select id="po-status">
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="received">Received</option>
+          <option value="partial">Partial</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
       </div>
       <div class="field">
-        <label>Contact</label>
-        <input type="text" id="po-contact" placeholder="Contact person / phone">
+        <label>Supplier Name *</label>
+        <input type="text" id="po-supplier" placeholder="e.g. Al-Malik Trading Co.">
       </div>
       <div class="field">
-        <label>Delivery Address</label>
-        <input type="text" id="po-delivery-addr" placeholder="Delivery address">
+        <label>Contact Person / Phone</label>
+        <input type="text" id="po-contact" placeholder="Name or +966...">
       </div>
       <div class="field">
         <label>Expected Delivery Date</label>
         <input type="date" id="po-delivery-date">
       </div>
     </div>
-
     <div class="field">
-      <label>Notes</label>
-      <textarea id="po-notes" rows="2" placeholder="Additional notes..."></textarea>
+      <label>Delivery Address</label>
+      <input type="text" id="po-delivery-addr" placeholder="Full delivery address">
+    </div>
+    <div class="field">
+      <label>Notes / Terms</label>
+      <textarea id="po-notes" rows="2" placeholder="Payment terms, special instructions..."></textarea>
     </div>
 
     <!-- Line items -->
-    <div style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)">Line Items</label>
-        <button class="btn btn-sm btn-outline" onclick="addPOLine()">+ Add Line</button>
-      </div>
-      <div class="table-wrap" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)">
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <div style="margin:16px 0 8px;display:flex;justify-content:space-between;align-items:center;">
+      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);">Line Items</label>
+      <button class="btn btn-sm btn-outline" onclick="addPOLine()">+ Add Line</button>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:12px;">
+      <div style="overflow-x:auto;max-height:300px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:640px;">
           <thead>
-            <tr style="background:var(--surface2)">
-              <th style="padding:8px 10px;text-align:left">Product / Description</th>
-              <th style="padding:8px 10px;width:60px">Qty</th>
-              <th style="padding:8px 10px;width:80px">Unit</th>
-              <th style="padding:8px 10px;width:100px">Unit Price</th>
-              <th style="padding:8px 10px;width:100px">Total</th>
-              <th style="padding:8px 10px;width:36px"></th>
+            <tr style="background:var(--surface2);">
+              <th style="padding:8px 10px;text-align:left;min-width:280px;">Product / Description</th>
+              <th style="padding:8px 10px;width:80px;">Qty</th>
+              <th style="padding:8px 10px;width:90px;">Unit</th>
+              <th style="padding:8px 10px;width:110px;">Unit Price</th>
+              <th style="padding:8px 10px;width:100px;">Total</th>
+              <th style="padding:8px 10px;width:40px;"></th>
             </tr>
           </thead>
           <tbody id="po-lines-body"></tbody>
@@ -9564,12 +9805,12 @@ window.addEventListener('DOMContentLoaded', init);
     </div>
 
     <!-- Totals -->
-    <div id="po-totals" style="text-align:right;padding:10px 0;font-size:13px"></div>
+    <div id="po-totals" style="text-align:right;padding:8px 0;font-size:13px;border-top:1px solid var(--border);"></div>
 
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
       <button class="btn btn-outline" onclick="savePO('draft')">💾 Save Draft</button>
-      <button class="btn btn-gold" onclick="savePO('sent')">📤 Save & Send</button>
+      <button class="btn btn-gold" onclick="savePO('sent')">📤 Save & Print</button>
     </div>
   </div>
 </div>
