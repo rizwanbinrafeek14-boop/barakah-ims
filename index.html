@@ -505,7 +505,8 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 
 /* ── PAGE ── */
 .page { display: none; padding: 24px; }
-.page.active { display: block; opacity: 1; }
+.page.active { display: block !important; opacity: 1 !important; visibility: visible !important; }
+#page-purchase-orders.active { display: block !important; }
 #page-catalogue { padding: 12px 20px 24px; }
 @keyframes pageIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
@@ -2287,9 +2288,10 @@ async function saveSettings() {
 // ─── NAVIGATION ───────────────────────────────────────────────
 const PAGE_TITLES = {
   dashboard:'Dashboard', inventory:'Inventory', movements:'Stock Movements',
-  quotations:'Quotations', 'low-stock':'Low Stock Alerts', 'movement-analysis':'Movement Analysis',
-  documents:'Product Documents', reports:'Monthly Reports', 'ai-insights':'AI Insights',
-  users:'User Management', settings:'Settings'
+  quotations:'Quotations', 'purchase-orders':'Purchase Orders', 'low-stock':'Low Stock Alerts',
+  'movement-analysis':'Movement Analysis', documents:'Product Documents',
+  reports:'Monthly Reports', 'ai-insights':'AI Insights',
+  'activity-log':'Activity Log', users:'User Management', settings:'Settings'
 };
 
 function showPage(id) {
@@ -2334,6 +2336,9 @@ function showPage(id) {
   }
   if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
   if (id === 'purchase-orders') {
+    // Force browser reflow to ensure page is visible
+    const poPage = document.getElementById('page-purchase-orders');
+    if (poPage) { poPage.style.display = 'block'; poPage.offsetHeight; } // trigger reflow
     setTimeout(() => { loadAndRenderPOs(); }, 50);
   }
   // Update bottom nav
