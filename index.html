@@ -9702,66 +9702,19 @@ function autoFillCode() {
 }
 
 // Regenerate button next to code field (added via JS)
-function addCodeGenButton() {
-  const codeField = document.getElementById('p-code');
-  if (!codeField || document.getElementById('gen-code-btn')) return;
+// addCodeGenButton removed - using addAutoCodeButton instead
 
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.id   = 'gen-code-btn';
-  btn.textContent = '⚡ Auto';
-  btn.title = 'Auto-generate product code';
-  btn.style.cssText = 'padding:6px 10px;background:var(--gold-light);color:var(--gold);border:1.5px solid var(--gold);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap;transition:all .15s;';
-  btn.addEventListener('click', () => {
-    const codeEl = document.getElementById('p-code');
-    if (codeEl) codeEl.value = ''; // clear first to allow regeneration
-    generateProductCode();
-    if (codeEl && !codeEl.value) {
-      // Fallback: generate from name words
-      const name = document.getElementById('p-name')?.value || '';
-      const mat  = document.getElementById('p-material')?.value || 'XX';
-      const words = name.trim().toUpperCase().split(/\s+/).filter(w => w.length > 2);
-      const abbr  = words.slice(0,2).map(w => w.substring(0,3)).join('-');
-      if (abbr) codeEl.value = mat + '-' + abbr;
-    }
-  });
-  btn.addEventListener('mouseover', () => btn.style.background = 'var(--gold)' );
-  btn.addEventListener('mouseout',  () => btn.style.background = 'var(--gold-light)');
-  codeField.parentElement.style.display = 'flex';
-  codeField.parentElement.style.gap = '6px';
-  codeField.style.flex = '1';
-  codeField.parentElement.appendChild(btn);
-}
 
 // Hook into form events to auto-generate on blur
-function hookAutoCode() {
-  const nameEl    = document.getElementById('p-name');
-  const sizeEl    = document.getElementById('p-size');
-  const matEl     = document.getElementById('p-material');
-  const catEl     = document.getElementById('p-category');
-  const subtypeEl = document.getElementById('p-subtype');
+// hookAutoCode removed - using addAutoCodeButton instead
 
-  [nameEl, sizeEl, matEl, catEl, subtypeEl].forEach(el => {
-    if (el) el.addEventListener('change', autoFillCode);
-  });
-  if (nameEl) nameEl.addEventListener('blur', autoFillCode);
-  if (sizeEl) sizeEl.addEventListener('blur', autoFillCode);
-  addCodeGenButton();
-}
 
 // Hook into openAddProduct to setup auto-code
-const _origOpenAddProductCode = openAddProduct;
-openAddProduct = function() {
-  _origOpenAddProductCode();
-  setTimeout(hookAutoCode, 100);
-};
+// hookAutoCode now handled by _origOpenAddProduct_code wrapper
 
 // Also hook into openEditProduct (don't auto-fill when editing)
-const _origOpenEditProductCode = openEditProduct;
-openEditProduct = function(id) {
-  _origOpenEditProductCode(id);
-  setTimeout(addCodeGenButton, 100); // only add button, don't auto-fill
-};
+// old edit wrapper removed
+
 
 // ═══════════════════════════════════════════════════════════════
 // AUTO PRODUCT CODE GENERATOR
@@ -9769,160 +9722,257 @@ openEditProduct = function(id) {
 // e.g. CS-GV-009-P16 = Carbon Steel Gate Valve 2" PN16
 // ═══════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════
+// PRODUCT CODE GENERATOR — Based on actual inventory sequences
+// Examples: CSCAP40-008, BRZBV-006-APP600, CSPNPL40-001-008
+// ═══════════════════════════════════════════════════════════════
+
+// Size codes (from chart: 001=1/8" to 027=30")
 const SIZE_CODE_MAP = {
   '1/8':'001','1/4':'002','3/8':'003','1/2':'004','3/4':'005',
-  '1"':'006','1 inch':'006','1in':'006',
-  '1':'006','1 1/4':'007','1 1/2':'008',
-  '2"':'009','2 inch':'009','2in':'009',
-  '2':'009','2 1/2':'010',
-  '3"':'011','3 inch':'011','3in':'011',
-  '3':'011','3 1/2':'012',
-  '4"':'013','4 inch':'013','4in':'013',
-  '4':'013','5':'014','6':'015','8':'016',
-  '10':'017','12':'018','14':'019','16':'020','18':'021',
-  '20':'022','22':'023','24':'024','26':'025','28':'026','30':'027'
+  '1':'006','1"':'006','1 inch':'006',
+  '1 1/4':'007','1-1/4':'007','1.25':'007',
+  '1 1/2':'008','1-1/2':'008','1.5':'008',
+  '2':'009','2"':'009','2 inch':'009',
+  '2 1/2':'010','2-1/2':'010','2.5':'010',
+  '3':'011','3"':'011','3 inch':'011',
+  '3 1/2':'012','3-1/2':'012',
+  '4':'013','4"':'013','4 inch':'013',
+  '5':'014','5"':'014','6':'015','6"':'015',
+  '8':'016','8"':'016','10':'017','12':'018',
+  '14':'019','16':'020','18':'021','20':'022',
+  '22':'023','24':'024','26':'025','28':'026','30':'027'
 };
 
-const PRESSURE_CODE_MAP = {
-  'PN40':'P40','PN25':'P25','PN16':'P16','PN10':'P10',
-  '580 PSI':'P40','362 PSI':'P25','232 PSI':'P16','145 PSI':'P10'
+// Material prefix codes
+const MAT_PREFIX = {
+  'CS':'CS','SS':'SS','GI':'GI','BMI':'BMI','Brass':'BRS',
+  'Bronze':'BRZ','Copper':'COP','PVC':'PVC','CPVC':'CP',
+  'PPR':'PPR','HDPE':'HDP','Other':'OT'
 };
 
-const CAT_CODE_MAP = {
-  'Valves':'V','Pipes & Tubes':'PP','Fittings':'FT',
-  'Forged Steel Fittings':'FF','Flanges':'FL',
-  'Rods / Bars / Beams':'RD','Electrical':'EL',
-  'Safety Equipment':'SE','Instruments':'IN',
-  'Hardware & Tools':'HT','Other':'OT'
-};
-
-const SUBTYPE_CODE_MAP = {
-  'Gate Valve':'GV','Ball Valve':'BV','Check Valve':'CV',
+// Type codes matching your examples
+const TYPE_CODE = {
+  // Valves
+  'Gate Valve':'GV','Ball Valve':'BV','Check Valve':'CVT',
   'Globe Valve':'GLV','Butterfly Valve':'BFV','Y Stainer':'YS',
-  'Air Vents':'AV','Storm Valve':'STV','Angle Valve':'ANV','Hose Valve':'HV',
-  'Coupling':'CPL','Bush':'BSH','End Cap':'EC','Sockolet':'SOL',
-  'Weld Olet':'WOL','Tee':'TEE','Elbow':'ELB','Con Red':'CR',
-  'Ecc Red':'ER','Pipe Nipple':'PN','Swage Nipple':'SN',
-  'Slip-On':'SO','Socket Weld':'SW','Blind':'BL',
-  'Threaded':'THR','Lap Joint':'LJ',
-  'Bolt & Nut':'BN','Washer':'WSH','Stud Bolt':'SB',
-  'Anchor Bolt':'AB','Threaded Rod':'TR','Chain':'CHN',
-  'Wire Rope':'WR','Clamp':'CLP','Hanger':'HGR',
-  'Gasket':'GSK','O-Ring':'OR','Seal':'SL',
-  'Pressure Gauge':'PG','Temperature Gauge':'TG',
-  'Flow Meter':'FM','Level Sensor':'LS','Transmitter':'TX',
-  'Cable':'CBL','Conduit':'CDT','Junction Box':'JB',
-  'Switch':'SW2','MCB':'MCB','Panel':'PNL',
-  'Helmet':'HLM','Gloves':'GLV2','Safety Boots':'SB2',
-  'Harness':'HRN','Goggles':'GGL','Hi-Vis Vest':'HVV'
+  'Air Vents':'AV','Storm Valve':'STV','Angle Valve':'ANV',
+  'Hose Valve':'HV','Vertical Check Valve':'VCV',
+  // Fittings
+  'Coupling':'CPL','Bush':'BSH','End Cap':'CAP',
+  'Sockolet':'SOL','Weld Olet':'WOL',
+  'Tee':'TEE','Elbow':'EL','45 Elbow':'EL45','90 Elbow':'EL90',
+  'Con Red':'CR','Ecc Red':'ER',
+  'Pipe Nipple':'PNPL','Swage Nipple':'SN',
+  'Female Adapter':'FA','Male Adapter':'MA',
+  'Union':'UN','Reducer':'RED',
+  // Flanges
+  'Slip-On':'FLSO','Socket Weld':'FLSW','Blind':'FLBL',
+  'Threaded':'FLTH','Lap Joint':'FLLJ',
+  // Pipes
+  'Seamless Pipe':'PS','ERW Pipe':'PERW','Welded Pipe':'PWLD',
+  'Square Tube':'TSQ','Rectangular Tube':'TRC',
+  // Hardware
+  'Bolt & Nut':'BN','Stud Bolt':'SB','Gasket':'GSK','O-Ring':'OR',
 };
 
-// Extract size code from size string
-function extractSizeCode(sizeStr) {
-  if (!sizeStr) return null;
-  const s = sizeStr.trim();
+// Name keyword → type code (from your examples)
+const NAME_PATTERNS = [
+  // Pipe types
+  [/\bSMLS\b/i,                'PS'],
+  [/SEAMLESS/i,                'PS'],
+  [/\bERW\b/i,                 'PERW'],
+  [/WELDED/i,                  'PWLD'],
+  [/\bPIPE\b/i,                'PP'],
+  // Valve types
+  [/GATE\s+VALVE/i,            'GV'],
+  [/BALL\s+VALVE/i,            'BV'],
+  [/CHECK\s+VALVE/i,           'CVT'],
+  [/GLOBE\s+VALVE/i,           'GLV'],
+  [/BUTTERFLY/i,               'BFV'],
+  [/VERT[A-Z]*\s+[A-Z]*VALVE/i,'VCV'],
+  [/Y[\s-]?STAINER|Y[\s-]?STRAINER/i,'YS'],
+  // Fitting types
+  [/ELBOW\s+45|45[°\s]+ELBOW/i,'EL45'],
+  [/ELBOW\s+90|90[°\s]+ELBOW/i,'EL90'],
+  [/\bELBOW\b/i,               'EL'],
+  [/\bTEE\b/i,                 'TEE'],
+  [/END\s+CAP|\bCAP\b/i,       'CAP'],
+  [/COUPLING|COUPL/i,          'CPL'],
+  [/PIPE\s+NIPPLE|NIPPLE/i,    'PNPL'],
+  [/SWAGE/i,                   'SN'],
+  [/FEMALE\s+ADAPTER/i,        'FA'],
+  [/MALE\s+ADAPTER/i,          'MA'],
+  [/SOCKOLET/i,                'SOL'],
+  [/WELD\s*OLET/i,             'WOL'],
+  [/\bUNION\b/i,               'UN'],
+  [/CON\s+RED|CONC\s+RED/i,   'CR'],
+  [/ECC\s+RED/i,               'ER'],
+  [/REDUCER/i,                 'RED'],
+  // Flange types
+  [/BLIND\s+FLANGE|BLIND\s+FL/i,'FLBL'],
+  [/SLIP[\s-]ON/i,             'FLSO'],
+  [/SOCKET\s+WELD\s+FLANGE/i, 'FLSW'],
+  [/LAP\s+JOINT/i,             'FLLJ'],
+  // Hardware
+  [/GASKET/i,                  'GSK'],
+  [/O[\s-]RING/i,              'OR'],
+  [/STUD\s+BOLT/i,             'SB'],
+];
 
-  // Direct match
+// Schedule/pressure codes from name
+const SCHEDULE_PATTERNS = [
+  [/S\/160|SCH\s*160|S-160/i, '160'],
+  [/S\/80|SCH\s*80|S-80/i,   '80'],
+  [/S\/40|SCH\s*40|S-40/i,   '40'],
+  [/S\/20|SCH\s*20/i,         '20'],
+  [/PN40/i, 'P40'],[/PN25/i, 'P25'],[/PN16/i, 'P16'],[/PN10/i, 'P10'],
+  [/150\s*#|150LB|CL150|CLASS\s*150/i, '150'],
+  [/300\s*#|300LB|CL300/i, '300'],
+  [/600\s*#|600LB|CL600/i, '600'],
+  [/\bBSPT\b/i, 'BSP'],
+  [/\bNPT\b/i,  'NPT'],
+];
+
+// Grade codes from name
+const GRADE_PATTERNS = [
+  [/A316|316L?/i, '316'],
+  [/A304|304L?/i, '304'],
+  [/A234|WPB/i,   'WPB'],
+  [/A105/i, 'A105'],
+  [/A312/i, 'A312'],
+  [/A216|WCB/i, 'WCB'],
+];
+
+function extractSizeCode(str) {
+  if (!str) return null;
+  const s = str.trim();
+  // Direct lookup
   if (SIZE_CODE_MAP[s]) return SIZE_CODE_MAP[s];
-
-  // Try extracting number part
-  // Match patterns like "2 inch", "2\"", "2IN", "DN50"
+  // Patterns: "1 1/2\"", "3/4 inch", "1.5", etc.
   const patterns = [
-    /(\d+\s*\d*\/?\d*)\s*(?:inch|in|")/i,
-    /DN\s*(\d+)/i,
-    /^(\d+\.?\d*)\s*$/,
-    /^(\d+\s+\d+\/\d+)/,  // "1 1/2"
-    /^(\d+\/\d+)/,           // "3/4"
+    /(\d+\s+\d+\/\d+)\s*(?:inch|in|"|')?/,  // "1 1/2"
+    /(\d+\/\d+)\s*(?:inch|in|"|')?/,          // "3/4"
+    /(\d+)\s*(?:inch|in|"|')/i,               // "2 inch"
+    /DN\s*(\d+)/i,                            // DN50
+    /NPS\s*(\d+)/i,                           // NPS4
   ];
-
   for (const pat of patterns) {
     const m = s.match(pat);
     if (m) {
-      const val = m[1].trim();
+      const val = m[1].trim().replace(/"/g,'');
       if (SIZE_CODE_MAP[val]) return SIZE_CODE_MAP[val];
-      // Try numeric conversion for DN sizes
-      if (pat.source.includes('DN')) {
-        const dnMap = {
-          '15':'004','20':'006','25':'007','32':'008','40':'009',
-          '50':'011','65':'012','80':'013','100':'014','150':'015',
-          '200':'016','250':'017','300':'018','350':'019','400':'020'
-        };
-        if (dnMap[val]) return dnMap[val];
-      }
+    }
+  }
+  // DN → inch conversion
+  const dn = s.match(/DN\s*(\d+)/i);
+  if (dn) {
+    const dnMap = {'15':'004','20':'006','25':'007','32':'008','40':'009',
+      '50':'011','65':'012','80':'013','100':'014','125':'015',
+      '150':'015','200':'016','250':'017','300':'018','350':'019','400':'020'};
+    if (dnMap[dn[1]]) return dnMap[dn[1]];
+  }
+  return null;
+}
+
+function extractSizeFromText(text) {
+  if (!text) return null;
+  // Look for size patterns in full text string
+  const patterns = [
+    /(\d+\s+\d+\/\d+)\s*(?:inch|in|"|x\s*\d)/i,
+    /(\d+\/\d+)\s*(?:inch|in|"|x)/i,
+    /\b(\d+)\s*"\s/,
+    /(\d+)\s*inch/i,
+    /\b(\d+\.?\d*)\s*"\s*(?:china|italy|$)/i,
+  ];
+  for (const pat of patterns) {
+    const m = text.match(pat);
+    if (m) {
+      const code = extractSizeCode(m[1].trim());
+      if (code) return code;
     }
   }
   return null;
 }
 
-// Extract pressure code from various strings
-function extractPressureCode(str) {
-  if (!str) return null;
-  for (const [key, code] of Object.entries(PRESSURE_CODE_MAP)) {
-    if (str.toUpperCase().includes(key)) return code;
+function getTypeCode(subtype, name) {
+  // 1. From sub-type dropdown
+  if (subtype && TYPE_CODE[subtype]) return TYPE_CODE[subtype];
+  // 2. From name patterns
+  const n = (name || '').toUpperCase();
+  for (const [pat, code] of NAME_PATTERNS) {
+    if (pat.test(name)) return code;
   }
   return null;
 }
 
-// Main auto-generate function
-// ── CODE GENERATOR FOR EXCEL IMPORT (no DOM) ─────────────────
-function generateImportCode(material, category, subtype, sizeStr, name) {
-  const matCode = (material||'').substring(0, material.length > 4 ? 3 : material.length).toUpperCase() || 'XX';
-  const catCode = CAT_CODE_MAP[category] || (category||'').substring(0,2).toUpperCase() || 'OT';
-  const subCode = SUBTYPE_CODE_MAP[subtype] || '';
-  const typeCode = subCode || catCode;
-
-  // Try size extraction from sizeStr, then from name
-  let sizeCode = extractSizeCode(sizeStr) || extractSizeCode(name);
-  let pressCode = extractPressureCode(sizeStr) || extractPressureCode(name);
-
-  const parts = [matCode, typeCode];
-  if (sizeCode) parts.push(sizeCode);
-  if (pressCode) parts.push(pressCode);
-
-  return parts.join('-');
+function getScheduleCode(name) {
+  for (const [pat, code] of SCHEDULE_PATTERNS) {
+    if (pat.test(name)) return code;
+  }
+  return null;
 }
 
+function getGradeCode(name) {
+  for (const [pat, code] of GRADE_PATTERNS) {
+    if (pat.test(name)) return code;
+  }
+  return null;
+}
+
+// ── MAIN CODE GENERATOR ───────────────────────────────────────
+// Generates codes matching your examples:
+// CS + CAP + 40 + 008 → CSCAP40-008
+// CS + PNPL + 40 + 004 + 003 → CSPNPL40-004-003
+// BRZ + BV + 006 + APP600 → BRZBV-006-APP600
+
+function buildProductCode(material, category, subtype, sizeStr, name, brand) {
+  const mat  = MAT_PREFIX[material] || (material||'').substring(0,3).toUpperCase() || 'XX';
+  const type = getTypeCode(subtype, name) || 'OT';
+  const sch  = getScheduleCode(name) || '';
+  const size = extractSizeCode(sizeStr) || extractSizeFromText(name) || '';
+  const grade = getGradeCode(name) || '';
+
+  // Build code based on type
+  let code = mat + type;
+  if (sch) code += sch;
+  if (grade && grade !== 'WPB' && grade !== 'WCB') code += grade; // only show grade for special
+  if (size) code += '-' + size;
+
+  return code;
+}
+
+// ── DOM VERSION (for Add/Edit Product form) ───────────────────
 function autoGenerateCode() {
-  const mat      = document.getElementById('p-material')?.value || '';
-  const cat      = document.getElementById('p-category')?.value || '';
-  const subtype  = getSubtypeValue() || '';
-  const sizeRaw  = document.getElementById('p-size')?.value?.trim() || '';
-  const name     = document.getElementById('p-name')?.value?.trim() || '';
   const codeEl   = document.getElementById('p-code');
   if (!codeEl) return;
 
-  // Material code (first 2-3 chars)
-  const matCode = mat.substring(0, mat.length > 4 ? 3 : mat.length).toUpperCase();
+  const material = document.getElementById('p-material')?.value || '';
+  const category = document.getElementById('p-category')?.value || '';
+  const subtype  = getSubtypeValue ? (getSubtypeValue() || '') : '';
+  const sizeRaw  = document.getElementById('p-size')?.value?.trim() || '';
+  const name     = document.getElementById('p-name')?.value?.trim() || '';
+  const brand    = document.getElementById('p-brand')?.value?.trim() || '';
 
-  // Category/subtype code
-  const catCode = CAT_CODE_MAP[cat] || cat.substring(0,2).toUpperCase();
-  const subCode = SUBTYPE_CODE_MAP[subtype] || (subtype ? subtype.replace(/\s+/g,'').substring(0,3).toUpperCase() : '');
-  const typeCode = subCode || catCode;
+  const generated = buildProductCode(material, category, subtype, sizeRaw, name, brand);
+  if (!generated || generated === 'XXOT') return;
 
-  // Size code - try from size field first, then from name
-  let sizeCode = extractSizeCode(sizeRaw);
-  if (!sizeCode) sizeCode = extractSizeCode(name);
-
-  // Pressure code - try from size field, then from name
-  let pressCode = extractPressureCode(sizeRaw);
-  if (!pressCode) pressCode = extractPressureCode(name);
-
-  // Build code
-  const parts = [matCode, typeCode];
-  if (sizeCode) parts.push(sizeCode);
-  if (pressCode) parts.push(pressCode);
-
-  const generated = parts.join('-');
   codeEl.value = generated;
+  codeEl.dataset.autoGenerated = 'true';
   codeEl.style.background = 'var(--gold-light)';
   codeEl.style.borderColor = 'var(--gold)';
   setTimeout(() => {
-    codeEl.style.background = '';
-    codeEl.style.borderColor = '';
+    if (codeEl) { codeEl.style.background = ''; codeEl.style.borderColor = ''; }
   }, 1500);
-
   return generated;
 }
+
+// ── IMPORT VERSION (no DOM) ───────────────────────────────────
+function generateImportCode(material, category, subtype, sizeStr, name) {
+  return buildProductCode(material, category, subtype, sizeStr, name, '');
+}
+
+
 
 // Attach auto-generate triggers
 function attachAutoCodeListeners() {
