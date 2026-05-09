@@ -2298,9 +2298,7 @@ function showPage(id) {
     if (typeof initCatalogueIfEmpty === 'function') initCatalogueIfEmpty();
   }
   // settings renders on its own
-  if (id === 'activity-log') { setTimeout(loadActivityLog, 20); }
-  if (id === 'purchase-orders') { setTimeout(renderPOs, 20); }
-  // Page-specific side effects
+  // Page-specific side effects (single call each)
   if (id === 'settings') {
     setTimeout(() => {
       if (typeof loadCompanySettings === 'function') loadCompanySettings();
@@ -2308,7 +2306,7 @@ function showPage(id) {
     }, 30);
   }
   if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
-  if (id === 'purchase-orders') { setTimeout(() => { if (typeof renderPOs === 'function') renderPOs(); }, 30); }
+  if (id === 'purchase-orders') { setTimeout(() => { loadAndRenderPOs(); }, 30); }
   // Update bottom nav
   if (typeof updateBottomNav === 'function') updateBottomNav(id);
   // Close sidebar on mobile
@@ -4615,12 +4613,15 @@ async function loadPOs() {
       .order('created_at', { ascending: false });
     if (error) throw error;
     allPOs = data || [];
-    renderPOs();
   } catch(e) {
     console.warn('loadPOs error:', e.message);
     allPOs = [];
-    renderPOs();
   }
+}
+
+async function loadAndRenderPOs() {
+  await loadPOs();
+  renderPOs();
 }
 
 function openNewPO() {
@@ -4802,32 +4803,80 @@ ALTER TABLE purchase_order_lines ENABLE ROW LEVEL SECURITY;`;
 }
 
 function renderPOs() {
-  const search = (document.getElementById('po-search')?.value||'').toLowerCase();
-  const fc = document.getElementById('po-filter-company')?.value||'';
-  const fs = document.getElementById('po-filter-status')?.value||'';
-  const statusColors = {draft:'badge-warn',sent:'badge-blue',received:'badge-green',partial:'badge-gold',cancelled:'badge-red'};
+  const tbody = document.getElementById('po-tbody');
+  if (!tbody) return;
 
-  const list = allPOs.filter(po =>
-    (!search || po.supplier.toLowerCase().includes(search) || po.po_no.toLowerCase().includes(search)) &&
-    (!fc || po.company===fc) && (!fs || po.status===fs)
-  );
+  const search = (document.getElementById('po-search')?.value || '').toLowerCase();
+  const fc     = document.getElementById('po-filter-company')?.value || '';
+  const fs     = document.getElementById('po-filter-status')?.value || '';
 
-  document.getElementById('po-tbody').innerHTML = list.length ? list.map(po => `
-    <tr>
-      <td class="mono" style="font-size:12px;color:var(--gold)">${po.po_no}</td>
-      <td style="font-size:13px">${new Date(po.po_date||po.created_at).toLocaleDateString()}</td>
-      <td><div style="font-weight:500">${po.supplier}</div><div style="font-size:11px;color:var(--text-muted)">${po.contact||''}</div></td>
-      <td><span class="badge badge-blue" style="font-size:10px">${COMPANY_NAMES[po.company]||po.company}</span></td>
-      <td>${(po.purchase_order_lines||[]).length} items</td>
-      <td class="mono" style="font-weight:600">SAR ${Number(po.total||0).toFixed(2)}</td>
-      <td><span class="badge ${statusColors[po.status]||'badge-blue'}">${(po.status||'').toUpperCase()}</span></td>
-      <td onclick="event.stopPropagation()" style="white-space:nowrap">
-        <button class="btn btn-sm btn-outline" onclick="printPO(allPOs.find(x=>x.id==='${po.id}'))">Print</button>
-        <button class="btn btn-sm btn-success" onclick="updatePOStatus('${po.id}','received')">✓ Received</button>
-        ${currentProfile?.role === 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deletePO('${po.id}','${po.po_no}')">🗑️</button>` : ''}
-      </td>
-    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:28px">No purchase orders yet. Click + New PO to create one.</td></tr>';
+  const statusColors = {
+    draft:'badge-warn', sent:'badge-blue', received:'badge-green',
+    partial:'badge-gold', cancelled:'badge-red'
+  };
+
+  const list = (allPOs || []).filter(po => {
+    if (!po) return false;
+    const sup = (po.supplier || '').toLowerCase();
+    const num = (po.po_no || '').toLowerCase();
+    return (!search || sup.includes(search) || num.includes(search))
+        && (!fc || po.company === fc)
+        && (!fs || po.status === fs);
+  });
+
+  if (!list.length) {
+    tbody.innerHTML = [
+      '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">',
+      '<div style="font-size:32px;margin-bottom:10px;">📋</div>',
+      '<div style="font-size:15px;font-weight:600;margin-bottom:6px;">No Purchase Orders</div>',
+      '<div style="font-size:13px;">Click <strong>+ New PO</strong> to create one.</div>',
+      '</td></tr>'
+    ].join('');
+    return;
+  }
+
+  const isAdmin = currentProfile?.role === 'admin';
+  tbody.innerHTML = '';
+
+  list.forEach(po => {
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', function() { openViewPO(po.id); });
+
+    const date  = (po.po_date || po.created_at)
+      ? new Date(po.po_date || po.created_at).toLocaleDateString('en-SA') : '—';
+    const lines = (po.purchase_order_lines || []).length;
+    const total = Number(po.total || 0).toFixed(2);
+    const badge = statusColors[po.status] || 'badge-blue';
+    const coName = (COMPANY_NAMES && COMPANY_NAMES[po.company]) || po.company || '—';
+
+    let actHtml = '<button class="btn btn-sm btn-outline">🖨️ Print</button> '
+                + '<button class="btn btn-sm btn-success">✓ Recv</button>';
+    if (isAdmin) actHtml += ' <button class="btn btn-sm btn-danger">🗑️</button>';
+
+    tr.innerHTML = [
+      '<td class="mono" style="font-size:12px;color:var(--gold);font-weight:700;">' + (po.po_no || '—') + '</td>',
+      '<td style="font-size:13px;">' + date + '</td>',
+      '<td><div style="font-weight:500;">' + (po.supplier || '—') + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);">' + (po.contact || '') + '</div></td>',
+      '<td><span class="badge badge-blue" style="font-size:10px;">' + coName + '</span></td>',
+      '<td>' + lines + ' items</td>',
+      '<td class="mono" style="font-weight:600;">SAR ' + total + '</td>',
+      '<td><span class="badge ' + badge + '">' + (po.status || '').toUpperCase() + '</span></td>',
+      '<td onclick="event.stopPropagation();" style="white-space:nowrap;display:flex;gap:4px;">' + actHtml + '</td>'
+    ].join('');
+
+    // Attach action button events
+    const btns = tr.querySelectorAll('td:last-child button');
+    if (btns[0]) btns[0].addEventListener('click', function(e) { e.stopPropagation(); printPO(po.id); });
+    if (btns[1]) btns[1].addEventListener('click', function(e) { e.stopPropagation(); updatePOStatus(po.id, 'received'); });
+    if (btns[2]) btns[2].addEventListener('click', function(e) { e.stopPropagation(); deletePO(po.id, po.po_no || ''); });
+
+    tbody.appendChild(tr);
+  });
 }
+
+function openViewPO(id) { printPO(id); }
 
 async function updatePOStatus(id, status) {
   try {
