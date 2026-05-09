@@ -2823,11 +2823,18 @@ function addQuotLine() {
   tr.id = 'ql-'+idx;
   tr.innerHTML = `
     <td style="padding:4px">
-      <select style="width:100%;padding:6px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:13px" onchange="onQlProductChange(${idx},this)">
-        <option value="">Select product...</option>
-        ${allProducts.map(p=>`<option value="${p.id}" data-price="${p.price||0}" data-unit="${p.unit||'PCS'}">${p.name}</option>`).join('')}
-        <option value="_custom">Custom item</option>
-      </select>
+      <div style="position:relative;">
+        <input type="text" id="ql-search-${idx}" placeholder="Type to search product..."
+          autocomplete="off"
+          style="width:100%;padding:6px 10px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:13px;outline:none;"
+          oninput="filterQlProducts(${idx},this.value)"
+          onfocus="filterQlProducts(${idx},this.value)"
+          onblur="setTimeout(()=>hideQlDropdown(${idx}),200)">
+        <input type="hidden" id="ql-pid-${idx}" value="">
+        <div id="ql-drop-${idx}"
+          style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--gold);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:9999;max-height:220px;overflow-y:auto;margin-top:2px;">
+        </div>
+      </div>
       <input type="text" id="ql-custom-${idx}" placeholder="Custom description"
         style="display:none;width:100%;margin-top:3px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:13px"
         oninput="recalcQl(${idx})">
@@ -2889,10 +2896,11 @@ async function saveQuotation(status) {
     const idx=tr.id.replace('ql-','');
     const sel=tr.querySelector('select');
     const custom=document.getElementById('ql-custom-'+idx);
+    const hiddenPid=document.getElementById('ql-pid-'+idx)?.value;
     const qty=parseFloat(document.getElementById('ql-qty-'+idx)?.value)||0;
     const unitPrice=parseFloat(document.getElementById('ql-price-'+idx)?.value)||0;
     if(qty>0){
-      const pid=sel?.value==='_custom'?null:sel?.value||null;
+      const pid=(hiddenPid&&hiddenPid!=='_custom')?hiddenPid:(sel?.value==='_custom'?null:sel?.value||null);
       const pObj=pid?allProducts.find(x=>x.id===pid):null;
       const unitEl=tr.querySelector(`[id^='ql-unit-']`);
       const unit=unitEl?.value||pObj?.unit||'PCS';
@@ -4636,11 +4644,18 @@ function addPOLine() {
   tr.id = 'pol-' + idx;
   tr.innerHTML = `
     <td style="padding:4px">
-      <select style="width:100%;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px" onchange="onPOLProductChange(${idx},this)">
-        <option value="">Select product or type custom...</option>
-        ${allProducts.map(p => `<option value="${p.id}" data-unit="${p.unit||'PCS'}">${p.name}${p.code?' ('+p.code+')':''}</option>`).join('')}
-        <option value="_custom">Custom item / Free text</option>
-      </select>
+      <div style="position:relative;">
+        <input type="text" id="pol-search-${idx}" placeholder="Type to search product..."
+          autocomplete="off"
+          style="width:100%;padding:5px 10px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;outline:none;"
+          oninput="filterPolProducts(${idx},this.value)"
+          onfocus="filterPolProducts(${idx},this.value)"
+          onblur="setTimeout(()=>hidePolDropdown(${idx}),200)">
+        <input type="hidden" id="pol-pid-${idx}" value="">
+        <div id="pol-drop-${idx}"
+          style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--gold);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:9999;max-height:220px;overflow-y:auto;margin-top:2px;">
+        </div>
+      </div>
       <input type="text" id="pol-custom-${idx}" placeholder="Custom item description" style="display:none;width:100%;margin-top:3px;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px" oninput="recalcPOL(${idx})">
     </td>
     <td style="padding:4px"><input type="number" id="pol-qty-${idx}" value="1" min="1" style="width:70px;padding:5px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;text-align:center" oninput="recalcPOL(${idx})"></td>
@@ -4695,7 +4710,8 @@ async function savePO(status) {
     const qty = parseFloat(document.getElementById('pol-qty-'+idx)?.value)||0;
     const unitPrice = parseFloat(document.getElementById('pol-price-'+idx)?.value)||0;
     if (qty <= 0) return;
-    const pid = sel?.value === '_custom' ? null : sel?.value || null;
+    const hiddenPid2 = document.getElementById('pol-pid-'+idx)?.value;
+    const pid = (hiddenPid2 && hiddenPid2 !== '_custom') ? hiddenPid2 : (sel?.value === '_custom' ? null : sel?.value || null);
     const pObj = pid ? allProducts.find(x=>x.id===pid) : null;
     lines.push({ product_id:pid, custom_desc:custom?.value||'', qty, unit:pObj?.unit||'PCS', unit_price:unitPrice, total:qty*unitPrice, product_name:pObj?pObj.name:(custom?.value||'Item') });
   });
@@ -8869,121 +8885,80 @@ function _renderCatLevel1(mat) {
 }
 
 // ── LEVEL 2: Category products ────────────────────────────────
-function _openCatCategory(catId, mat, filterSubtype = null) {
+function _openCatCategory(catId, mat) {
   const root = document.getElementById('cat-root');
   if (!root) return;
-
   _catCat = catId;
-  const mc = CATALOGUE_MATERIALS[mat] || { label: mat, color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
-  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools'];
-  const matProducts = CATEGORY_PAGES.includes(mat)
-    ? allProducts.filter(p => (p.category || 'Other') === mat)
-    : allProducts.filter(p => (p.material || 'Other') === mat);
 
-  const catProds = matProducts.filter(p => normalizeCatName(p.category) === catId);
+  const mc = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
+  const CATEGORY_PAGES = ['Electrical','Safety Equipment','Hardware & Tools'];
+  const matProds = CATEGORY_PAGES.includes(mat)
+    ? allProducts.filter(p => (p.category||'Other') === mat)
+    : allProducts.filter(p => (p.material||'Other') === mat);
+
+  const catProds = matProds.filter(p => normalizeCatName(p.category) === catId);
   const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
 
-  // Get all unique sub-types in this category
-  const subtypes = [...new Set(catProds.map(p => p.sub_type || '').filter(Boolean))].sort();
-  const hasSubtypes = subtypes.length > 0;
+  // Build rows using string concat (no nested backticks)
+  let rowsHtml = '';
+  catProds.forEach(p => {
+    const isLow = (p.qty_bv||0)<threshold || (p.qty_is||0)<threshold || (p.qty_sw||0)<threshold;
+    const photo  = p.photo_url
+      ? '<img src="' + p.photo_url + '" style="width:38px;height:34px;object-fit:cover;border-radius:6px;">'
+      : '<span style="font-size:16px;opacity:.3">📦</span>';
+    const sub = p.sub_type
+      ? '<span style="background:' + mc.bg + ';color:' + mc.color + ';border:1px solid ' + mc.border + ';padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">' + p.sub_type + '</span>'
+      : '<span style="color:var(--text-muted)">—</span>';
+    const price = p.price ? 'SAR ' + Number(p.price).toFixed(2) : '—';
+    rowsHtml += '<tr data-id="' + p.id + '" style="cursor:pointer;border-bottom:1px solid var(--border);'
+      + (isLow ? 'background:#fff5f5;' : '') + '">'
+      + '<td style="padding:10px 14px;width:44px;">'
+      + '<div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;">'
+      + photo + '</div></td>'
+      + '<td style="padding:10px 14px;">'
+      + '<div style="font-weight:500;font-size:13px;">' + p.name + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);">' + (p.code||'') + (p.size ? ' · '+p.size : '') + '</div>'
+      + '</td>'
+      + '<td style="padding:10px 14px;">' + sub + '</td>'
+      + '<td style="padding:10px 14px;">'
+      + '<span class="qty-tag qty-bv" style="' + ((p.qty_bv||0)<threshold?'color:#dc2626;font-weight:700;':'') + '">BV:' + (p.qty_bv||0) + '</span> '
+      + '<span class="qty-tag qty-is" style="' + ((p.qty_is||0)<threshold?'color:#dc2626;font-weight:700;':'') + '">IS:' + (p.qty_is||0) + '</span> '
+      + '<span class="qty-tag qty-sw" style="' + ((p.qty_sw||0)<threshold?'color:#dc2626;font-weight:700;':'') + '">SW:' + (p.qty_sw||0) + '</span>'
+      + '</td>'
+      + '<td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">' + price + '</td>'
+      + '</tr>';
+  });
 
-  // Filter products by selected sub-type
-  const activeSubtype = filterSubtype;
-  const displayProds = activeSubtype
-    ? catProds.filter(p => (p.sub_type || '') === activeSubtype)
-    : catProds;
+  const tableHtml = catProds.length === 0
+    ? '<div style="padding:40px;text-align:center;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:10px;">📦</div><div>No products in this category</div></div>'
+    : '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;">'
+      + '<thead><tr style="background:var(--surface2);">'
+      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;width:50px;">Photo</th>'
+      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Name</th>'
+      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Sub-type</th>'
+      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Stock</th>'
+      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Price</th>'
+      + '</tr></thead>'
+      + '<tbody>' + rowsHtml + '</tbody>'
+      + '</table></div>';
 
-  // Sub-type filter tabs
-  const subtypeTabs = hasSubtypes ? `
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
-      <button onclick="_openCatCategory('${catId.replace(/'/g,"\'")}','${mat.replace(/'/g,"\'")}',null)"
-        style="padding:5px 14px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;
-               background:${!activeSubtype ? mc.color : 'transparent'};
-               color:${!activeSubtype ? '#fff' : mc.color};
-               border-color:${mc.color};">
-        All (${catProds.length})
-      </button>
-      ${subtypes.map(sub => {
-        const count = catProds.filter(p => (p.sub_type||'') === sub).length;
-        const isActive = activeSubtype === sub;
-        return `<button onclick="_openCatCategory('${catId.replace(/'/g,"\'")}','${mat.replace(/'/g,"\'")}','${sub.replace(/'/g,"\'")}')"
-          style="padding:5px 14px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;
-                 background:${isActive ? mc.color : 'var(--surface)'};
-                 color:${isActive ? '#fff' : 'var(--text)'};
-                 border-color:${isActive ? mc.color : 'var(--border)'};
-                 transition:all .15s;">
-          ${sub} <span style="opacity:.7">(${count})</span>
-        </button>`;
-      }).join('')}
-    </div>` : '';
+  root.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">'
+    + '<button id="cat-back-btn" class="btn btn-outline" style="font-size:12px;padding:5px 12px;">← ' + mat + '</button>'
+    + '<span style="color:var(--text-muted);">›</span>'
+    + '<span style="font-weight:600;color:var(--text);">' + catId + '</span>'
+    + '<span class="badge badge-blue" style="margin-left:4px;">' + catProds.length + ' products</span>'
+    + '</div>'
+    + '<div class="card" style="padding:0;overflow:hidden;">' + tableHtml + '</div>';
 
-  const productRows = displayProds.map(p => {
-    const isLow = (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold;
-    return `<tr onclick="viewProduct('${p.id}')" style="cursor:pointer;${isLow ? 'background:#fff5f5;' : ''}">
-      <td style="padding:10px 14px;width:44px;">
-        <div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);
-                    display:flex;align-items:center;justify-content:center;">
-          ${p.photo_url ? `<img src="${p.photo_url}" style="width:38px;height:34px;object-fit:cover;">` : '<span style="font-size:14px;opacity:.3;">📦</span>'}
-        </div>
-      </td>
-      <td style="padding:10px 14px;">
-        <div style="font-weight:500;font-size:13px;">${p.name}</div>
-        <div style="font-size:11px;color:var(--text-muted);">${p.code || ''} ${p.size ? '· '+p.size : ''}</div>
-      </td>
-      <td style="padding:10px 14px;">
-        ${p.sub_type ? `<span style="background:${mc.bg};color:${mc.color};border:1px solid ${mc.border};
-          padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">${p.sub_type}</span>` : '<span style="color:var(--text-muted);">—</span>'}
-      </td>
-      <td style="padding:10px 14px;">
-        <div style="display:flex;gap:4px;">
-          <span class="qty-tag qty-bv" style="${(p.qty_bv||0)<threshold?'color:#dc2626;font-weight:700;':''}">BV:${p.qty_bv||0}</span>
-          <span class="qty-tag qty-is" style="${(p.qty_is||0)<threshold?'color:#dc2626;font-weight:700;':''}">IS:${p.qty_is||0}</span>
-          <span class="qty-tag qty-sw" style="${(p.qty_sw||0)<threshold?'color:#dc2626;font-weight:700;':''}">SW:${p.qty_sw||0}</span>
-        </div>
-      </td>
-      <td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">
-        ${p.price ? 'SAR '+Number(p.price).toFixed(2) : '—'}
-      </td>
-    </tr>`;
-  }).join('');
+  // Attach click handlers
+  const backBtn = root.querySelector('#cat-back-btn');
+  if (backBtn) backBtn.addEventListener('click', function() { _renderCatLevel1(_catMat); });
 
-  root.innerHTML = `
-    <!-- Breadcrumb -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <button onclick="_renderCatLevel1('${mat}')" class="btn btn-outline" style="font-size:12px;padding:5px 12px;">
-        ← ${mat}
-      </button>
-      <span style="color:var(--text-muted);">›</span>
-      <span style="font-weight:600;color:var(--text);">${catId}</span>
-      ${activeSubtype ? `<span style="color:var(--text-muted);">›</span>
-        <span style="font-weight:600;color:${mc.color};">${activeSubtype}</span>` : ''}
-      <span class="badge badge-blue" style="margin-left:4px;">${displayProds.length} product${displayProds.length !== 1 ? 's' : ''}</span>
-    </div>
-
-    <!-- Sub-type filter tabs -->
-    ${subtypeTabs}
-
-    <!-- Products table -->
-    <div class="card" style="padding:0;overflow:hidden;">
-      ${displayProds.length === 0
-        ? `<div style="padding:40px;text-align:center;color:var(--text-muted);">
-             <div style="font-size:36px;margin-bottom:10px;">📦</div>
-             <div>No products${activeSubtype ? ' for '+activeSubtype : ''}</div>
-           </div>`
-        : `<div class="table-wrap">
-             <table>
-               <thead><tr>
-                 <th style="width:50px;">Photo</th>
-                 <th>Name</th>
-                 <th>Sub-type</th>
-                 <th>Stock</th>
-                 <th>Price</th>
-               </tr></thead>
-               <tbody>${productRows}</tbody>
-             </table>
-           </div>`
-      }
-    </div>`;
+  root.querySelectorAll('tr[data-id]').forEach(function(tr) {
+    tr.addEventListener('click', function() {
+      viewProduct(this.getAttribute('data-id'));
+    });
+  });
 }
 
 // ── COMPATIBILITY ALIASES ─────────────────────────────────────
@@ -9030,6 +9005,156 @@ function navigatePage(id) {
   window.scrollTo(0, 0);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SEARCHABLE PRODUCT INPUT — Quotation & PO
+// ═══════════════════════════════════════════════════════════════
+
+// ── QUOTATION PRODUCT SEARCH ──────────────────────────────────
+function filterQlProducts(idx, query) {
+  const drop = document.getElementById('ql-drop-' + idx);
+  if (!drop) return;
+
+  const q = (query || '').toLowerCase().trim();
+  // Always show dropdown on focus
+  const matches = allProducts.filter(p =>
+    !q || p.name.toLowerCase().includes(q) ||
+    (p.code && p.code.toLowerCase().includes(q)) ||
+    (p.material && p.material.toLowerCase().includes(q))
+  ).slice(0, 40);
+
+  if (!matches.length) {
+    drop.innerHTML = '<div style="padding:10px 14px;color:var(--text-muted);font-size:13px;">No products found</div>'
+      + '<div style="padding:8px 14px;border-top:1px solid var(--border);">'
+      + '<button onmousedown="selectQlCustom(' + idx + ')" style="background:none;border:none;cursor:pointer;color:var(--gold);font-size:13px;padding:0;">+ Add custom item</button></div>';
+  } else {
+    drop.innerHTML = matches.map(p =>
+      '<div onmousedown="selectQlProduct(' + idx + ',\'' + p.id + '\')" '
+      + 'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;" '
+      + 'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      + '<div style="font-weight:500;font-size:13px;">' + p.name + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">'
+      + (p.code ? p.code + ' · ' : '') + (p.material || '') + (p.size ? ' · ' + p.size : '')
+      + (p.price ? ' · SAR ' + Number(p.price).toFixed(2) : '') + '</div>'
+      + '</div>'
+    ).join('')
+    + '<div style="padding:8px 14px;border-top:1px solid var(--border);">'
+    + '<button onmousedown="selectQlCustom(' + idx + ')" style="background:none;border:none;cursor:pointer;color:var(--gold);font-size:13px;padding:0;">+ Add custom item</button></div>';
+  }
+
+  drop.style.display = 'block';
+}
+
+function selectQlProduct(idx, pid) {
+  const p = allProducts.find(x => x.id === pid);
+  if (!p) return;
+  const searchEl = document.getElementById('ql-search-' + idx);
+  const pidEl    = document.getElementById('ql-pid-' + idx);
+  const drop     = document.getElementById('ql-drop-' + idx);
+  const customEl = document.getElementById('ql-custom-' + idx);
+  if (searchEl) searchEl.value = p.name + (p.code ? ' (' + p.code + ')' : '');
+  if (pidEl)    pidEl.value    = pid;
+  if (drop)     drop.style.display = 'none';
+  if (customEl) customEl.style.display = 'none';
+  // Set price and unit
+  const priceEl = document.getElementById('ql-price-' + idx);
+  const unitEl  = document.getElementById('ql-unit-' + idx);
+  if (priceEl) priceEl.value = p.price || 0;
+  if (unitEl && p.unit) unitEl.value = p.unit;
+  recalcQl(idx);
+}
+
+function selectQlCustom(idx) {
+  const searchEl = document.getElementById('ql-search-' + idx);
+  const pidEl    = document.getElementById('ql-pid-' + idx);
+  const drop     = document.getElementById('ql-drop-' + idx);
+  const customEl = document.getElementById('ql-custom-' + idx);
+  if (searchEl) searchEl.value = '';
+  if (pidEl)    pidEl.value    = '_custom';
+  if (drop)     drop.style.display = 'none';
+  if (customEl) { customEl.style.display = ''; customEl.focus(); }
+}
+
+function hideQlDropdown(idx) {
+  const drop = document.getElementById('ql-drop-' + idx);
+  if (drop) drop.style.display = 'none';
+}
+
+// Patch recalcQl / onQlProductChange to use hidden pid input
+const _origRecalcQl = recalcQl;
+recalcQl = function(idx) {
+  const pid    = document.getElementById('ql-pid-' + idx)?.value;
+  const custom = document.getElementById('ql-custom-' + idx)?.value || '';
+  const qty    = parseFloat(document.getElementById('ql-qty-' + idx)?.value) || 0;
+  const price  = parseFloat(document.getElementById('ql-price-' + idx)?.value) || 0;
+  const total  = qty * price;
+  const totalEl = document.getElementById('ql-total-' + idx);
+  if (totalEl) totalEl.textContent = 'SAR ' + total.toFixed(2);
+  updateQuotTotals();
+};
+
+// Patch collectQuotLines to read from hidden pid input
+const _origCollectQuotLines = typeof collectQuotLines === 'function' ? collectQuotLines : null;
+
+// ── PO PRODUCT SEARCH ─────────────────────────────────────────
+function filterPolProducts(idx, query) {
+  const drop = document.getElementById('pol-drop-' + idx);
+  if (!drop) return;
+
+  const q = (query || '').toLowerCase().trim();
+  const matches = allProducts.filter(p =>
+    !q || p.name.toLowerCase().includes(q) ||
+    (p.code && p.code.toLowerCase().includes(q)) ||
+    (p.material && p.material.toLowerCase().includes(q))
+  ).slice(0, 40);
+
+  drop.innerHTML = (matches.length
+    ? matches.map(p =>
+        '<div onmousedown="selectPolProduct(' + idx + ',\'' + p.id + '\')" '
+        + 'style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;" '
+        + 'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+        + '<div style="font-weight:500;font-size:13px;">' + p.name + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">'
+        + (p.code ? p.code + ' · ' : '') + (p.material || '') + (p.size ? ' · ' + p.size : '') + '</div>'
+        + '</div>'
+      ).join('')
+    : '<div style="padding:10px 14px;color:var(--text-muted);font-size:13px;">No products found</div>'
+  ) + '<div style="padding:8px 14px;border-top:1px solid var(--border);">'
+    + '<button onmousedown="selectPolCustom(' + idx + ')" style="background:none;border:none;cursor:pointer;color:var(--gold);font-size:13px;padding:0;">+ Custom item</button></div>';
+
+  drop.style.display = 'block';
+}
+
+function selectPolProduct(idx, pid) {
+  const p = allProducts.find(x => x.id === pid);
+  if (!p) return;
+  const searchEl = document.getElementById('pol-search-' + idx);
+  const pidEl    = document.getElementById('pol-pid-' + idx);
+  const drop     = document.getElementById('pol-drop-' + idx);
+  const customEl = document.getElementById('pol-custom-' + idx);
+  if (searchEl) searchEl.value = p.name + (p.code ? ' (' + p.code + ')' : '');
+  if (pidEl)    pidEl.value    = pid;
+  if (drop)     drop.style.display = 'none';
+  if (customEl) customEl.style.display = 'none';
+  const unitEl = document.getElementById('pol-unit-' + idx);
+  if (unitEl && p.unit) unitEl.value = p.unit;
+  recalcPOL(idx);
+}
+
+function selectPolCustom(idx) {
+  const searchEl = document.getElementById('pol-search-' + idx);
+  const pidEl    = document.getElementById('pol-pid-' + idx);
+  const drop     = document.getElementById('pol-drop-' + idx);
+  const customEl = document.getElementById('pol-custom-' + idx);
+  if (searchEl) searchEl.value = '';
+  if (pidEl)    pidEl.value    = '_custom';
+  if (drop)     drop.style.display = 'none';
+  if (customEl) { customEl.style.display = ''; customEl.focus(); }
+}
+
+function hidePolDropdown(idx) {
+  const drop = document.getElementById('pol-drop-' + idx);
+  if (drop) drop.style.display = 'none';
+}
 window.addEventListener('DOMContentLoaded', init);
 </script>
 
@@ -9355,7 +9480,8 @@ window.addEventListener('DOMContentLoaded', init);
 
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
-      <button class="btn btn-gold" onclick="savePO()">💾 Save PO</button>
+      <button class="btn btn-outline" onclick="savePO('draft')">💾 Save Draft</button>
+      <button class="btn btn-gold" onclick="savePO('sent')">📤 Save & Send</button>
     </div>
   </div>
 </div>
