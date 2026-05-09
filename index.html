@@ -505,7 +505,7 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 
 /* ── PAGE ── */
 .page { display: none; padding: 24px; }
-.page.active { display: block; animation: pageIn 0.2s ease both; }
+.page.active { display: block; opacity: 1; }
 #page-catalogue { padding: 12px 20px 24px; }
 @keyframes pageIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
@@ -2334,8 +2334,7 @@ function showPage(id) {
   }
   if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
   if (id === 'purchase-orders') {
-    renderPOs(); // immediate render
-    setTimeout(() => { loadAndRenderPOs(); }, 100); // then reload from DB
+    setTimeout(() => { loadAndRenderPOs(); }, 50);
   }
   // Update bottom nav
   if (typeof updateBottomNav === 'function') updateBottomNav(id);
@@ -9016,11 +9015,9 @@ async function loadPOs() {
 }
 
 async function loadAndRenderPOs() {
-  // Render immediately with cached data (shows empty state or cached POs)
-  renderPOs();
-  // Then fetch fresh from DB and re-render
-  await loadPOs();
-  renderPOs();
+  renderPOs(); // show immediately with cached/empty data
+  await loadPOs(); // fetch from DB
+  renderPOs(); // re-render with fresh data
 }
 
 // ── RENDER LIST ───────────────────────────────────────────────
