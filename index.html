@@ -8730,6 +8730,12 @@ function _openCatCategory(catId, mat) {
   const root = document.getElementById('cat-root');
   if (!root) return;
   _catCat = catId;
+  _renderCatSubTypes(catId, mat, null); // null = show all sub-types
+}
+
+function _renderCatSubTypes(catId, mat, filterSubType) {
+  const root = document.getElementById('cat-root');
+  if (!root) return;
 
   const mc = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
   const CATEGORY_PAGES = ['Electrical','Safety Equipment','Hardware & Tools'];
@@ -8740,65 +8746,99 @@ function _openCatCategory(catId, mat) {
   const catProds = matProds.filter(p => normalizeCatName(p.category) === catId);
   const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
 
-  // Build rows using string concat (no nested backticks)
-  let rowsHtml = '';
+  // Group by sub_type
+  const subTypes = {};
   catProds.forEach(p => {
-    const isLow = (p.qty_bv||0)<threshold || (p.qty_is||0)<threshold || (p.qty_sw||0)<threshold;
-    const photo  = p.photo_url
-      ? '<img src="' + p.photo_url + '" style="width:38px;height:34px;object-fit:cover;border-radius:6px;">'
-      : '<span style="font-size:16px;opacity:.3">📦</span>';
-    const sub = p.sub_type
-      ? '<span style="background:' + mc.bg + ';color:' + mc.color + ';border:1px solid ' + mc.border + ';padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">' + p.sub_type + '</span>'
-      : '<span style="color:var(--text-muted)">—</span>';
-    const price = p.price ? 'SAR ' + Number(p.price).toFixed(2) : '—';
-    rowsHtml += '<tr data-id="' + p.id + '" style="cursor:pointer;border-bottom:1px solid var(--border);'
-      + (isLow ? 'background:#fff5f5;' : '') + '">'
-      + '<td style="padding:10px 14px;width:44px;">'
-      + '<div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;">'
-      + photo + '</div></td>'
-      + '<td style="padding:10px 14px;">'
-      + '<div style="font-weight:500;font-size:13px;">' + p.name + '</div>'
-      + '<div style="font-size:11px;color:var(--text-muted);">' + (p.code||'') + (p.size ? ' · '+p.size : '') + '</div>'
-      + '</td>'
-      + '<td style="padding:10px 14px;">' + sub + '</td>'
-      + '<td style="padding:10px 14px;">'
-      + '<span class="qty-tag qty-bv" style="' + ((p.qty_bv||0)<threshold?'color:#dc2626;font-weight:700;':'') + '">BV:' + (p.qty_bv||0) + '</span> '
-      + '<span class="qty-tag qty-is" style="' + ((p.qty_is||0)<threshold?'color:#dc2626;font-weight:700;':'') + '">IS:' + (p.qty_is||0) + '</span> '
-      + '<span class="qty-tag qty-sw" style="' + ((p.qty_sw||0)<threshold?'color:#dc2626;font-weight:700;':'') + '">SW:' + (p.qty_sw||0) + '</span>'
-      + '</td>'
-      + '<td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">' + price + '</td>'
-      + '</tr>';
+    const st = p.sub_type || 'General';
+    if (!subTypes[st]) subTypes[st] = [];
+    subTypes[st].push(p);
+  });
+  const subTypeKeys = Object.keys(subTypes).sort((a,b) => {
+    if (a === 'General') return 1;
+    if (b === 'General') return -1;
+    return a.localeCompare(b);
   });
 
-  const tableHtml = catProds.length === 0
-    ? '<div style="padding:40px;text-align:center;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:10px;">📦</div><div>No products in this category</div></div>'
-    : '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;">'
-      + '<thead><tr style="background:var(--surface2);">'
-      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;width:50px;">Photo</th>'
-      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Name</th>'
-      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Sub-type</th>'
-      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Stock</th>'
-      + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Price</th>'
-      + '</tr></thead>'
-      + '<tbody>' + rowsHtml + '</tbody>'
-      + '</table></div>';
+  // Display products: filtered or all
+  const displayProds = filterSubType
+    ? catProds.filter(p => (p.sub_type || 'General') === filterSubType)
+    : catProds;
 
-  root.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">'
+  // Build sub-type filter pills
+  let pillsHtml = '<button id="cat-sub-all" data-sub="" style="padding:5px 14px;border-radius:99px;cursor:pointer;font-size:12px;font-weight:600;border:1.5px solid ' + (filterSubType ? 'var(--border)' : mc.color) + ';background:' + (filterSubType ? 'var(--surface)' : mc.bg) + ';color:' + (filterSubType ? 'var(--text-muted)' : mc.color) + ';">All (' + catProds.length + ')</button> ';
+  subTypeKeys.forEach(st => {
+    const active = filterSubType === st;
+    pillsHtml += '<button data-sub="' + st + '" style="padding:5px 14px;border-radius:99px;cursor:pointer;font-size:12px;font-weight:600;border:1.5px solid ' + (active ? mc.color : 'var(--border)') + ';background:' + (active ? mc.bg : 'var(--surface)') + ';color:' + (active ? mc.color : 'var(--text-muted)') + ';margin:2px;">' + st + ' (' + subTypes[st].length + ')</button> ';
+  });
+
+  // Build product rows
+  let rowsHtml = '';
+  if (!displayProds.length) {
+    rowsHtml = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted);">No products in this sub-type</td></tr>';
+  } else {
+    displayProds.forEach(p => {
+      const isLow = (p.qty_bv||0)<threshold || (p.qty_is||0)<threshold || (p.qty_sw||0)<threshold;
+      const photo = p.photo_url
+        ? '<img src="' + p.photo_url + '" style="width:38px;height:34px;object-fit:cover;border-radius:6px;">'
+        : '<span style="font-size:16px;opacity:.3;">📦</span>';
+      const subBadge = p.sub_type
+        ? '<span style="background:' + mc.bg + ';color:' + mc.color + ';border:1px solid ' + mc.border + ';padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">' + p.sub_type + '</span>'
+        : '<span style="color:var(--text-muted);">—</span>';
+      const price = p.price ? 'SAR ' + Number(p.price).toFixed(2) : '—';
+      rowsHtml += '<tr data-id="' + p.id + '" style="cursor:pointer;border-bottom:1px solid var(--border);' + (isLow ? 'background:#fff5f5;' : '') + '">'
+        + '<td style="padding:10px 14px;width:50px;"><div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;">' + photo + '</div></td>'
+        + '<td style="padding:10px 14px;"><div style="font-weight:500;font-size:13px;">' + p.name + '</div><div style="font-size:11px;color:var(--text-muted);">' + (p.code||'') + (p.size?' · '+p.size:'') + '</div></td>'
+        + '<td style="padding:10px 14px;">' + subBadge + '</td>'
+        + '<td style="padding:10px 14px;"><span class="qty-tag qty-bv">BV:' + (p.qty_bv||0) + '</span> <span class="qty-tag qty-is">IS:' + (p.qty_is||0) + '</span> <span class="qty-tag qty-sw">SW:' + (p.qty_sw||0) + '</span></td>'
+        + '<td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">' + price + '</td>'
+        + '</tr>';
+    });
+  }
+
+  root.innerHTML =
+    // Breadcrumb
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
     + '<button id="cat-back-btn" class="btn btn-outline" style="font-size:12px;padding:5px 12px;">← ' + mat + '</button>'
     + '<span style="color:var(--text-muted);">›</span>'
     + '<span style="font-weight:600;color:var(--text);">' + catId + '</span>'
-    + '<span class="badge badge-blue" style="margin-left:4px;">' + catProds.length + ' products</span>'
+    + '<span class="badge badge-blue" style="margin-left:4px;">' + catProds.length + ' total</span>'
     + '</div>'
-    + '<div class="card" style="padding:0;overflow:hidden;">' + tableHtml + '</div>';
+    // Sub-type pills
+    + (subTypeKeys.length > 0
+      ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding:12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);" id="cat-sub-pills">' + pillsHtml + '</div>'
+      : '')
+    // Product count
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">'
+    + (filterSubType ? '<strong style="color:' + mc.color + ';">' + filterSubType + '</strong> — ' : '')
+    + displayProds.length + ' products</div>'
+    // Table
+    + '<div class="card" style="padding:0;overflow:hidden;">'
+    + '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr style="background:var(--surface2);">'
+    + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;width:50px;">Photo</th>'
+    + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Name</th>'
+    + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Sub-type</th>'
+    + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Stock</th>'
+    + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Price</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rowsHtml + '</tbody>'
+    + '</table></div></div>';
 
-  // Attach click handlers
+  // Back button
   const backBtn = root.querySelector('#cat-back-btn');
-  if (backBtn) backBtn.addEventListener('click', function() { _renderCatLevel1(_catMat); });
+  if (backBtn) backBtn.addEventListener('click', () => _renderCatLevel1(mat));
 
-  root.querySelectorAll('tr[data-id]').forEach(function(tr) {
-    tr.addEventListener('click', function() {
-      viewProduct(this.getAttribute('data-id'));
+  // Sub-type pill filters
+  root.querySelectorAll('[data-sub]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const sub = this.dataset.sub;
+      _renderCatSubTypes(catId, mat, sub || null);
     });
+  });
+
+  // Product row clicks
+  root.querySelectorAll('tr[data-id]').forEach(tr => {
+    tr.addEventListener('click', () => viewProduct(tr.dataset.id));
   });
 }
 
