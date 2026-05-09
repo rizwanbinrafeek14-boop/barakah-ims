@@ -8869,7 +8869,7 @@ function _renderCatLevel1(mat) {
 }
 
 // ── LEVEL 2: Category products ────────────────────────────────
-function _openCatCategory(catId, mat) {
+function _openCatCategory(catId, mat, filterSubtype = null) {
   const root = document.getElementById('cat-root');
   if (!root) return;
 
@@ -8883,15 +8883,41 @@ function _openCatCategory(catId, mat) {
   const catProds = matProducts.filter(p => normalizeCatName(p.category) === catId);
   const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
 
-  // Group by sub-type
-  const bySubtype = {};
-  catProds.forEach(p => {
-    const sub = p.sub_type || 'General';
-    if (!bySubtype[sub]) bySubtype[sub] = [];
-    bySubtype[sub].push(p);
-  });
+  // Get all unique sub-types in this category
+  const subtypes = [...new Set(catProds.map(p => p.sub_type || '').filter(Boolean))].sort();
+  const hasSubtypes = subtypes.length > 0;
 
-  const productRows = catProds.map(p => {
+  // Filter products by selected sub-type
+  const activeSubtype = filterSubtype;
+  const displayProds = activeSubtype
+    ? catProds.filter(p => (p.sub_type || '') === activeSubtype)
+    : catProds;
+
+  // Sub-type filter tabs
+  const subtypeTabs = hasSubtypes ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      <button onclick="_openCatCategory('${catId.replace(/'/g,"\'")}','${mat.replace(/'/g,"\'")}',null)"
+        style="padding:5px 14px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;
+               background:${!activeSubtype ? mc.color : 'transparent'};
+               color:${!activeSubtype ? '#fff' : mc.color};
+               border-color:${mc.color};">
+        All (${catProds.length})
+      </button>
+      ${subtypes.map(sub => {
+        const count = catProds.filter(p => (p.sub_type||'') === sub).length;
+        const isActive = activeSubtype === sub;
+        return `<button onclick="_openCatCategory('${catId.replace(/'/g,"\'")}','${mat.replace(/'/g,"\'")}','${sub.replace(/'/g,"\'")}')"
+          style="padding:5px 14px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;
+                 background:${isActive ? mc.color : 'var(--surface)'};
+                 color:${isActive ? '#fff' : 'var(--text)'};
+                 border-color:${isActive ? mc.color : 'var(--border)'};
+                 transition:all .15s;">
+          ${sub} <span style="opacity:.7">(${count})</span>
+        </button>`;
+      }).join('')}
+    </div>` : '';
+
+  const productRows = displayProds.map(p => {
     const isLow = (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold;
     return `<tr onclick="viewProduct('${p.id}')" style="cursor:pointer;${isLow ? 'background:#fff5f5;' : ''}">
       <td style="padding:10px 14px;width:44px;">
@@ -8904,35 +8930,45 @@ function _openCatCategory(catId, mat) {
         <div style="font-weight:500;font-size:13px;">${p.name}</div>
         <div style="font-size:11px;color:var(--text-muted);">${p.code || ''} ${p.size ? '· '+p.size : ''}</div>
       </td>
-      <td style="padding:10px 14px;font-size:12px;color:var(--text-muted);">${p.sub_type || '—'}</td>
+      <td style="padding:10px 14px;">
+        ${p.sub_type ? `<span style="background:${mc.bg};color:${mc.color};border:1px solid ${mc.border};
+          padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">${p.sub_type}</span>` : '<span style="color:var(--text-muted);">—</span>'}
+      </td>
       <td style="padding:10px 14px;">
         <div style="display:flex;gap:4px;">
-          <span class="qty-tag qty-bv" style="color:${(p.qty_bv||0)<threshold?'#dc2626':''}">BV:${p.qty_bv||0}</span>
-          <span class="qty-tag qty-is" style="color:${(p.qty_is||0)<threshold?'#dc2626':''}">IS:${p.qty_is||0}</span>
-          <span class="qty-tag qty-sw" style="color:${(p.qty_sw||0)<threshold?'#dc2626':''}">SW:${p.qty_sw||0}</span>
+          <span class="qty-tag qty-bv" style="${(p.qty_bv||0)<threshold?'color:#dc2626;font-weight:700;':''}">BV:${p.qty_bv||0}</span>
+          <span class="qty-tag qty-is" style="${(p.qty_is||0)<threshold?'color:#dc2626;font-weight:700;':''}">IS:${p.qty_is||0}</span>
+          <span class="qty-tag qty-sw" style="${(p.qty_sw||0)<threshold?'color:#dc2626;font-weight:700;':''}">SW:${p.qty_sw||0}</span>
         </div>
       </td>
-      <td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">${p.price ? 'SAR '+Number(p.price).toFixed(2) : '—'}</td>
+      <td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">
+        ${p.price ? 'SAR '+Number(p.price).toFixed(2) : '—'}
+      </td>
     </tr>`;
   }).join('');
 
   root.innerHTML = `
-    <!-- Breadcrumb with back button -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+    <!-- Breadcrumb -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
       <button onclick="_renderCatLevel1('${mat}')" class="btn btn-outline" style="font-size:12px;padding:5px 12px;">
         ← ${mat}
       </button>
       <span style="color:var(--text-muted);">›</span>
       <span style="font-weight:600;color:var(--text);">${catId}</span>
-      <span class="badge badge-blue" style="margin-left:4px;">${catProds.length} products</span>
+      ${activeSubtype ? `<span style="color:var(--text-muted);">›</span>
+        <span style="font-weight:600;color:${mc.color};">${activeSubtype}</span>` : ''}
+      <span class="badge badge-blue" style="margin-left:4px;">${displayProds.length} product${displayProds.length !== 1 ? 's' : ''}</span>
     </div>
+
+    <!-- Sub-type filter tabs -->
+    ${subtypeTabs}
 
     <!-- Products table -->
     <div class="card" style="padding:0;overflow:hidden;">
-      ${catProds.length === 0
+      ${displayProds.length === 0
         ? `<div style="padding:40px;text-align:center;color:var(--text-muted);">
              <div style="font-size:36px;margin-bottom:10px;">📦</div>
-             <div>No products in this category</div>
+             <div>No products${activeSubtype ? ' for '+activeSubtype : ''}</div>
            </div>`
         : `<div class="table-wrap">
              <table>
