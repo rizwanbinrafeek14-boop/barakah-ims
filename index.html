@@ -1268,12 +1268,18 @@ window.onerror = function(msg, src, line, col, err) {
     <!-- PURCHASE ORDERS PAGE -->
     <div class="page" id="page-purchase-orders">
       <div class="page-header">
-        <div class="page-header-title"><h1>Purchase Orders</h1><p>Create and track supplier purchase orders</p></div>
+        <div class="page-header-title">
+          <h1>Purchase Orders</h1>
+          <p>Create and track supplier purchase orders</p>
+        </div>
         <button class="btn btn-gold manager-only" onclick="openNewPO()">+ New PO</button>
       </div>
-      <div class="card" style="margin-bottom:14px">
+
+      <!-- Filters -->
+      <div class="card" style="margin-bottom:14px;">
         <div class="filter-bar">
-          <input class="search-input" type="text" placeholder="Search POs..." id="po-search" oninput="renderPOs()">
+          <input class="search-input" type="text" id="po-search"
+            placeholder="🔍 Search by PO no. or supplier..." oninput="renderPOs()">
           <select class="filter-select" id="po-filter-company" onchange="renderPOs()">
             <option value="">All Companies</option>
             <option value="bv">Barakah Valves</option>
@@ -1282,18 +1288,47 @@ window.onerror = function(msg, src, line, col, err) {
           </select>
           <select class="filter-select" id="po-filter-status" onchange="renderPOs()">
             <option value="">All Status</option>
-            <option value="draft">Draft</option><option value="sent">Sent</option>
-            <option value="received">Received</option><option value="partial">Partial</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="received">Received</option>
+            <option value="partial">Partial</option>
             <option value="cancelled">Cancelled</option>
           </select>
         </div>
       </div>
-      <div class="card" style="padding:0">
+
+      <!-- Table -->
+      <div class="card" style="padding:0;">
         <div class="table-wrap">
-          <table><thead><tr>
-            <th>PO No.</th><th>Date</th><th>Supplier</th><th>Company</th><th>Items</th><th>Total (SAR)</th><th>Status</th><th>Actions</th>
-          </tr></thead><tbody id="po-tbody"></tbody></table>
+          <table>
+            <thead>
+              <tr>
+                <th>PO No.</th>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Company</th>
+                <th>Items</th>
+                <th>Total (SAR)</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="po-tbody">
+              <tr>
+                <td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">
+                  <div style="font-size:32px;margin-bottom:10px;">📋</div>
+                  <div style="font-size:14px;">Loading purchase orders...</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+      </div>
+
+      <!-- SQL notice -->
+      <div id="po-sql-notice" style="display:none;" class="alert alert-warn" style="margin-top:12px;">
+        ⚠️ Purchase Orders table not set up yet.
+        <button class="btn btn-sm btn-outline" onclick="showPOSchemaNotice()" style="margin-left:8px;">Show SQL</button>
       </div>
     </div>
 
@@ -2944,7 +2979,7 @@ function renderQuotations() {
       <button class="btn btn-sm btn-success" onclick="updateQuotStatus('${q.id}','accepted')">✓</button>
       <button class="btn btn-sm btn-danger" onclick="updateQuotStatus('${q.id}','rejected')">✗</button>
       <button class="btn btn-sm btn-outline admin-only" onclick="openEditQuotation('${q.id}')" style="border-color:rgba(201,168,76,0.4);color:var(--gold)" ${currentProfile?.role!=='admin'?'style="display:none"':''}>✏️</button>
-      <button class="btn btn-sm btn-danger admin-only" onclick="deleteQuotation('${q.id}','${q.quot_no}')" ${currentProfile?.role!=='admin'?'style="display:none"':''}>🗑️</button>
+      <button class="btn btn-sm btn-danger admin-only" onclick="deleteQuotation('${q.id}','${q.quot_no}')" ${currentProfile?.role==='admin'?'':'style="display:none"'}>🗑️</button>
     </td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:28px">No quotations yet</td></tr>';
 }
 
@@ -4806,9 +4841,11 @@ function renderPOs() {
   const tbody = document.getElementById('po-tbody');
   if (!tbody) return;
 
-  const search = (document.getElementById('po-search')?.value || '').toLowerCase();
-  const fc     = document.getElementById('po-filter-company')?.value || '';
-  const fs     = document.getElementById('po-filter-status')?.value || '';
+  const search  = (document.getElementById('po-search')?.value || '').toLowerCase();
+  const fc      = document.getElementById('po-filter-company')?.value || '';
+  const fs      = document.getElementById('po-filter-status')?.value || '';
+  const isAdmin = currentProfile?.role === 'admin';
+  const isMgr   = currentProfile?.role === 'admin' || currentProfile?.role === 'manager';
 
   const statusColors = {
     draft:'badge-warn', sent:'badge-blue', received:'badge-green',
@@ -4817,60 +4854,57 @@ function renderPOs() {
 
   const list = (allPOs || []).filter(po => {
     if (!po) return false;
-    const sup = (po.supplier || '').toLowerCase();
-    const num = (po.po_no || '').toLowerCase();
-    return (!search || sup.includes(search) || num.includes(search))
+    return (!search || (po.supplier||'').toLowerCase().includes(search) || (po.po_no||'').toLowerCase().includes(search))
         && (!fc || po.company === fc)
         && (!fs || po.status === fs);
   });
 
   if (!list.length) {
-    tbody.innerHTML = [
-      '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">',
-      '<div style="font-size:32px;margin-bottom:10px;">📋</div>',
-      '<div style="font-size:15px;font-weight:600;margin-bottom:6px;">No Purchase Orders</div>',
-      '<div style="font-size:13px;">Click <strong>+ New PO</strong> to create one.</div>',
-      '</td></tr>'
-    ].join('');
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">'
+      + '<div style="font-size:32px;margin-bottom:10px;">📋</div>'
+      + '<div style="font-weight:600;font-size:15px;margin-bottom:6px;">No Purchase Orders</div>'
+      + '<div style="font-size:13px;">Click <strong>+ New PO</strong> to create one.</div>'
+      + '</td></tr>';
     return;
   }
 
-  const isAdmin = currentProfile?.role === 'admin';
   tbody.innerHTML = '';
 
   list.forEach(po => {
     const tr = document.createElement('tr');
     tr.style.cursor = 'pointer';
-    tr.addEventListener('click', function() { openViewPO(po.id); });
+    tr.addEventListener('click', () => printPO(po));
 
-    const date  = (po.po_date || po.created_at)
-      ? new Date(po.po_date || po.created_at).toLocaleDateString('en-SA') : '—';
-    const lines = (po.purchase_order_lines || []).length;
-    const total = Number(po.total || 0).toFixed(2);
-    const badge = statusColors[po.status] || 'badge-blue';
-    const coName = (COMPANY_NAMES && COMPANY_NAMES[po.company]) || po.company || '—';
+    const date   = (po.po_date || po.created_at) ? new Date(po.po_date || po.created_at).toLocaleDateString('en-SA') : '—';
+    const lines  = (po.purchase_order_lines || []).length;
+    const total  = Number(po.total || 0).toFixed(2);
+    const badge  = statusColors[po.status] || 'badge-blue';
+    const coName = (typeof COMPANY_NAMES !== 'undefined' && COMPANY_NAMES[po.company]) || po.company || '—';
 
-    let actHtml = '<button class="btn btn-sm btn-outline">🖨️ Print</button> '
-                + '<button class="btn btn-sm btn-success">✓ Recv</button>';
-    if (isAdmin) actHtml += ' <button class="btn btn-sm btn-danger">🗑️</button>';
+    tr.innerHTML = '<td class="mono" style="font-size:12px;color:var(--gold);font-weight:700;">' + (po.po_no||'—') + '</td>'
+      + '<td style="font-size:13px;">' + date + '</td>'
+      + '<td><div style="font-weight:500;">' + (po.supplier||'—') + '</div><div style="font-size:11px;color:var(--text-muted);">' + (po.contact||'') + '</div></td>'
+      + '<td><span class="badge badge-blue" style="font-size:10px;">' + coName + '</span></td>'
+      + '<td>' + lines + ' items</td>'
+      + '<td class="mono" style="font-weight:600;">SAR ' + total + '</td>'
+      + '<td><span class="badge ' + badge + '">' + (po.status||'draft').toUpperCase() + '</span></td>'
+      + '<td style="white-space:nowrap;">'
+      + '<div style="display:flex;gap:4px;" onclick="event.stopPropagation();">'
+      + '<button class="btn btn-sm btn-outline" title="Print">🖨️</button>'
+      + (po.status !== 'received' && isMgr ? '<button class="btn btn-sm btn-success" title="Mark Received">✓ Recv</button>' : '')
+      + (isAdmin ? '<button class="btn btn-sm btn-danger" title="Delete">🗑️</button>' : '')
+      + '</div></td>';
 
-    tr.innerHTML = [
-      '<td class="mono" style="font-size:12px;color:var(--gold);font-weight:700;">' + (po.po_no || '—') + '</td>',
-      '<td style="font-size:13px;">' + date + '</td>',
-      '<td><div style="font-weight:500;">' + (po.supplier || '—') + '</div>'
-        + '<div style="font-size:11px;color:var(--text-muted);">' + (po.contact || '') + '</div></td>',
-      '<td><span class="badge badge-blue" style="font-size:10px;">' + coName + '</span></td>',
-      '<td>' + lines + ' items</td>',
-      '<td class="mono" style="font-weight:600;">SAR ' + total + '</td>',
-      '<td><span class="badge ' + badge + '">' + (po.status || '').toUpperCase() + '</span></td>',
-      '<td onclick="event.stopPropagation();" style="white-space:nowrap;display:flex;gap:4px;">' + actHtml + '</td>'
-    ].join('');
-
-    // Attach action button events
+    // Attach button events
     const btns = tr.querySelectorAll('td:last-child button');
-    if (btns[0]) btns[0].addEventListener('click', function(e) { e.stopPropagation(); printPO(po.id); });
-    if (btns[1]) btns[1].addEventListener('click', function(e) { e.stopPropagation(); updatePOStatus(po.id, 'received'); });
-    if (btns[2]) btns[2].addEventListener('click', function(e) { e.stopPropagation(); deletePO(po.id, po.po_no || ''); });
+    let bi = 0;
+    btns[bi++].addEventListener('click', e => { e.stopPropagation(); printPO(po); });
+    if (po.status !== 'received' && isMgr && btns[bi]) {
+      btns[bi++].addEventListener('click', e => { e.stopPropagation(); updatePOStatus(po.id, 'received'); });
+    }
+    if (isAdmin && btns[bi]) {
+      btns[bi].addEventListener('click', e => { e.stopPropagation(); deletePO(po.id, po.po_no||''); });
+    }
 
     tbody.appendChild(tr);
   });
