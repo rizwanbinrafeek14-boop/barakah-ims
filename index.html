@@ -9610,9 +9610,8 @@ async function loadPOs() {
 }
 
 async function loadAndRenderPOs() {
-  renderPOs(); // show immediately
   await loadPOs();
-  renderPOs(); // refresh with data
+  renderPOs();
 }
 
 // ── RENDER ───────────────────────────────────────────────────
@@ -10730,6 +10729,75 @@ window.addEventListener('DOMContentLoaded', init);
     <div class="modal-footer" style="margin-top:16px;">
       <button class="btn btn-outline" onclick="closeModal('modal-cat-matrix')">Cancel</button>
       <button class="btn btn-gold" onclick="saveCatMatrix().then(()=>closeModal('modal-cat-matrix'))">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASSIGN PHOTO TO PRODUCTS MODAL -->
+<div class="modal-overlay" id="modal-assign-photo">
+  <div class="modal" style="max-width:820px;width:96vw;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-title">📌 Assign Photo to Products</div>
+
+    <!-- Photo preview -->
+    <div style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:14px;border:1px solid var(--border);">
+      <img id="assign-photo-preview" src="" alt="Photo"
+        style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0;">
+      <div>
+        <div id="assign-photo-name" style="font-weight:600;font-size:14px;margin-bottom:2px;"></div>
+        <div style="font-size:12px;color:var(--text-muted);">
+          Selected: <strong id="assign-selected-count" style="color:var(--gold);">0</strong> products
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:10px;">
+      <input type="text" id="assign-search" placeholder="🔍 Search products..."
+        oninput="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none;">
+      <select id="assign-filter-cat" onchange="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;">
+        <option value="">All Categories</option>
+        <option>Valves</option><option>Pipes &amp; Tubes</option><option>Fittings</option>
+        <option>Forged Steel Fittings</option><option>Flanges</option>
+        <option>Hardware &amp; Tools</option><option>Clamps</option>
+        <option>Fasteners</option><option>Gaskets</option><option>Other</option>
+      </select>
+      <select id="assign-filter-mat" onchange="renderAssignProductList()"
+        style="padding:9px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;">
+        <option value="">All Materials</option>
+        <option>CS</option><option>SS</option><option>GI</option><option>BMI</option>
+        <option>Brass</option><option>Bronze</option><option>Copper</option>
+        <option>PVC</option><option>CPVC</option><option>PPR</option><option>HDPE</option>
+      </select>
+    </div>
+
+    <!-- Select all row -->
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:8px;border:1px solid var(--border);">
+      <input type="checkbox" id="assign-select-all" onchange="toggleAssignAll(this.checked)"
+        style="width:16px;height:16px;cursor:pointer;">
+      <label for="assign-select-all" style="font-size:13px;font-weight:600;cursor:pointer;">
+        Select / Deselect All Visible
+      </label>
+    </div>
+
+    <!-- Product list -->
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">
+      <span id="assign-visible-count">0</span> products shown
+    </div>
+    <div id="assign-empty" style="display:none;text-align:center;padding:32px;color:var(--text-muted);">
+      <div style="font-size:32px;margin-bottom:8px;">🔍</div>
+      <div>No matching products</div>
+    </div>
+    <div id="assign-product-list"
+      style="flex:1;overflow-y:auto;max-height:340px;border:1px solid var(--border);border-radius:var(--radius-sm);">
+    </div>
+
+    <div class="modal-footer" style="margin-top:12px;">
+      <button class="btn btn-outline" onclick="closeModal('modal-assign-photo')">Cancel</button>
+      <button class="btn btn-gold" id="assign-confirm-btn" onclick="confirmAssignPhoto()">
+        📌 Assign to <span id="assign-btn-count">0</span> Products
+      </button>
     </div>
   </div>
 </div>
