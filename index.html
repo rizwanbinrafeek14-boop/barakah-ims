@@ -823,8 +823,6 @@ input[type=file].photo-picker { position: absolute; width: 1px; height: 1px; opa
 </style>
 
 
-
-
 </head>
 <body>
 <script>
@@ -1864,7 +1862,6 @@ window.onerror = function(msg, src, line, col, err) {
 </div>
 
 
-
 <!-- DELETE CONFIRM MODAL -->
 <div class="modal-overlay" id="modal-delete-confirm">
   <div class="modal" style="max-width:380px;text-align:center">
@@ -2308,12 +2305,19 @@ async function loadProfile() {
 }
 
 async function doLogout() {
+  try {
+
   await sb.auth.signOut();
   currentUser = null;
   currentProfile = null;
   allProducts = []; allMovements = []; allQuotations = [];
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex'; document.getElementById('auth-screen').style.alignItems = 'center'; document.getElementById('auth-screen').style.justifyContent = 'center';
+
+  } catch(e) {
+    console.error('Logout:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Logout: ' + e.message, 'error');
+  }
 }
 
 // ─── APP LAUNCH ───────────────────────────────────────────────
@@ -2353,7 +2357,7 @@ async function launchApp() {
     loadPOs().catch(()=>{}),
     loadPhotoLibrary().then(()=>{ renderLibraryGrid(); ensurePhotoLibraryTable(); }).catch(()=>{}),
     loadActivityLog().catch(()=>{}),
-    Promise.resolve().then(()=>{ updateCatNavBadges(); }),
+    Promise.resolve().then(()=>{ updateCatNavBadges(); if(typeof loadCatMatrix==='function') loadCatMatrix(); }),
     logActivity('login','Logged in').catch(()=>{}),
   ]).catch(()=>{});
 }
@@ -2376,6 +2380,8 @@ async function preloadData() {
 }
 
 async function loadSettings() {
+  try {
+
   const { data } = await sb.from('settings').select('*');
   if (data) data.forEach(s => { settings[s.key] = s.value; });
   if (settings.lowStockThreshold) {
@@ -2391,9 +2397,16 @@ async function loadSettings() {
     document.getElementById('letterhead-preview').innerHTML =
       `<img src="${settings.letterheadUrl}" style="max-width:100%;max-height:100px;border-radius:6px;margin-top:8px">`;
   }
+
+  } catch(e) {
+    console.error('Load settings:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Load settings: ' + e.message, 'error');
+  }
 }
 
 async function saveSettings() {
+  try {
+
   const pairs = [
     ['lowStockThreshold', document.getElementById('low-stock-threshold')?.value || '10'],
     ['vatRate', document.getElementById('vat-rate')?.value || '15'],
@@ -2406,6 +2419,11 @@ async function saveSettings() {
   }
   showToast('Settings saved!');
   checkLowStock();
+
+  } catch(e) {
+    console.error('Save settings:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Save settings: ' + e.message, 'error');
+  }
 }
 
 // ─── NAVIGATION ───────────────────────────────────────────────
@@ -2647,6 +2665,8 @@ function checkOtherMaterial(sel) {
 }
 
 async function saveProduct() {
+  try {
+
   const name = document.getElementById('p-name').value.trim();
   if (!name) { showToast('Product name is required','error'); return; }
   document.getElementById('save-product-btn').textContent = 'Saving...';
@@ -2725,6 +2745,11 @@ async function saveProduct() {
   renderInventory();
   checkLowStock();
   showToast(editId ? 'Product updated!' : 'Product added!');
+
+  } catch(e) {
+    console.error('Save product:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Save product: ' + e.message, 'error');
+  }
 }
 
 // Store id pending deletion
@@ -2740,6 +2765,8 @@ function deleteProduct(id) {
 }
 
 async function confirmDelete() {
+  try {
+
   if (!_pendingDeleteId) return;
   const id = _pendingDeleteId;
   _pendingDeleteId = null;
@@ -2770,9 +2797,16 @@ async function confirmDelete() {
   renderInventory();
   checkLowStock();
   showToast('Product deleted successfully');
+
+  } catch(e) {
+    console.error('Delete product:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Delete product: ' + e.message, 'error');
+  }
 }
 
 async function viewProduct(id) {
+  try {
+
   const p = allProducts.find(x=>x.id===id);
   if (!p) return;
   const threshold = parseInt(settings.lowStockThreshold||10);
@@ -2822,6 +2856,11 @@ async function viewProduct(id) {
   delBtn.style.display = currentProfile?.role === 'admin' ? '' : 'none';
   delBtn.onclick = () => deleteProduct(id);
   openModal('modal-product-detail');
+
+  } catch(e) {
+    console.error('Load product:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Load product: ' + e.message, 'error');
+  }
 }
 
 function handlePhotoUpload(input) {
@@ -2871,6 +2910,8 @@ function openStockUpdate(id) {
 }
 
 async function applyStockUpdate() {
+  try {
+
   const id = document.getElementById('su-product-id').value;
   const p = allProducts.find(x=>x.id===id);
   if (!p) return;
@@ -2896,6 +2937,11 @@ async function applyStockUpdate() {
   renderInventory();
   checkLowStock();
   showToast('Stock updated!');
+
+  } catch(e) {
+    console.error('Update stock:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Update stock: ' + e.message, 'error');
+  }
 }
 
 // ─── MOVEMENTS ────────────────────────────────────────────────
@@ -2915,6 +2961,8 @@ function updateMovProduct() {
 }
 
 async function saveMovement() {
+  try {
+
   const pid = document.getElementById('mov-product').value;
   const type = document.getElementById('mov-type').value;
   const company = document.getElementById('mov-company').value;
@@ -2941,6 +2989,11 @@ async function saveMovement() {
   renderMovements();
   checkLowStock();
   showToast('Movement recorded!');
+
+  } catch(e) {
+    console.error('Save movement:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Save movement: ' + e.message, 'error');
+  }
 }
 
 function renderMovements() {
@@ -3040,6 +3093,8 @@ function updateQuotTotals() {
 }
 
 async function saveQuotation(status) {
+  try {
+
   const client=document.getElementById('quot-client').value.trim();
   if(!client){showToast('Client name required','error');return;}
   const company=document.getElementById('quot-company').value;
@@ -3051,6 +3106,7 @@ async function saveQuotation(status) {
     const hiddenPid=document.getElementById('ql-pid-'+idx)?.value;
     const qty=parseFloat(document.getElementById('ql-qty-'+idx)?.value)||0;
     const unitPrice=parseFloat(document.getElementById('ql-price-'+idx)?.value)||0;
+    if(qty<=0) return; // skip zero-qty lines
     if(qty>0){
       const pid=(hiddenPid&&hiddenPid!=='_custom')?hiddenPid:(sel?.value==='_custom'?null:sel?.value||null);
       const pObj=pid?allProducts.find(x=>x.id===pid):null;
@@ -3083,6 +3139,11 @@ async function saveQuotation(status) {
     showToast('Quotation saved!');
     if(status==='sent') printQuotation({...qData,quotation_lines:qData.quotation_lines||[]});
   }
+
+  } catch(e) {
+    console.error('Save quotation:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Save quotation: ' + e.message, 'error');
+  }
 }
 
 function renderQuotations() {
@@ -3103,10 +3164,17 @@ function renderQuotations() {
 }
 
 async function updateQuotStatus(id, status) {
+  try {
+
   await sb.from('quotations').update({ status }).eq('id', id);
   const q=allQuotations.find(x=>x.id===id); if(q) q.status=status;
   renderQuotations(); showToast(`Quotation marked as ${status}`);
   if (status === 'accepted' && q) addNotification('accepted', `Quotation Accepted`, `${q.quot_no} for ${q.client} has been accepted`);
+
+  } catch(e) {
+    console.error('Update status:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Update status: ' + e.message, 'error');
+  }
 }
 
 
@@ -3132,6 +3200,8 @@ function renderLowStock() {
 
 // ─── DOCUMENTS ────────────────────────────────────────────────
 async function renderDocuments() {
+  try {
+
   const search=(document.getElementById('doc-search')?.value||'').toLowerCase();
   const ft=document.getElementById('doc-filter-type')?.value||'';
   const {data:docs} = await sb.from('product_documents').select('*, products(name)').order('created_at',{ascending:false});
@@ -3139,6 +3209,11 @@ async function renderDocuments() {
   const typeIcons={photo:'📷',datasheet:'📄',mtc:'🏆',other:'📎'};
   const typeBadge={photo:'badge-blue',datasheet:'badge-warn',mtc:'badge-gold',other:'badge-blue'};
   document.getElementById('documents-container').innerHTML=list.length?`<div class="product-grid">${list.map(d=>`<div class="card" style="cursor:pointer" onclick="window.open('${d.file_url}','_blank')">${d.type==='photo'?`<img src="${d.file_url}" style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:10px">`:`<div style="height:90px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:10px">${typeIcons[d.type]||'📎'}</div>`}<span class="badge ${typeBadge[d.type]||'badge-blue'}" style="font-size:10px;margin-bottom:5px">${d.type}</span><div style="font-weight:500;font-size:13px">${d.name}</div><div style="font-size:11px;color:var(--text-muted)">${d.products?.name||''}</div><a href="${d.file_url}" download="${d.name}" class="btn btn-outline btn-sm" style="margin-top:8px;text-decoration:none" onclick="event.stopPropagation()">⬇ Download</a></div>`).join('')}</div>`:'<div class="card" style="text-align:center;padding:36px;color:var(--text-muted)">No documents uploaded yet</div>';
+
+  } catch(e) {
+    console.error('Load documents:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Load documents: ' + e.message, 'error');
+  }
 }
 
 // ─── REPORTS ─────────────────────────────────────────────────
@@ -3271,6 +3346,8 @@ function renderMovementAnalysis() {
 
 // ─── USERS ────────────────────────────────────────────────────
 async function renderUsers() {
+  try {
+
   if(currentProfile?.role!=='admin') return;
   const {data} = await sb.from('profiles').select('*').order('created_at');
   const roleClass={admin:'role-admin',manager:'role-manager',viewer:'role-viewer'};
@@ -3278,6 +3355,11 @@ async function renderUsers() {
   document.getElementById('users-tbody').innerHTML=(data||[]).map(u=>`
     <tr><td style="font-weight:500">${u.full_name}</td><td class="mono" style="font-size:12px">${u.username}</td><td><span class="${roleClass[u.role]||'role-viewer'}">${u.role}</span></td><td style="font-size:13px;color:var(--text-muted)">${coNames[u.company_access||'all']}</td><td style="font-size:12px;color:var(--text-muted)">${u.last_login?new Date(u.last_login).toLocaleDateString():'-'}</td><td><span class="badge ${u.status==='active'?'badge-green':'badge-red'}">${(u.status||'active').toUpperCase()}</span></td>
     <td><button class="btn btn-sm btn-outline" onclick="toggleUserStatus('${u.id}','${u.status||'active'}')">${u.status==='inactive'?'Enable':'Disable'}</button></td></tr>`).join('');
+
+  } catch(e) {
+    console.error('Load users:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Load users: ' + e.message, 'error');
+  }
 }
 
 function openAddUserModal() {
@@ -3286,6 +3368,8 @@ function openAddUserModal() {
 }
 
 async function createUser() {
+  try {
+
   const name=document.getElementById('new-user-name').value.trim();
   const email=document.getElementById('new-user-email').value.trim();
   const username=document.getElementById('new-user-username').value.trim()||email.split('@')[0];
@@ -3304,6 +3388,11 @@ async function createUser() {
     renderUsers();
     showCredentialsPopup(name,email,pass,role,company);
     showToast('User created!');
+  }
+
+  } catch(e) {
+    console.error('Create user:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Create user: ' + e.message, 'error');
   }
 }
 
@@ -3329,14 +3418,23 @@ function showCredentialsPopup(name,email,pass,role,company) {
 }
 
 async function toggleUserStatus(id, current) {
+  try {
+
   const next = current==='inactive'?'active':'inactive';
   await sb.from('profiles').update({status:next}).eq('id',id);
   renderUsers();
   showToast(`User ${next==='active'?'enabled':'disabled'}`);
+
+  } catch(e) {
+    console.error('Update user:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Update user: ' + e.message, 'error');
+  }
 }
 
 // ─── SETTINGS LETTERHEAD ──────────────────────────────────────
 async function uploadLetterhead(input) {
+  try {
+
   const file=input.files[0];if(!file) return;
   const path=`letterheads/${Date.now()}.${file.name.split('.').pop()}`;
   const {error}=await sb.storage.from('letterheads').upload(path,file,{upsert:true});
@@ -3346,6 +3444,11 @@ async function uploadLetterhead(input) {
   settings.letterheadUrl=data.publicUrl;
   document.getElementById('letterhead-preview').innerHTML=`<img src="${data.publicUrl}" style="max-width:100%;max-height:100px;border-radius:6px;margin-top:8px"><div style="font-size:12px;color:var(--text-muted);margin-top:5px">✓ Letterhead uploaded</div>`;
   showToast('Letterhead uploaded!');
+
+  } catch(e) {
+    console.error('Upload letterhead:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Upload letterhead: ' + e.message, 'error');
+  }
 }
 
 // ─── MODAL HELPERS ────────────────────────────────────────────
@@ -3763,6 +3866,8 @@ function deleteQuotation(id, quotNo) {
 }
 
 async function confirmDeleteQuotation() {
+  try {
+
   if (!_pendingDeleteQuotId) return;
   const id = _pendingDeleteQuotId;
   _pendingDeleteQuotId = null;
@@ -3779,10 +3884,17 @@ async function confirmDeleteQuotation() {
   allQuotations = allQuotations.filter(q => q.id !== id);
   renderQuotations();
   showToast('Quotation deleted successfully');
+
+  } catch(e) {
+    console.error('Delete quotation:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Delete quotation: ' + e.message, 'error');
+  }
 }
 
 // ── EDIT QUOTATION ────────────────────────────────────────────
 async function openEditQuotation(id) {
+  try {
+
   if (currentProfile?.role !== 'admin') { showToast('Admin only', 'error'); return; }
 
   const q = allQuotations.find(x => x.id === id);
@@ -3842,6 +3954,11 @@ async function openEditQuotation(id) {
   }
 
   openModal('modal-quotation');
+
+  } catch(e) {
+    console.error('Load quotation:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Load quotation: ' + e.message, 'error');
+  }
 }
 
 async function addQuotLineWithData(line) {
@@ -3891,6 +4008,8 @@ async function addQuotLineWithData(line) {
 }
 
 async function updateQuotation(status) {
+  try {
+
   if (!_editingQuotId) return;
   const client = document.getElementById('quot-client').value.trim();
   if (!client) { showToast('Client name required', 'error'); return; }
@@ -3990,6 +4109,11 @@ async function updateQuotation(status) {
   if (status === 'sent') {
     const updated = allQuotations.find(x => x.id === editId);
     if (updated) printQuotation(updated);
+  }
+
+  } catch(e) {
+    console.error('Update quotation:', e.message || e);
+    if (typeof showToast === 'function' && e.message) showToast('Update quotation: ' + e.message, 'error');
   }
 }
 
@@ -4756,62 +4880,6 @@ let _editingPOId = null;
 PAGE_TITLES['purchase-orders'] = 'Purchase Orders';
 
 // Hook into showPage
-
-
-
-// loadPOs rebuilt below
-
-
-
-// loadAndRenderPOs rebuilt below
-
-
-
-// openNewPO rebuilt below
-
-
-
-// addPOLine rebuilt below
-
-
-
-// onPOLProductChange rebuilt below
-
-
-
-// recalcPOL rebuilt below
-
-
-
-// removePOL rebuilt below
-
-
-
-// updatePOTotals rebuilt below
-
-
-
-// savePO rebuilt below
-
-
-
-// showPOSchemaNotice rebuilt below
-
-
-
-// renderPOs rebuilt below
-
-
-
-// openViewPO rebuilt below
-
-
-
-// updatePOStatus rebuilt below
-
-
-
-// deletePO rebuilt below
 
 
 function printPO(po) {
@@ -6052,9 +6120,7 @@ saveProduct = async function() {
 const _origPreloadData2 = preloadData;
 
 // Hook into after product saved to apply library URL if needed
-const _origSb_insert = null; // we'll use a different approach
-
-// Override: patch product save to use library URL when no file selected
+// Product saverary URL when no file selected
 // Find and patch after save completes
 function getProductPhotoUrlForSave() {
   if (window._libraryPhotoUrlToApply) {
@@ -7273,22 +7339,12 @@ let _catCurrentMat = null; // legacy, use _catMat
 let _catCurrentCat = null; // legacy, use _catCat
 
 // ── NAVIGATION ────────────────────────────────────────────────
-// showCataloguePage replaced by new catalogue system
-
-
-// showCatalogueHome replaced by new catalogue system
-
-
-// backToCatMaterial replaced by new catalogue system
 
 
 // ── LEVEL 1: Material home ────────────────────────────────────
-// renderCatMaterialPage replaced by new catalogue system
-
 
 
 // ── LEVEL 2: Category products ────────────────────────────────
-// openCatCategory replaced by new catalogue system
 
 
 function renderCatProducts() {
@@ -7387,7 +7443,6 @@ function normalizeCatName(cat) {
 
 // Add 'catalogue' to PAGE_TITLES
 if (typeof PAGE_TITLES !== 'undefined') PAGE_TITLES['catalogue'] = 'Catalogue';
-
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -8877,7 +8932,7 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
   const catProds = matProds.filter(p => normalizeCatName(p.category) === catId);
   const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
 
-  // Group by sub_type
+  // Group by sub_type for pills
   const subTypes = {};
   catProds.forEach(p => {
     const st = p.sub_type || 'General';
@@ -8885,17 +8940,16 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
     subTypes[st].push(p);
   });
   const subTypeKeys = Object.keys(subTypes).sort((a,b) => {
-    if (a === 'General') return 1;
-    if (b === 'General') return -1;
+    if (a==='General') return 1; if (b==='General') return -1;
     return a.localeCompare(b);
   });
 
-  // Display products: filtered by sub-type and/or search
+  // Apply filters: sub-type first, then search within that
   let displayProds = filterSubType
-    ? catProds.filter(p => (p.sub_type || 'General') === filterSubType)
+    ? catProds.filter(p => (p.sub_type||'General') === filterSubType)
     : catProds;
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
+  const q = (searchQuery||'').toLowerCase().trim();
+  if (q) {
     displayProds = displayProds.filter(p =>
       (p.name||'').toLowerCase().includes(q) ||
       (p.code||'').toLowerCase().includes(q) ||
@@ -8904,38 +8958,75 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
     );
   }
 
-  // Build sub-type filter pills
-  let pillsHtml = '<button id="cat-sub-all" data-sub="" style="padding:5px 14px;border-radius:99px;cursor:pointer;font-size:12px;font-weight:600;border:1.5px solid ' + (filterSubType ? 'var(--border)' : mc.color) + ';background:' + (filterSubType ? 'var(--surface)' : mc.bg) + ';color:' + (filterSubType ? 'var(--text-muted)' : mc.color) + ';">All (' + catProds.length + ')</button> ';
+  // Build pill HTML — count shows products matching current search within each sub-type
+  const buildPillCount = (stProds) => {
+    if (!q) return stProds.length;
+    return stProds.filter(p =>
+      (p.name||'').toLowerCase().includes(q) ||
+      (p.code||'').toLowerCase().includes(q) ||
+      (p.sub_type||'').toLowerCase().includes(q) ||
+      (p.size||'').toLowerCase().includes(q)
+    ).length;
+  };
+
+  const allCount = buildPillCount(catProds);
+  const allActive = !filterSubType;
+
+  let pillsHtml = '<button id="cat-pill-all" data-sub="" '
+    + 'style="padding:6px 16px;border-radius:99px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;'
+    + 'border:2px solid ' + mc.color + ';'
+    + 'background:' + (allActive ? mc.color : 'var(--surface)') + ';'
+    + 'color:' + (allActive ? '#fff' : mc.color) + ';">'
+    + 'All (' + allCount + ')</button>';
+
   subTypeKeys.forEach(st => {
+    const stCount = buildPillCount(subTypes[st]);
     const active = filterSubType === st;
-    pillsHtml += '<button data-sub="' + st + '" style="padding:5px 14px;border-radius:99px;cursor:pointer;font-size:12px;font-weight:600;border:1.5px solid ' + (active ? mc.color : 'var(--border)') + ';background:' + (active ? mc.bg : 'var(--surface)') + ';color:' + (active ? mc.color : 'var(--text-muted)') + ';margin:2px;">' + st + ' (' + subTypes[st].length + ')</button> ';
+    pillsHtml += ' <button data-sub="' + st + '" '
+      + 'style="padding:6px 16px;border-radius:99px;cursor:pointer;font-size:13px;font-weight:' + (active?'700':'500') + ';white-space:nowrap;'
+      + 'border:2px solid ' + (active ? mc.color : 'var(--border)') + ';'
+      + 'background:' + (active ? mc.color : 'var(--surface)') + ';'
+      + 'color:' + (active ? '#fff' : 'var(--text)') + ';margin:2px 0;">'
+      + st + ' (' + stCount + ')</button>';
   });
 
   // Build product rows
   let rowsHtml = '';
   if (!displayProds.length) {
-    rowsHtml = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted);">No products in this sub-type</td></tr>';
+    rowsHtml = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted);">'
+      + '<div style="font-size:32px;margin-bottom:10px;">🔍</div>'
+      + '<div style="font-weight:600;margin-bottom:6px;">' + (q ? 'No results for "' + q + '"' : 'No products in this category') + '</div>'
+      + (q ? '<div><button onclick="document.getElementById(\'cat-live-search\').value=\'\';_renderCatSubTypes(\'' + catId + '\',\'' + mat + '\',' + (filterSubType?'\''+filterSubType+'\'':'null') + ',\'\')" style="padding:6px 16px;border-radius:99px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:12px;">✕ Clear search</button></div>' : '')
+      + '</td></tr>';
   } else {
     displayProds.forEach(p => {
-      const isLow = (p.qty_bv||0)<threshold || (p.qty_is||0)<threshold || (p.qty_sw||0)<threshold;
+      const isLow = (p.qty_bv||0)<threshold && (p.qty_is||0)<threshold && (p.qty_sw||0)<threshold;
       const photo = p.photo_url
-        ? '<img src="' + p.photo_url + '" style="width:38px;height:34px;object-fit:cover;border-radius:6px;">'
-        : '<span style="font-size:16px;opacity:.3;">📦</span>';
+        ? '<img src="' + p.photo_url + '" style="width:38px;height:34px;object-fit:cover;border-radius:5px;">'
+        : '<span style="opacity:.3;font-size:16px;">📦</span>';
       const subBadge = p.sub_type
         ? '<span style="background:' + mc.bg + ';color:' + mc.color + ';border:1px solid ' + mc.border + ';padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">' + p.sub_type + '</span>'
         : '<span style="color:var(--text-muted);">—</span>';
-      const price = p.price ? 'SAR ' + Number(p.price).toFixed(2) : '—';
-      rowsHtml += '<tr data-id="' + p.id + '" style="cursor:pointer;border-bottom:1px solid var(--border);' + (isLow ? 'background:#fff5f5;' : '') + '">'
+      const bvC = (p.qty_bv||0)<threshold?'#dc2626':'';
+      const isC = (p.qty_is||0)<threshold?'#dc2626':'';
+      const swC = (p.qty_sw||0)<threshold?'#dc2626':'';
+      rowsHtml += '<tr data-id="' + p.id + '" style="cursor:pointer;border-bottom:1px solid var(--border);' + (isLow?'background:#fff5f5;':'') + '">'
         + '<td style="padding:10px 14px;width:50px;"><div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;">' + photo + '</div></td>'
         + '<td style="padding:10px 14px;"><div style="font-weight:500;font-size:13px;">' + p.name + '</div><div style="font-size:11px;color:var(--text-muted);">' + (p.code||'') + (p.size?' · '+p.size:'') + '</div></td>'
         + '<td style="padding:10px 14px;">' + subBadge + '</td>'
-        + '<td style="padding:10px 14px;"><span class="qty-tag qty-bv">BV:' + (p.qty_bv||0) + '</span> <span class="qty-tag qty-is">IS:' + (p.qty_is||0) + '</span> <span class="qty-tag qty-sw">SW:' + (p.qty_sw||0) + '</span></td>'
-        + '<td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">' + price + '</td>'
+        + '<td style="padding:10px 14px;">'
+        + '<span class="qty-tag qty-bv" style="' + (bvC?'color:'+bvC+';font-weight:700;':'') + '">BV:' + (p.qty_bv||0) + '</span> '
+        + '<span class="qty-tag qty-is" style="' + (isC?'color:'+isC+';font-weight:700;':'') + '">IS:' + (p.qty_is||0) + '</span> '
+        + '<span class="qty-tag qty-sw" style="' + (swC?'color:'+swC+';font-weight:700;':'') + '">SW:' + (p.qty_sw||0) + '</span>'
+        + '</td>'
+        + '<td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">' + (p.price?'SAR '+Number(p.price).toFixed(2):'—') + '</td>'
         + '</tr>';
     });
   }
 
+  // ── Build full page ──────────────────────────────────────────
   root.innerHTML =
+
     // Breadcrumb
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
     + '<button id="cat-back-btn" class="btn btn-outline" style="font-size:12px;padding:5px 12px;">← ' + mat + '</button>'
@@ -8943,14 +9034,40 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
     + '<span style="font-weight:600;color:var(--text);">' + catId + '</span>'
     + '<span class="badge badge-blue" style="margin-left:4px;">' + catProds.length + ' total</span>'
     + '</div>'
-    // Sub-type pills
-    + (subTypeKeys.length > 0
-      ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding:12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);" id="cat-sub-pills">' + pillsHtml + '</div>'
-      : '')
-    // Product count
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">'
-    + (filterSubType ? '<strong style="color:' + mc.color + ';">' + filterSubType + '</strong> — ' : '')
-    + displayProds.length + ' products</div>'
+
+    // ── STICKY FILTER BAR ──────────────────────────────────────
+    + '<div id="cat-filter-bar" style="position:sticky;top:0;z-index:100;background:var(--bg);padding-bottom:10px;">'
+
+      // Search row
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
+      + '<div style="position:relative;flex:1;">'
+      + '<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none;">🔍</span>'
+      + '<input type="text" id="cat-live-search" placeholder="Search by name, code, sub-type, size..." '
+      + 'value="' + (searchQuery||'') + '" '
+      + 'style="width:100%;padding:10px 40px 10px 38px;background:var(--surface);border:1.5px solid var(--border);'
+      + 'border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:14px;outline:none;box-sizing:border-box;">'
+      + '<button id="cat-search-clear" '
+      + 'style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;'
+      + 'color:var(--text-muted);font-size:16px;padding:2px;' + (q?'':'display:none;') + '" '
+      + 'title="Clear search">✕</button>'
+      + '</div>'
+      // Result count
+      + '<div style="font-size:13px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">'
+      + '<strong style="color:' + mc.color + ';">' + displayProds.length + '</strong>'
+      + (catProds.length !== displayProds.length ? ' of ' + catProds.length : '') + ' products'
+      + '</div>'
+      + '</div>'
+
+      // Pills row (horizontal scroll)
+      + (subTypeKeys.length > 0
+        ? '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none;" id="cat-sub-pills">'
+          + pillsHtml
+          + '</div>'
+        : '')
+
+    + '</div>'
+    // ── END STICKY BAR ─────────────────────────────────────────
+
     // Table
     + '<div class="card" style="padding:0;overflow:hidden;">'
     + '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;">'
@@ -8964,15 +9081,48 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
     + '<tbody>' + rowsHtml + '</tbody>'
     + '</table></div></div>';
 
+  // ── ATTACH EVENTS ────────────────────────────────────────────
+
   // Back button
   const backBtn = root.querySelector('#cat-back-btn');
   if (backBtn) backBtn.addEventListener('click', () => _renderCatLevel1(mat));
 
-  // Sub-type pill filters
+  // Live search — instant with debounce
+  const searchEl = root.querySelector('#cat-live-search');
+  const clearEl  = root.querySelector('#cat-search-clear');
+  let searchTimer;
+  if (searchEl) {
+    searchEl.addEventListener('input', function() {
+      const val = this.value;
+      if (clearEl) clearEl.style.display = val ? '' : 'none';
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        _renderCatSubTypes(catId, mat, filterSubType, val);
+        // Restore focus + cursor position
+        const newEl = document.getElementById('cat-live-search');
+        if (newEl) { newEl.focus(); newEl.setSelectionRange(val.length, val.length); }
+      }, 180);
+    });
+    // Focus the search if there was a query
+    if (searchQuery) setTimeout(() => {
+      if (searchEl) { searchEl.focus(); searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length); }
+    }, 20);
+  }
+
+  // Clear button
+  if (clearEl) {
+    clearEl.addEventListener('click', () => {
+      _renderCatSubTypes(catId, mat, filterSubType, '');
+      setTimeout(() => { const el = document.getElementById('cat-live-search'); if (el) el.focus(); }, 20);
+    });
+  }
+
+  // Sub-type pill clicks
   root.querySelectorAll('[data-sub]').forEach(btn => {
     btn.addEventListener('click', function() {
-      const sub = this.dataset.sub;
-      _renderCatSubTypes(catId, mat, sub || null);
+      const sub = this.dataset.sub || null;
+      const currentSearch = document.getElementById('cat-live-search')?.value || '';
+      _renderCatSubTypes(catId, mat, sub, currentSearch);
     });
   });
 
@@ -9181,52 +9331,30 @@ function hidePolDropdown(idx) {
 // ═══════════════════════════════════════════════════════════════
 
 // ── LOAD ─────────────────────────────────────────────────────
-// loadPOs removed
-
-
-// loadAndRenderPOs removed
 
 
 // ── RENDER LIST ───────────────────────────────────────────────
-// renderPOs removed
 
 
 // ── OPEN NEW PO ───────────────────────────────────────────────
-// openNewPO removed
 
 
 // ── OPEN EDIT PO ──────────────────────────────────────────────
-// openEditPO removed
 
 
 // ── ADD LINE ──────────────────────────────────────────────────
-// addPOLine removed
-
-
-// recalcPOL removed
-
-
-// removePOL removed
-
-
-// updatePOTotals removed
 
 
 // ── SAVE PO ───────────────────────────────────────────────────
-// savePO removed
 
 
 // ── UPDATE STATUS ─────────────────────────────────────────────
-// updatePOStatus removed
 
 
 // ── DELETE PO ─────────────────────────────────────────────────
-// deletePO removed
 
 
 // ── SCHEMA NOTICE ─────────────────────────────────────────────
-// showPOSchemaNotice removed
-
 
 
 // ═══════════════════════════════════════════════════════════════
