@@ -1398,7 +1398,13 @@ window.onerror = function(msg, src, line, col, err) {
 
     <!-- SETTINGS (Admin only) -->
     <div class="page" id="page-settings">
-      <div class="page-header"><div class="page-header-title"><h1>Settings</h1><p>System configuration</p></div></div>
+      <div class="page-header">
+        <div class="page-header-title"><h1>Settings</h1><p>System configuration</p></div>
+        <button class="btn btn-outline admin-only" onclick="openCatMatrixModal()"
+          style="display:flex;align-items:center;gap:6px;">
+          📊 Catalogue Matrix
+        </button>
+      </div>
       <!-- System settings row -->
       <div class="grid-2" style="margin-bottom:18px">
         <div class="card">
@@ -2376,6 +2382,8 @@ async function loadSettings() {
     const el = document.getElementById('low-stock-threshold');
     if (el) el.value = settings.lowStockThreshold;
   }
+  // Load catalogue matrix
+  if (typeof loadCatMatrix === 'function') loadCatMatrix();
   if (settings.vatRate) { const el = document.getElementById('vat-rate'); if (el) el.value = settings.vatRate; }
   if (settings.crNumber) { const el = document.getElementById('cr-number'); if (el) el.value = settings.crNumber; }
   if (settings.vatNumber) { const el = document.getElementById('vat-number'); if (el) el.value = settings.vatNumber; }
@@ -8769,7 +8777,9 @@ function _renderCatLevel1(mat) {
   const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
 
   // Build category rows
-  const rows = CATALOGUE_CATEGORIES.map(cat => {
+  // Filter categories based on admin matrix config
+  const visibleCats = CATALOGUE_CATEGORIES.filter(cat => isCatEnabled(mat, cat.id));
+  const rows = visibleCats.map(cat => {
     const prods    = matProducts.filter(p => normalizeCatName(p.category) === cat.id);
     const count    = prods.length;
     const lowCount = prods.filter(p =>
@@ -10027,6 +10037,228 @@ confirmImport = async function() {
 };
 
 
+// ═══════════════════════════════════════════════════════════════
+// CATALOGUE MATRIX — Material × Category visibility config
+// Stored in settings table as key='catalogue_matrix', value=JSON
+// ═══════════════════════════════════════════════════════════════
+
+// All materials in catalogue (order matters for display)
+const CAT_MATRIX_MATERIALS = [
+  'CS','SS','GI','BMI','Brass','Bronze','Copper',
+  'PVC','CPVC','PPR','HDPE',
+  'Electrical','Safety Equipment','Hardware & Tools',
+  'Clamps','Fasteners','Gaskets'
+];
+
+// All categories that can appear under each material
+const CAT_MATRIX_CATEGORIES = [
+  'Valves','Pipes & Tubes','Fittings','Forged Steel Fittings','Flanges',
+  'Rods / Bars / Beams','Electrical','Safety Equipment','Instruments',
+  'Hardware & Tools','Clamps','Fasteners','Gaskets','Other'
+];
+
+// In-memory matrix: { 'CS': { 'Valves': true, 'Pipes & Tubes': true, ... }, ... }
+// null/undefined = enabled (default all on)
+let catMatrix = {};
+
+// Load matrix from settings
+function loadCatMatrix() {
+  const raw = settings && settings.catalogue_matrix;
+  if (raw) {
+    try {
+      catMatrix = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch(e) { catMatrix = {}; }
+  } else {
+    catMatrix = {};
+  }
+}
+
+// Check if a category is enabled for a material
+function isCatEnabled(material, categoryId) {
+  if (!catMatrix[material]) return true; // default: all enabled
+  if (catMatrix[material][categoryId] === false) return false;
+  return true;
+}
+
+// Save matrix to Supabase settings table
+async function saveCatMatrix() {
+  try {
+    const json = JSON.stringify(catMatrix);
+    const { error } = await sb.from('settings').upsert(
+      { key: 'catalogue_matrix', value: json },
+      { onConflict: 'key' }
+    );
+    if (error) throw error;
+    settings.catalogue_matrix = json;
+    showToast('Catalogue matrix saved!');
+    // Re-render catalogue if open
+    if (typeof _catMat !== 'undefined' && _catMat) _renderCatLevel1(_catMat);
+  } catch(e) {
+    showToast('Save failed: ' + e.message, 'error');
+  }
+}
+
+// Toggle a cell in the matrix
+function toggleCatMatrixCell(mat, cat) {
+  if (!catMatrix[mat]) catMatrix[mat] = {};
+  const current = catMatrix[mat][cat] !== false; // currently enabled
+  catMatrix[mat][cat] = !current; // toggle
+  // Update checkbox UI
+  const cb = document.getElementById('cm-' + mat.replace(/[^a-z0-9]/gi,'_') + '-' + cat.replace(/[^a-z0-9]/gi,'_'));
+  if (cb) cb.checked = !current;
+  updateMatrixRowCount(mat);
+}
+
+function updateMatrixRowCount(mat) {
+  const enabled = CAT_MATRIX_CATEGORIES.filter(c => isCatEnabled(mat, c)).length;
+  const countEl = document.getElementById('cm-count-' + mat.replace(/[^a-z0-9]/gi,'_'));
+  if (countEl) countEl.textContent = enabled + '/' + CAT_MATRIX_CATEGORIES.length + ' categories';
+}
+
+// Enable / disable all for a material
+function setAllForMaterial(mat, enabled) {
+  if (!catMatrix[mat]) catMatrix[mat] = {};
+  CAT_MATRIX_CATEGORIES.forEach(c => { catMatrix[mat][c] = enabled; });
+  renderCatMatrixGrid();
+}
+
+// ── RENDER THE MANAGEMENT GRID ────────────────────────────────
+function openCatMatrixModal() {
+  loadCatMatrix();
+  const modal = document.getElementById('modal-cat-matrix');
+  if (!modal) return;
+  renderCatMatrixGrid();
+  openModal('modal-cat-matrix');
+}
+
+function renderCatMatrixGrid() {
+  const container = document.getElementById('cat-matrix-grid');
+  if (!container) return;
+
+  // Header row
+  let html = '<div style="overflow-x:auto;">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    + '<thead><tr>'
+    + '<th style="padding:8px 12px;text-align:left;background:var(--surface2);border:1px solid var(--border);min-width:140px;position:sticky;left:0;z-index:1;">Material</th>';
+
+  CAT_MATRIX_CATEGORIES.forEach(cat => {
+    const short = cat.replace('Pipes & Tubes','Pipes').replace('Forged Steel Fittings','Forged').replace('Rods / Bars / Beams','Rods').replace('Hardware & Tools','Hardware').replace('Safety Equipment','Safety');
+    html += '<th style="padding:6px 4px;text-align:center;background:var(--surface2);border:1px solid var(--border);min-width:68px;font-size:10px;color:var(--text-muted);">'
+      + '<div style="writing-mode:vertical-rl;transform:rotate(180deg);height:80px;display:flex;align-items:center;justify-content:center;">' + short + '</div>'
+      + '</th>';
+  });
+  html += '<th style="padding:8px;background:var(--surface2);border:1px solid var(--border);min-width:110px;">Count</th>'
+    + '<th style="padding:8px;background:var(--surface2);border:1px solid var(--border);min-width:120px;">Quick Set</th>'
+    + '</tr></thead><tbody>';
+
+  // Material rows
+  CAT_MATRIX_MATERIALS.forEach(mat => {
+    const matId = mat.replace(/[^a-z0-9]/gi,'_');
+    const mc = (typeof CATALOGUE_MATERIALS !== 'undefined' && CATALOGUE_MATERIALS[mat]) || {};
+    const color = mc.color || '#64748b';
+    const enabled = CAT_MATRIX_CATEGORIES.filter(c => isCatEnabled(mat, c)).length;
+
+    html += '<tr>'
+      + '<td style="padding:8px 12px;border:1px solid var(--border);background:var(--surface);position:sticky;left:0;z-index:1;">'
+      + '<span style="font-weight:600;color:' + color + ';">' + mat + '</span>'
+      + '</td>';
+
+    CAT_MATRIX_CATEGORIES.forEach(cat => {
+      const catId = cat.replace(/[^a-z0-9]/gi,'_');
+      const checked = isCatEnabled(mat, cat);
+      const cbId = 'cm-' + matId + '-' + catId;
+      html += '<td style="padding:0;text-align:center;border:1px solid var(--border);background:' + (checked ? 'var(--surface)' : '#fef2f2') + ';" id="td-' + cbId + '">'
+        + '<label style="display:flex;align-items:center;justify-content:center;width:100%;height:38px;cursor:pointer;margin:0;">'
+        + '<input type="checkbox" id="' + cbId + '" ' + (checked ? 'checked' : '') + ' '
+        + 'onchange="catMatrix[\'' + mat.replace(/'/g,"\\'") + '\'][\'' + cat.replace(/'/g,"\\'") + '\'] = this.checked; document.getElementById(\'td-' + cbId + '\').style.background = this.checked ? \'var(--surface)\' : \'#fef2f2\'; updateMatrixRowCount(\'' + matId + '\');">'
+        + '</label></td>';
+    });
+
+    html += '<td style="padding:8px;border:1px solid var(--border);text-align:center;">'
+      + '<span id="cm-count-' + matId + '" style="font-size:11px;color:var(--text-muted);">' + enabled + '/' + CAT_MATRIX_CATEGORIES.length + ' categories</span>'
+      + '</td>'
+      + '<td style="padding:6px 8px;border:1px solid var(--border);">'
+      + '<div style="display:flex;gap:4px;">'
+      + '<button onclick="setAllForMaterial(\'' + mat.replace(/'/g,"\\'") + '\',true)" class="btn btn-sm btn-outline" style="font-size:10px;padding:3px 8px;">All ✓</button>'
+      + '<button onclick="setAllForMaterial(\'' + mat.replace(/'/g,"\\'") + '\',false)" class="btn btn-sm btn-outline" style="font-size:10px;padding:3px 8px;">None ✗</button>'
+      + '</div>'
+      + '</td></tr>';
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+// ── PATCH _renderCatLevel1 TO FILTER BY MATRIX ────────────────
+const _origRenderCatLevel1 = _renderCatLevel1;
+_renderCatLevel1 = function(mat) {
+  loadCatMatrix(); // ensure fresh
+  _origRenderCatLevel1(mat);
+};
+
+// Override the category rows rendering to hide disabled categories
+// This patches the rows variable in _renderCatLevel1
+// We do it by filtering CATALOGUE_CATEGORIES before the render
+const _origCATALOGUE_CATEGORIES_filter = function(mat) {
+  return (typeof CATALOGUE_CATEGORIES !== 'undefined')
+    ? CATALOGUE_CATEGORIES.filter(cat => isCatEnabled(mat, cat.id))
+    : [];
+};
+
+// Make isCatEnabled available globally for template access
+window.isCatEnabled = isCatEnabled;
+
+// ── PATCH p-category DROPDOWN ─────────────────────────────────
+// Filter category dropdown when material changes in Add/Edit Product
+const _origCheckOtherMaterial = typeof checkOtherMaterial === 'function' ? checkOtherMaterial : null;
+
+function filterCategoryByMaterial() {
+  const mat = document.getElementById('p-material')?.value || '';
+  const catSel = document.getElementById('p-category');
+  if (!catSel || !mat) return;
+
+  const allOpts = Array.from(catSel.querySelectorAll('option'));
+  allOpts.forEach(opt => {
+    const catName = opt.value || opt.textContent;
+    const enabled = isCatEnabled(mat, catName);
+    opt.style.display = enabled ? '' : 'none';
+    opt.disabled = !enabled;
+  });
+
+  // If current selection is now disabled, pick first enabled
+  const currentOpt = catSel.options[catSel.selectedIndex];
+  if (currentOpt && currentOpt.disabled) {
+    const firstEnabled = allOpts.find(o => !o.disabled);
+    if (firstEnabled) catSel.value = firstEnabled.value || firstEnabled.textContent;
+    populateSubtypeOptions && populateSubtypeOptions();
+  }
+}
+
+// Hook into material change
+document.addEventListener('DOMContentLoaded', () => {
+  const matSel = document.getElementById('p-material');
+  if (matSel) {
+    const orig = matSel.onchange;
+    matSel.addEventListener('change', () => {
+      if (orig) orig.call(matSel);
+      setTimeout(filterCategoryByMaterial, 10);
+    });
+  }
+});
+
+// Also call when product modal opens
+const _origOpenAddProd = openAddProduct;
+openAddProduct = function() {
+  _origOpenAddProd();
+  setTimeout(filterCategoryByMaterial, 80);
+};
+
+const _origOpenEditProd = openEditProduct;
+openEditProduct = function(id) {
+  _origOpenEditProd(id);
+  setTimeout(filterCategoryByMaterial, 120);
+};
+
 window.addEventListener('DOMContentLoaded', init);
 </script>
 
@@ -10350,6 +10582,26 @@ window.addEventListener('DOMContentLoaded', init);
     <div class="modal-footer" style="justify-content:center;">
       <button class="btn btn-outline" onclick="closeModal('modal-delete-quot')">Cancel</button>
       <button class="btn btn-danger" onclick="confirmDeleteQuotation()">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATALOGUE MATRIX MODAL -->
+<div class="modal-overlay" id="modal-cat-matrix">
+  <div class="modal" style="max-width:95vw;width:1100px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-title">
+      📊 Catalogue Category Matrix
+      <span style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:8px;">Admin only — control which categories appear for each material</span>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+      ✓ = category visible in catalogue &nbsp;|&nbsp; ✗ = hidden from catalogue and product form
+    </p>
+    <div id="cat-matrix-grid">
+      <div style="text-align:center;padding:32px;color:var(--text-muted);">Loading...</div>
+    </div>
+    <div class="modal-footer" style="margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeModal('modal-cat-matrix')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveCatMatrix().then(()=>closeModal('modal-cat-matrix'))">💾 Save Changes</button>
     </div>
   </div>
 </div>
