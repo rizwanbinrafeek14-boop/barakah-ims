@@ -962,6 +962,21 @@ window.onerror = function(msg, src, line, col, err) {
         <span>Hardware</span>
         <span id="nav-badge-Hardware & Tools" style="margin-left:auto;font-size:10px;color:#0891b2;font-weight:700;opacity:.8"></span>
       </div>
+      <div class="nav-item" onclick="showCataloguePage('Clamps')" id="nav-catalogue-clamps" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#0f766e;flex-shrink:0;display:inline-block"></span>
+        <span>Clamps</span>
+        <span id="nav-badge-Clamps" style="margin-left:auto;font-size:10px;color:#0f766e;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('Fasteners')" id="nav-catalogue-fasteners" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#7c3aed;flex-shrink:0;display:inline-block"></span>
+        <span>Fasteners</span>
+        <span id="nav-badge-Fasteners" style="margin-left:auto;font-size:10px;color:#7c3aed;font-weight:700;opacity:.8"></span>
+      </div>
+      <div class="nav-item" onclick="showCataloguePage('Gaskets')" id="nav-catalogue-gaskets" style="padding-left:20px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#be185d;flex-shrink:0;display:inline-block"></span>
+        <span>Gaskets</span>
+        <span id="nav-badge-Gaskets" style="margin-left:auto;font-size:10px;color:#be185d;font-weight:700;opacity:.8"></span>
+      </div>
 
       <div class="nav-item" onclick="showPage('movements')" id="nav-movements"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="nav-label">Stock Movements</span></div>
       <div class="nav-item" onclick="showPage('quotations')" id="nav-quotations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span class="nav-label">Quotations</span></div>
@@ -1544,7 +1559,75 @@ window.onerror = function(msg, src, line, col, err) {
     <input type="hidden" id="edit-product-id">
     <div class="grid-2">
       <div class="field"><label>Product Name *</label><input type="text" id="p-name" placeholder="e.g. Gate Valve 2 inch"></div>
-      <div class="field"><label>Product Code</label><input type="text" id="p-code" placeholder="e.g. GV-2IN-SS"></div>
+      <div class="field">
+        <label>Product Code
+          <span style="font-size:10px;color:var(--text-muted);font-weight:400;text-transform:none;margin-left:6px;">— built from selectors below or type manually</span>
+        </label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" id="p-code" placeholder="e.g. CSGV40-009"
+            style="flex:1;"
+            oninput="this.dataset.manual='true'">
+          <button type="button" onclick="buildCodeFromSelectors()" title="Generate code"
+            style="padding:9px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--gold);
+                   background:var(--gold-light,#fffbeb);color:var(--gold);font-size:12px;font-weight:700;
+                   cursor:pointer;white-space:nowrap;flex-shrink:0;">⚡ Build</button>
+          <button type="button" onclick="clearCode()" title="Clear code"
+            style="padding:9px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);
+                   background:var(--surface2);color:var(--text-muted);font-size:12px;cursor:pointer;flex-shrink:0;">✕</button>
+        </div>
+        <!-- Code builder selectors (shown when ⚡ Build clicked) -->
+        <div id="code-builder" style="display:none;margin-top:8px;padding:12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:8px;">Code Builder</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">SCHEDULE / CLASS</div>
+              <select id="cb-schedule" onchange="assembleCode()"
+                style="width:100%;padding:6px 8px;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;">
+                <option value="">None</option>
+                <option>40</option><option>80</option><option>160</option>
+                <option>20</option><option>10S</option><option>STD</option><option>XS</option><option>XXS</option>
+                <option>150</option><option>300</option><option>600</option><option>900</option><option>1500</option>
+                <option>P10</option><option>P16</option><option>P25</option><option>P40</option>
+                <option>NPT</option><option>BSP</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">SIZE</div>
+              <select id="cb-size" onchange="assembleCode()"
+                style="width:100%;padding:6px 8px;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;">
+                <option value="">None</option>
+                <option value="001">1/8"</option><option value="002">1/4"</option><option value="003">3/8"</option>
+                <option value="004">1/2"</option><option value="005">3/4"</option><option value="006">1"</option>
+                <option value="007">1¼"</option><option value="008">1½"</option><option value="009">2"</option>
+                <option value="010">2½"</option><option value="011">3"</option><option value="012">3½"</option>
+                <option value="013">4"</option><option value="014">5"</option><option value="015">6"</option>
+                <option value="016">8"</option><option value="017">10"</option><option value="018">12"</option>
+                <option value="019">14"</option><option value="020">16"</option><option value="021">18"</option>
+                <option value="022">20"</option><option value="023">22"</option><option value="024">24"</option>
+                <option value="025">26"</option><option value="026">28"</option><option value="027">30"</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">SUFFIX (optional)</div>
+              <input type="text" id="cb-suffix" placeholder="e.g. APP600, KIT"
+                style="width:100%;padding:6px 8px;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;"
+                oninput="assembleCode()">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">PREVIEW</div>
+              <div id="cb-preview" style="padding:6px 8px;background:var(--surface);border:1.5px solid var(--gold);border-radius:6px;font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);min-height:32px;"></div>
+            </div>
+          </div>
+          <button type="button" onclick="applyCbCode()"
+            style="padding:6px 16px;border-radius:var(--radius-sm);border:none;background:var(--gold);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">
+            ✓ Use This Code
+          </button>
+          <button type="button" onclick="document.getElementById('code-builder').style.display='none'"
+            style="padding:6px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:12px;cursor:pointer;margin-left:6px;">
+            Close
+          </button>
+        </div>
+      </div>
     </div>
     <div class="grid-2">
       <div class="field"><label>Category</label>
@@ -1559,6 +1642,9 @@ window.onerror = function(msg, src, line, col, err) {
                 <option>Safety Equipment</option>
                 <option>Instruments</option>
                 <option>Hardware &amp; Tools</option>
+                <option>Clamps</option>
+                <option>Fasteners</option>
+                <option>Gaskets</option>
                 <option>Other</option>
               </select>
       </div>
@@ -1830,6 +1916,49 @@ window.onerror = function(msg, src, line, col, err) {
             <option value="50">50 rows (fewer API calls)</option>
           </select>
         </div>
+      </div>
+      <!-- Category & Sub-type override for import -->
+      <div style="background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;">
+          📂 Category Override <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">(optional — apply to all imported rows)</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field" style="margin:0;">
+            <label style="font-size:11px;">Category</label>
+            <div style="position:relative;">
+              <select id="import-override-category" onchange="updateImportSubtypeOptions()"
+                style="width:100%;padding:9px 12px;background:var(--surface);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;">
+                <option value="">— Let AI decide —</option>
+                <option>Valves</option><option>Pipes &amp; Tubes</option><option>Fittings</option>
+                <option>Forged Steel Fittings</option><option>Flanges</option>
+                <option>Rods / Bars / Beams</option><option>Electrical</option>
+                <option>Safety Equipment</option><option>Instruments</option>
+                <option>Hardware &amp; Tools</option><option>Clamps</option>
+                <option>Fasteners</option><option>Gaskets</option><option>Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin:0;">
+            <label style="font-size:11px;">Sub-type</label>
+            <div style="position:relative;">
+              <input type="text" id="import-override-subtype-search" placeholder="Search or type new sub-type..."
+                autocomplete="off"
+                style="width:100%;padding:9px 12px;background:var(--surface);border:1.5px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none;"
+                oninput="filterImportSubtypes(this.value)"
+                onfocus="showImportSubtypeDropdown()"
+                onblur="setTimeout(hideImportSubtypeDropdown,200)">
+              <div id="import-subtype-dropdown"
+                style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);
+                       border:1.5px solid var(--gold);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.12);
+                       z-index:9999;max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">
+          💡 If set, all imported rows will use this category/sub-type. Leave blank to let AI determine per row.
+        </div>
+      </div>
+      <div class="grid-2" style="display:none;">
       </div>
       <div class="field">
         <label>Select Excel or CSV file</label>
@@ -7110,6 +7239,9 @@ const CATALOGUE_MATERIALS = {
   Electrical:       { label:'Electrical Items',       color:'#b45309', bg:'#fffbeb', border:'#fde68a', icon:'⚡' },
   'Safety Equipment': { label:'Safety Equipment',     color:'#dc2626', bg:'#fef2f2', border:'#fecaca', icon:'🦺' },
   'Hardware & Tools': { label:'Hardware & Tools',     color:'#0891b2', bg:'#ecfeff', border:'#a5f3fc', icon:'🔩' },
+  'Clamps':           { label:'Clamps',                color:'#0f766e', bg:'#f0fdfa', border:'#99f6e4', icon:'🔗' },
+  'Fasteners':        { label:'Fasteners',             color:'#7c3aed', bg:'#f5f3ff', border:'#ddd6fe', icon:'🔩' },
+  'Gaskets':          { label:'Gaskets',               color:'#be185d', bg:'#fdf2f8', border:'#f9a8d4', icon:'⭕' },
 };
 
 const CATALOGUE_CATEGORIES = [
@@ -7124,6 +7256,9 @@ const CATALOGUE_CATEGORIES = [
   { id:'Instruments',           icon:'📊', subtypes:['Pressure Gauge','Temperature Gauge','Flow Meter','Level Sensor','Transmitter','Valve Actuator','Control Valve'] },
   { id:'Other',                 icon:'📦', subtypes:[] },
   { id:'Hardware & Tools',      icon:'🔩', subtypes:['Bolt & Nut','Washer','Stud Bolt','Anchor Bolt','Threaded Rod','Chain','Wire Rope','Clamp','Hanger','Support','Gasket','O-Ring','Seal'] },
+  { id:'Clamps',    icon:'🔗', subtypes:['Pipe Clamp','U-Bolt Clamp','Grip Clamp','Beam Clamp','Hose Clamp','Cable Clamp','Rod Clamp','Saddle Clamp'] },
+  { id:'Fasteners', icon:'🔩', subtypes:['Bolt & Nut','Stud Bolt','Anchor Bolt','Hex Bolt','Eye Bolt','Carriage Bolt','Washer','Spring Washer','Flat Washer','Threaded Rod','Machine Screw','Self-Drilling Screw'] },
+  { id:'Gaskets',   icon:'⭕', subtypes:['Ring Gasket','Full Face Gasket','Spiral Wound Gasket','Sheet Gasket','O-Ring','Rubber Seal','PTFE Gasket','Rubber Sheet','Expansion Joint'] },
 ];
 
 let _catCurrentMat = null; // legacy, use _catMat
@@ -7215,7 +7350,7 @@ function renderCatProducts() {
 
 // ── UPDATE NAV BADGES ─────────────────────────────────────────
 function updateCatNavBadges() {
-  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools'];
+  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools', 'Clamps', 'Fasteners', 'Gaskets'];
   Object.keys(CATALOGUE_MATERIALS).forEach(mat => {
     const badge = document.getElementById(`nav-badge-${mat}`);
     if (!badge) return;
@@ -7727,6 +7862,9 @@ const BULK_SUBTYPES = {
   'Fittings': ['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'],
   'Forged Steel Fittings': ['Coupling','Bush','End Cap','Sockolet','Weld Olet','Tee','Elbow','Con Red','Ecc Red','Pipe Nipple','Swage Nipple'],
   'Hardware & Tools': ['Bolt & Nut','Washer','Stud Bolt','Anchor Bolt','Threaded Rod','Chain','Wire Rope','Clamp','Hanger','Support','Gasket','O-Ring','Seal'],
+    'Clamps': ['Pipe Clamp','U-Bolt Clamp','Grip Clamp','Beam Clamp','Hose Clamp','Cable Clamp','Rod Clamp','Saddle Clamp'],
+    'Fasteners': ['Bolt & Nut','Stud Bolt','Anchor Bolt','Hex Bolt','Eye Bolt','Carriage Bolt','Washer','Spring Washer','Flat Washer','Threaded Rod','Machine Screw'],
+    'Gaskets': ['Ring Gasket','Full Face Gasket','Spiral Wound Gasket','Sheet Gasket','O-Ring','Rubber Seal','PTFE Gasket','Rubber Sheet','Expansion Joint'],
   'Electrical': ['Cable','Conduit','Junction Box','Switch','MCB','Panel','Cable Tray','Gland','Socket'],
   'Safety Equipment': ['Helmet','Gloves','Safety Boots','Harness','Goggles','Ear Muffs','Hi-Vis Vest','Face Shield'],
   'Instruments': ['Pressure Gauge','Temperature Gauge','Flow Meter','Level Sensor','Transmitter'],
@@ -8623,7 +8761,7 @@ function _renderCatLevel1(mat) {
   _catCat = null;
 
   const mc = CATALOGUE_MATERIALS[mat] || { label: mat, color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
-  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools'];
+  const CATEGORY_PAGES = ['Electrical', 'Safety Equipment', 'Hardware & Tools', 'Clamps', 'Fasteners', 'Gaskets'];
   const matProducts = CATEGORY_PAGES.includes(mat)
     ? allProducts.filter(p => (p.category || 'Other') === mat)
     : allProducts.filter(p => (p.material || 'Other') === mat);
@@ -8721,7 +8859,7 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
   if (!root) return;
 
   const mc = CATALOGUE_MATERIALS[mat] || { label:mat, color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' };
-  const CATEGORY_PAGES = ['Electrical','Safety Equipment','Hardware & Tools'];
+  const CATEGORY_PAGES = ['Electrical','Safety Equipment','Hardware & Tools','Clamps','Fasteners','Gaskets'];
   const matProds = CATEGORY_PAGES.includes(mat)
     ? allProducts.filter(p => (p.category||'Other') === mat)
     : allProducts.filter(p => (p.material||'Other') === mat);
@@ -9247,7 +9385,7 @@ function catSearchLevel1(query, mat) {
   const q = query.toLowerCase().trim();
   if (!q) { _renderCatLevel1(mat); return; }
 
-  const CATEGORY_PAGES = ['Electrical','Safety Equipment','Hardware & Tools'];
+  const CATEGORY_PAGES = ['Electrical','Safety Equipment','Hardware & Tools','Clamps','Fasteners','Gaskets'];
   const matProds = CATEGORY_PAGES.includes(mat)
     ? allProducts.filter(p => (p.category||'Other') === mat)
     : allProducts.filter(p => (p.material||'Other') === mat);
@@ -9673,6 +9811,221 @@ async function deletePO(id, poNo) {
     hideLoading(); renderPOs(); showToast('PO deleted.');
   } catch(e) { hideLoading(); showToast('Failed: '+e.message,'error'); }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCT CODE BUILDER (dropdown-based)
+// ═══════════════════════════════════════════════════════════════
+
+// Type codes for code builder
+const CB_TYPE_CODES = {
+  'Valves':{'Gate Valve':'GV','Ball Valve':'BV','Check Valve':'CVT','Globe Valve':'GLV',
+    'Butterfly Valve':'BFV','Y Stainer':'YS','Air Vents':'AV','Storm Valve':'STV',
+    'Angle Valve':'ANV','Hose Valve':'HV'},
+  'Pipes & Tubes':{'Seamless Pipe (SMLS)':'PS','ERW Pipe':'PERW','Welded Pipe':'PWLD',
+    'Square Tube':'TSQ','Rectangular Tube':'TRC','Round Tube':'TRD','Line Pipe':'PL'},
+  'Fittings':{'Coupling':'CPL','Bush':'BSH','End Cap':'CAP','Sockolet':'SOL',
+    'Weld Olet':'WOL','Tee':'TEE','Elbow':'EL','Con Red':'CR','Ecc Red':'ER',
+    'Pipe Nipple':'PNPL','Swage Nipple':'SN','Female Adapter':'FA','Male Adapter':'MA'},
+  'Forged Steel Fittings':{'Socket Weld':'SW','Threaded':'THR','Weld Neck':'WN'},
+  'Flanges':{'Slip-On':'FLSO','Socket Weld':'FLSW','Blind':'FLBL',
+    'Threaded':'FLTHR','Lap Joint':'FLLJ','Weld Neck':'FLWN'},
+  'Clamps':{'Pipe Clamp':'CLP','U-Bolt Clamp':'UBC','Grip Clamp':'GRC',
+    'Beam Clamp':'BEC','Hose Clamp':'HCL','Cable Clamp':'CCL','Saddle Clamp':'SCL'},
+  'Fasteners':{'Bolt & Nut':'BN','Stud Bolt':'SB','Anchor Bolt':'AB','Hex Bolt':'HB',
+    'Eye Bolt':'EB','Washer':'WSH','Spring Washer':'SPW','Threaded Rod':'TR'},
+  'Gaskets':{'Ring Gasket':'RG','Full Face Gasket':'FFG','Spiral Wound Gasket':'SWG',
+    'O-Ring':'OR','Rubber Seal':'RS','PTFE Gasket':'PTFE','Sheet Gasket':'SHG'},
+  'Hardware & Tools':{'Bolt & Nut':'BN','Stud Bolt':'SB','Gasket':'GSK','O-Ring':'OR'},
+};
+
+const CB_MAT_CODES = {
+  'CS':'CS','SS':'SS','GI':'GI','BMI':'BMI','Brass':'BRS','Bronze':'BRZ',
+  'Copper':'COP','PVC':'PVC','CPVC':'CP','PPR':'PPR','HDPE':'HDP',
+};
+
+function buildCodeFromSelectors() {
+  const cb = document.getElementById('code-builder');
+  if (!cb) return;
+  // Show the builder
+  cb.style.display = 'block';
+  // Reset suffix
+  const suf = document.getElementById('cb-suffix');
+  if (suf) suf.value = '';
+  assembleCode();
+}
+
+function assembleCode() {
+  const mat      = document.getElementById('p-material')?.value || '';
+  const cat      = document.getElementById('p-category')?.value || '';
+  const subtype  = getSubtypeValue ? (getSubtypeValue() || '') : '';
+  const schedule = document.getElementById('cb-schedule')?.value || '';
+  const size     = document.getElementById('cb-size')?.value || '';
+  const suffix   = (document.getElementById('cb-suffix')?.value || '').trim().toUpperCase();
+
+  const matCode  = CB_MAT_CODES[mat] || mat.substring(0,3).toUpperCase();
+  const typeCode = (CB_TYPE_CODES[cat] && CB_TYPE_CODES[cat][subtype]) || subtype.replace(/\s+/g,'').substring(0,4).toUpperCase() || cat.substring(0,2).toUpperCase();
+
+  const parts = [matCode + typeCode];
+  if (schedule) parts[0] += schedule;
+  if (size) parts.push(size);
+  if (suffix) parts.push(suffix);
+
+  const code = parts.join('-');
+  const preview = document.getElementById('cb-preview');
+  if (preview) preview.textContent = code || '—';
+  return code;
+}
+
+function applyCbCode() {
+  const code = assembleCode();
+  if (!code) return;
+  const codeEl = document.getElementById('p-code');
+  if (codeEl) {
+    codeEl.value = code;
+    codeEl.dataset.manual = 'false';
+    codeEl.style.borderColor = 'var(--gold)';
+    setTimeout(() => { if(codeEl) codeEl.style.borderColor = ''; }, 1200);
+  }
+  const cb = document.getElementById('code-builder');
+  if (cb) cb.style.display = 'none';
+}
+
+function clearCode() {
+  const codeEl = document.getElementById('p-code');
+  if (codeEl) { codeEl.value = ''; codeEl.dataset.manual = 'false'; }
+  const cb = document.getElementById('code-builder');
+  if (cb) cb.style.display = 'none';
+}
+
+// Auto-update preview when category/subtype changes
+const _origPopulateSubtype = populateSubtypeOptions;
+populateSubtypeOptions = function() {
+  _origPopulateSubtype();
+  setTimeout(assembleCode, 50);
+};
+
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORT MODAL — CATEGORY & SUBTYPE OVERRIDE
+// ═══════════════════════════════════════════════════════════════
+
+// Custom sub-types created on the fly (persisted in session)
+let _customSubtypes = {};
+
+function updateImportSubtypeOptions() {
+  const cat = document.getElementById('import-override-category')?.value || '';
+  const searchEl = document.getElementById('import-override-subtype-search');
+  if (searchEl) { searchEl.value = ''; searchEl.dataset.value = ''; }
+  filterImportSubtypes('', cat);
+}
+
+function getImportSubtypes(cat) {
+  if (!cat) return [];
+  const catDef = (typeof CATALOGUE_CATEGORIES !== 'undefined')
+    ? CATALOGUE_CATEGORIES.find(c => c.id === cat)
+    : null;
+  const base = catDef ? catDef.subtypes : [];
+  const custom = _customSubtypes[cat] || [];
+  return [...new Set([...base, ...custom])];
+}
+
+function filterImportSubtypes(query, catOverride) {
+  const cat = catOverride || document.getElementById('import-override-category')?.value || '';
+  const drop = document.getElementById('import-subtype-dropdown');
+  if (!drop) return;
+
+  const q = (query || '').toLowerCase().trim();
+  const items = getImportSubtypes(cat);
+  const matches = items.filter(s => !q || s.toLowerCase().includes(q));
+
+  let html = matches.map(s =>
+    '<div onmousedown="selectImportSubtype(\'' + s.replace(/'/g,"\\'") + '\')" '
+    + 'style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);" '
+    + 'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+    + s + '</div>'
+  ).join('');
+
+  // Always show "Create new" option if query doesn't exactly match
+  if (cat && (!matches.includes(query) && q)) {
+    html += '<div onmousedown="createImportSubtype(\'' + (query||'').replace(/'/g,"\\'") + '\',\'' + cat.replace(/'/g,"\\'") + '\')" '
+      + 'style="padding:9px 12px;cursor:pointer;border-top:2px solid var(--gold);color:var(--gold);font-weight:600;" '
+      + 'onmouseover="this.style.background=\'var(--gold-light,#fffbeb)\'" onmouseout="this.style.background=\'\'">'
+      + '+ Create "' + (query || '') + '" as new sub-type</div>';
+  } else if (cat) {
+    html += '<div onmousedown="createImportSubtype(\'\',\'' + cat.replace(/'/g,"\\'") + '\')" '
+      + 'style="padding:9px 12px;cursor:pointer;border-top:1px solid var(--border);color:var(--gold);font-size:12px;" '
+      + 'onmouseover="this.style.background=\'var(--gold-light,#fffbeb)\'" onmouseout="this.style.background=\'\'">'
+      + '+ Create new sub-type...</div>';
+  }
+
+  if (!html) html = '<div style="padding:10px 12px;color:var(--text-muted);font-size:13px;">Select a category first</div>';
+
+  drop.innerHTML = html;
+  drop.style.display = 'block';
+}
+
+function selectImportSubtype(value) {
+  const el = document.getElementById('import-override-subtype-search');
+  if (el) { el.value = value; el.dataset.value = value; }
+  hideImportSubtypeDropdown();
+}
+
+function createImportSubtype(name, cat) {
+  let newName = name;
+  if (!newName) {
+    newName = prompt('Enter new sub-type name for ' + cat + ':');
+  }
+  if (!newName || !newName.trim()) return;
+  newName = newName.trim();
+  if (!_customSubtypes[cat]) _customSubtypes[cat] = [];
+  if (!_customSubtypes[cat].includes(newName)) {
+    _customSubtypes[cat].push(newName);
+  }
+  // Also add to CATALOGUE_CATEGORIES if present
+  if (typeof CATALOGUE_CATEGORIES !== 'undefined') {
+    const catDef = CATALOGUE_CATEGORIES.find(c => c.id === cat);
+    if (catDef && !catDef.subtypes.includes(newName)) catDef.subtypes.push(newName);
+  }
+  selectImportSubtype(newName);
+  showToast('"' + newName + '" added to ' + cat + ' sub-types!');
+}
+
+function showImportSubtypeDropdown() {
+  const cat = document.getElementById('import-override-category')?.value || '';
+  const query = document.getElementById('import-override-subtype-search')?.value || '';
+  filterImportSubtypes(query, cat);
+}
+
+function hideImportSubtypeDropdown() {
+  const drop = document.getElementById('import-subtype-dropdown');
+  if (drop) drop.style.display = 'none';
+}
+
+// Patch confirmImport / startSmartImport to apply override category/subtype
+const _origStartSmartImport = startSmartImport;
+startSmartImport = async function() {
+  // Store override values before AI runs
+  window._importCatOverride = document.getElementById('import-override-category')?.value || '';
+  window._importSubOverride = document.getElementById('import-override-subtype-search')?.dataset?.value
+    || document.getElementById('import-override-subtype-search')?.value || '';
+  await _origStartSmartImport();
+};
+
+// Patch _importPreview forEach to apply overrides
+const _origConfirmImport = confirmImport;
+confirmImport = async function() {
+  // Apply category/subtype overrides to all preview items
+  const catOv = window._importCatOverride || '';
+  const subOv = window._importSubOverride || '';
+  if ((catOv || subOv) && Array.isArray(_importPreview)) {
+    _importPreview.forEach(p => {
+      if (catOv) p.type = catOv;
+      if (subOv) p.sub_type = subOv;
+    });
+  }
+  await _origConfirmImport();
+};
+
 
 window.addEventListener('DOMContentLoaded', init);
 </script>
