@@ -506,7 +506,6 @@ h1,h2,h3,h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 /* ── PAGE ── */
 .page { display: none; padding: 24px; }
 .page.active { display: block !important; opacity: 1 !important; visibility: visible !important; }
-#page-purchase-orders.active { display: block !important; }
 #page-catalogue { padding: 12px 20px 24px; }
 @keyframes pageIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
@@ -830,6 +829,25 @@ input[type=file].photo-picker { position: absolute; width: 1px; height: 1px; opa
 .inv-dd-item:last-child { border-bottom: none; }
 .inv-dd-item:hover { background: var(--surface2); }
 .inv-dd-item.active { font-weight: 700; color: var(--gold); background: var(--gold-light, #fffbeb); }
+
+/* Catalogue sub-type dropdown */
+.cat-dd-item {
+  display: flex; align-items: center; gap:8px; padding: 9px 12px;
+  cursor: pointer; border-bottom: 1px solid var(--border);
+  font-size: 13px; transition: background .1s;
+}
+.cat-dd-item:last-child { border-bottom: none; }
+.cat-dd-item:hover { background: var(--surface2); }
+.cat-dd-check {
+  width: 18px; height: 18px; border: 1.5px solid var(--border);
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+  background: var(--surface2); color: var(--gold);
+}
+.cat-dd-count {
+  margin-left: auto; font-size: 11px; color: var(--text-muted);
+  background: var(--surface2); padding: 1px 6px; border-radius: 99px;
+}
 </style>
 
 
@@ -988,7 +1006,7 @@ window.onerror = function(msg, src, line, col, err) {
 
       <div class="nav-item" onclick="showPage('movements')" id="nav-movements"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="nav-label">Stock Movements</span></div>
       <div class="nav-item" onclick="showPage('quotations')" id="nav-quotations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span class="nav-label">Quotations</span></div>
-      <div class="nav-item" onclick="showPage('purchase-orders')" id="nav-purchase-orders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg><span class="nav-label">Purchase Orders</span></div>
+
       <div class="nav-item" onclick="showPage('low-stock')" id="nav-low-stock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         Low Stock <span class="notif-dot" id="low-stock-dot" style="display:none;margin-left:auto"></span>
       </div>
@@ -1334,49 +1352,7 @@ window.onerror = function(msg, src, line, col, err) {
         <button class="btn btn-outline" onclick="loadActivityLog()" style="font-size:12px">🔄 Refresh</button>
       </div>
     <!-- PURCHASE ORDERS PAGE -->
-    <div class="page" id="page-purchase-orders">
-      <div class="page-header">
-        <div class="page-header-title">
-          <h1>Purchase Orders</h1>
-          <p>Create and manage supplier POs</p>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline" onclick="loadAndRenderPOs()">🔄 Refresh</button>
-          <button class="btn btn-gold manager-only" onclick="openNewPO()">+ New PO</button>
-        </div>
-      </div>
-      <div class="grid-4" style="margin-bottom:16px;" id="po-stats-row"></div>
-      <div class="card" style="margin-bottom:14px;">
-        <div class="filter-bar">
-          <input class="search-input" type="text" id="po-search" placeholder="🔍 Search PO no. or supplier..." oninput="renderPOs()">
-          <select class="filter-select" id="po-filter-company" onchange="renderPOs()">
-            <option value="">All Companies</option>
-            <option value="bv">Barakah Valves</option>
-            <option value="is">Iron Spring</option>
-            <option value="sw">Stable Way</option>
-          </select>
-          <select class="filter-select" id="po-filter-status" onchange="renderPOs()">
-            <option value="">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="received">Received</option>
-            <option value="partial">Partial</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-      </div>
-      <div class="card" style="padding:0;">
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>PO No.</th><th>Date</th><th>Supplier</th>
-              <th>Company</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th>
-            </tr></thead>
-            <tbody id="po-tbody"><tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    
 
 
       <!-- Filters -->
@@ -2408,7 +2384,7 @@ async function launchApp() {
 
   // Run post-launch tasks in parallel (non-blocking)
   Promise.all([
-    loadPOs().catch(()=>{}),
+
     loadPhotoLibrary().then(()=>{ renderLibraryGrid(); ensurePhotoLibraryTable(); }).catch(()=>{}),
     loadActivityLog().catch(()=>{}),
     Promise.resolve().then(()=>{ updateCatNavBadges(); if(typeof loadCatMatrix==='function') loadCatMatrix(); }),
@@ -2483,7 +2459,7 @@ async function saveSettings() {
 // ─── NAVIGATION ───────────────────────────────────────────────
 const PAGE_TITLES = {
   dashboard:'Dashboard', inventory:'Inventory', movements:'Stock Movements',
-  quotations:'Quotations', 'purchase-orders':'Purchase Orders', 'low-stock':'Low Stock Alerts',
+  quotations:'Quotations', 'low-stock':'Low Stock Alerts',
   'movement-analysis':'Movement Analysis', documents:'Product Documents',
   reports:'Monthly Reports', 'ai-insights':'AI Insights',
   'activity-log':'Activity Log', users:'User Management', settings:'Settings'
@@ -2530,9 +2506,7 @@ function showPage(id) {
     }, 30);
   }
   if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
-  if (id === 'purchase-orders') {
-    setTimeout(() => loadAndRenderPOs(), 80);
-  }
+
   // Update bottom nav
   if (typeof updateBottomNav === 'function') updateBottomNav(id);
   // Close sidebar on mobile
@@ -4930,8 +4904,6 @@ renderProductRow = function(p, threshold, canEdit) {
 // ═══════════════════════════════════════════════════════════════
 let _editingPOId = null;
 
-// Add 'purchase-orders' to PAGE_TITLES
-PAGE_TITLES['purchase-orders'] = 'Purchase Orders';
 
 // Hook into showPage
 
@@ -8456,257 +8428,6 @@ function renderDuplicatesResults(pairs) {
         </div>`;
       }).join('')}
     </div>
-
-    <div style="display:flex;justify-content:flex-end">
-      <button class="btn btn-outline" onclick="document.getElementById('dup-results-overlay').remove()">Close</button>
-    </div>
-  </div>`;
-
-  document.body.appendChild(overlay);
-}
-
-function openMergeModal(idA, idB) {
-  _dupProductA   = allProducts.find(x => x.id === idA);
-  _dupProductB   = allProducts.find(x => x.id === idB);
-  _dupKeepChoice = null;
-
-  if (!_dupProductA || !_dupProductB) { showToast('Product not found', 'error'); return; }
-
-  // Reset UI
-  document.getElementById('dup-merge-step-1').style.display = '';
-  document.getElementById('dup-merge-step-2').style.display = 'none';
-  document.getElementById('dup-keep-a').style.display = 'none';
-  document.getElementById('dup-keep-b').style.display = 'none';
-  document.getElementById('dup-card-a').style.borderColor = 'var(--border)';
-  document.getElementById('dup-card-b').style.borderColor = 'var(--border)';
-  document.getElementById('dup-merge-btn').disabled = true;
-  document.getElementById('dup-merge-btn').style.opacity = '0.5';
-  document.getElementById('dup-merged-preview').style.display = 'none';
-
-  // Render product info cards
-  document.getElementById('dup-info-a').innerHTML = buildProductCard(_dupProductA);
-  document.getElementById('dup-info-b').innerHTML = buildProductCard(_dupProductB);
-
-  openModal('modal-dup-merge');
-}
-
-function buildProductCard(p) {
-  const total = (p.qty_bv||0) + (p.qty_is||0) + (p.qty_sw||0);
-  return `
-    ${p.photo_url ? `<img src="${p.photo_url}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;margin-bottom:10px">` : '<div style="width:100%;height:60px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;font-size:28px;opacity:.3">📦</div>'}
-    <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:6px">${p.name}</div>
-    ${p.code ? `<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:4px">${p.code}</div>` : ''}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-      ${p.material ? `<span class="badge badge-blue" style="font-size:10px">${p.material}</span>` : ''}
-      ${p.category ? `<span class="badge badge-gold" style="font-size:10px">${p.category}</span>` : ''}
-    </div>
-    <div style="display:flex;gap:8px;font-size:12px;font-family:'JetBrains Mono',monospace">
-      <span style="color:var(--steel)">BV:${p.qty_bv||0}</span>
-      <span style="color:#dc2626">IS:${p.qty_is||0}</span>
-      <span style="color:var(--gold)">SW:${p.qty_sw||0}</span>
-      <span style="color:var(--text-muted);margin-left:4px">Total:${total}</span>
-    </div>`;
-}
-
-function selectMergeKeep(choice) {
-  _dupKeepChoice = choice;
-  const keepCard  = document.getElementById(`dup-card-${choice}`);
-  const otherCard = document.getElementById(`dup-card-${choice === 'a' ? 'b' : 'a'}`);
-  const keepBadge  = document.getElementById(`dup-keep-${choice}`);
-  const otherBadge = document.getElementById(`dup-keep-${choice === 'a' ? 'b' : 'a'}`);
-
-  keepCard.style.borderColor  = 'var(--green)';
-  otherCard.style.borderColor = '#dc2626';
-  keepBadge.style.display  = '';
-  otherBadge.style.display = 'none';
-
-  // Show merged preview
-  const pKeep  = choice === 'a' ? _dupProductA : _dupProductB;
-  const pMerge = choice === 'a' ? _dupProductB : _dupProductA;
-  const newBV  = (pKeep.qty_bv||0) + (pMerge.qty_bv||0);
-  const newIS  = (pKeep.qty_is||0) + (pMerge.qty_is||0);
-  const newSW  = (pKeep.qty_sw||0) + (pMerge.qty_sw||0);
-
-  document.getElementById('dup-merged-preview').style.display = '';
-  document.getElementById('dup-merged-qty').innerHTML = `
-    <span class="badge badge-blue">BV: ${newBV} units</span>
-    <span class="badge badge-red">IS: ${newIS} units</span>
-    <span class="badge badge-gold">SW: ${newSW} units</span>
-    <span class="badge" style="background:var(--surface2);color:var(--text)">Total: ${newBV+newIS+newSW}</span>`;
-
-  const btn = document.getElementById('dup-merge-btn');
-  btn.disabled = false;
-  btn.style.opacity = '1';
-}
-
-async function confirmMerge() {
-  if (!_dupKeepChoice || !_dupProductA || !_dupProductB) return;
-
-  const pKeep  = _dupKeepChoice === 'a' ? _dupProductA : _dupProductB;
-  const pDel   = _dupKeepChoice === 'a' ? _dupProductB : _dupProductA;
-
-  showLoading('MERGING PRODUCTS...');
-
-  try {
-    // 1. Add stocks together on kept product
-    const updates = {
-      qty_bv: (pKeep.qty_bv||0) + (pDel.qty_bv||0),
-      qty_is: (pKeep.qty_is||0) + (pDel.qty_is||0),
-      qty_sw: (pKeep.qty_sw||0) + (pDel.qty_sw||0),
-      updated_at: new Date().toISOString()
-    };
-    // Keep best photo if kept product has none
-    if (!pKeep.photo_url && pDel.photo_url) updates.photo_url = pDel.photo_url;
-
-    await sb.from('products').update(updates).eq('id', pKeep.id);
-
-    // 2. Reassign stock movements from deleted to kept
-    await sb.from('stock_movements').update({ product_id: pKeep.id }).eq('product_id', pDel.id);
-
-    // 3. Reassign quotation lines
-    await sb.from('quotation_lines').update({ product_id: pKeep.id }).eq('product_id', pDel.id);
-
-    // 4. Delete duplicate product
-    await sb.from('products').delete().eq('id', pDel.id);
-
-    // 5. Update local cache
-    const kIdx = allProducts.findIndex(x => x.id === pKeep.id);
-    if (kIdx >= 0) { allProducts[kIdx] = { ...allProducts[kIdx], ...updates }; }
-    allProducts = allProducts.filter(x => x.id !== pDel.id);
-    allMovements = allMovements.map(m => m.product_id === pDel.id ? { ...m, product_id: pKeep.id } : m);
-
-    // 6. Log activity
-    await logActivity('product_delete', `Merged duplicate: "${pDel.name}" → "${pKeep.name}" (stocks combined)`);
-
-    hideLoading();
-
-    // Show done
-    document.getElementById('dup-merge-step-1').style.display = 'none';
-    document.getElementById('dup-merge-step-2').style.display = '';
-    document.getElementById('dup-merge-result').innerHTML =
-      `"<strong>${pDel.name}</strong>" has been merged into "<strong>${pKeep.name}</strong>".<br>
-       Combined stock: BV:${updates.qty_bv} · IS:${updates.qty_is} · SW:${updates.qty_sw}`;
-
-    renderInventory();
-  } catch(e) {
-    hideLoading();
-    showToast('Merge failed: ' + e.message, 'error');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// REDESIGN v3 JS ENHANCEMENTS
-// ═══════════════════════════════════════════════════════════════
-
-// ── SIDEBAR COLLAPSE ─────────────────────────────────────────
-let sidebarCollapsed = false;
-
-function toggleSidebarCollapse() {
-  if (window.innerWidth <= 768) return;
-  sidebarCollapsed = !sidebarCollapsed;
-  const sidebar  = document.querySelector('.sidebar');
-  const main     = document.querySelector('.main');
-  const btn      = document.querySelector('.sidebar-collapse-btn');
-  const showHide = document.getElementById('sidebar-show-btn');
-
-  if (sidebarCollapsed) {
-    if (sidebar) { sidebar.style.transform = 'translateX(-260px)'; sidebar.classList.add('collapsed'); }
-    if (main)    main.style.marginLeft = '0px';
-    if (btn)     btn.textContent = '▶';
-    if (showHide) showHide.classList.add('visible');
-  } else {
-    if (sidebar) { sidebar.style.transform = 'translateX(0)'; sidebar.classList.remove('collapsed'); }
-    if (main)    main.style.marginLeft = '240px';
-    if (btn)     btn.textContent = '◀';
-    if (showHide) showHide.classList.remove('visible');
-  }
-  localStorage.setItem('bims_sidebar_collapsed', sidebarCollapsed);
-}
-
-function initSidebarCollapse() {
-  const main     = document.querySelector('.main');
-  const sidebar  = document.querySelector('.sidebar');
-  const btn      = document.querySelector('.sidebar-collapse-btn');
-  const showHide = document.getElementById('sidebar-show-btn');
-
-  if (window.innerWidth <= 768) {
-    if (main)    main.style.marginLeft = '0px';
-    if (sidebar) sidebar.style.transform = '';
-    return;
-  }
-  const saved = localStorage.getItem('bims_sidebar_collapsed') === 'true';
-  sidebarCollapsed = saved;
-  if (saved) {
-    if (sidebar) { sidebar.style.transform = 'translateX(-260px)'; sidebar.classList.add('collapsed'); }
-    if (main)    main.style.marginLeft = '0px';
-    if (btn)     btn.textContent = '▶';
-    if (showHide) showHide.classList.add('visible');
-  } else {
-    if (sidebar) { sidebar.style.transform = 'translateX(0)'; sidebar.classList.remove('collapsed'); }
-    if (main)    main.style.marginLeft = '240px';
-    if (btn)     btn.textContent = '◀';
-    if (showHide) showHide.classList.remove('visible');
-  }
-}
-
-// ── BOTTOM NAV ACTIVE STATE ───────────────────────────────────
-const BNAV_MAP = {
-  'dashboard':      'bnav-dashboard',
-  'inventory':      'bnav-inventory',
-  'quotations':     'bnav-quotations',
-  'purchase-orders':'bnav-pos',
-};
-
-function updateBottomNav(pageId) {
-  document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active'));
-  const bnavId = BNAV_MAP[pageId];
-  if (bnavId) {
-    const el = document.getElementById(bnavId);
-    if (el) el.classList.add('active');
-  }
-}
-
-// Patch showPage to update bottom nav
-
-
-// ── SORTABLE TABLE COLUMNS ────────────────────────────────────
-let _sortCol = null;
-let _sortAsc  = true;
-
-function makeSortable(tableId, data, renderFn) {
-  const table = document.getElementById(tableId);
-  if (!table) return;
-  table.querySelectorAll('thead th[data-sort]').forEach(th => {
-    th.style.cursor = 'pointer';
-    th.addEventListener('click', () => {
-      const col = th.dataset.sort;
-      if (_sortCol === col) _sortAsc = !_sortAsc;
-      else { _sortCol = col; _sortAsc = true; }
-      table.querySelectorAll('thead th').forEach(t => {
-        t.classList.remove('sorted','asc');
-      });
-      th.classList.add('sorted');
-      if (_sortAsc) th.classList.add('asc');
-      const sorted = [...data].sort((a,b) => {
-        const av = a[col] || ''; const bv = b[col] || '';
-        return _sortAsc ? String(av).localeCompare(String(bv), undefined, {numeric:true})
-                        : String(bv).localeCompare(String(av), undefined, {numeric:true});
-      });
-      renderFn(sorted);
-    });
-  });
-}
-
-// ── EMPTY STATES ─────────────────────────────────────────────
-function showEmptyState(containerId, icon, title, subtitle, ctaText, ctaFn) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  el.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
-      <div style="font-size:52px;margin-bottom:16px;opacity:.6">${icon}</div>
-      <div style="font-family:'Syne',sans-serif;font-size:20px;color:var(--text);margin-bottom:8px;letter-spacing:-0.02em">${title}</div>
-      <div style="font-size:14px;color:var(--text-muted);max-width:320px;line-height:1.6;margin-bottom:20px">${subtitle}</div>
-      ${ctaText ? `<button class="btn btn-gold" onclick="${ctaFn}">${ctaText}</button>` : ''}
     </div>`;
 }
 
@@ -8970,10 +8691,13 @@ function _openCatCategory(catId, mat) {
   const root = document.getElementById('cat-root');
   if (!root) return;
   _catCat = catId;
-  _renderCatSubTypes(catId, mat, null); // null = show all sub-types
+  _catActiveSubTypes = new Set();
+  _catCurrentSearch  = '';
+  _renderCatSubTypes(catId, mat, new Set(), '');
 }
 
-function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
+function _renderCatSubTypes(catId, mat, activeSubTypes, searchQuery) {
+  // activeSubTypes: Set or Array of selected sub-type strings. null/empty = All
   const root = document.getElementById('cat-root');
   if (!root) return;
 
@@ -8986,7 +8710,12 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
   const catProds = matProds.filter(p => normalizeCatName(p.category) === catId);
   const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
 
-  // Group by sub_type for pills
+  // Normalise activeSubTypes to a Set
+  const activeSet = activeSubTypes && (activeSubTypes instanceof Set)
+    ? activeSubTypes
+    : new Set(activeSubTypes || []);
+
+  // Group by sub_type for dropdown
   const subTypes = {};
   catProds.forEach(p => {
     const st = p.sub_type || 'General';
@@ -8998,11 +8727,11 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
     return a.localeCompare(b);
   });
 
-  // Apply filters: sub-type first, then search within that
-  let displayProds = filterSubType
-    ? catProds.filter(p => (p.sub_type||'General') === filterSubType)
+  // Apply filters: active sub-types AND search
+  let displayProds = (activeSet.size > 0)
+    ? catProds.filter(p => activeSet.has(p.sub_type || 'General'))
     : catProds;
-  const q = (searchQuery||'').toLowerCase().trim();
+  const q = (searchQuery || '').toLowerCase().trim();
   if (q) {
     displayProds = displayProds.filter(p =>
       (p.name||'').toLowerCase().includes(q) ||
@@ -9012,115 +8741,145 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
     );
   }
 
-  // Build pill HTML — count shows products matching current search within each sub-type
-  const buildPillCount = (stProds) => {
-    if (!q) return stProds.length;
-    return stProds.filter(p =>
-      (p.name||'').toLowerCase().includes(q) ||
-      (p.code||'').toLowerCase().includes(q) ||
-      (p.sub_type||'').toLowerCase().includes(q) ||
-      (p.size||'').toLowerCase().includes(q)
-    ).length;
-  };
+  // Count per sub-type (matching search if any)
+  const countFor = (prods) => !q ? prods.length : prods.filter(p =>
+    (p.name||'').toLowerCase().includes(q) ||
+    (p.code||'').toLowerCase().includes(q) ||
+    (p.sub_type||'').toLowerCase().includes(q) ||
+    (p.size||'').toLowerCase().includes(q)
+  ).length;
 
-  const allCount = buildPillCount(catProds);
-  const allActive = !filterSubType;
+  // ── Dropdown button label ──────────────────────────────────
+  const selCount = activeSet.size;
+  const ddBtnLabel = selCount === 0
+    ? 'All Sub-types ▾'
+    : selCount === 1
+      ? [...activeSet][0] + ' ▾'
+      : 'Sub-type (' + selCount + ') ▾';
 
-  let pillsHtml = '<button id="cat-pill-all" data-sub="" '
-    + 'style="padding:6px 16px;border-radius:99px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;'
-    + 'border:2px solid ' + mc.color + ';'
-    + 'background:' + (allActive ? mc.color : 'var(--surface)') + ';'
-    + 'color:' + (allActive ? '#fff' : mc.color) + ';">'
-    + 'All (' + allCount + ')</button>';
-
+  // ── Dropdown items HTML ────────────────────────────────────
+  let ddItemsHtml = '<div class="cat-dd-item" data-val="" onclick="catDdSelectAll(\''+catId+'\',\''+mat+'\')">'
+    + '<span class="cat-dd-check">' + (selCount === 0 ? '✓' : '') + '</span>'
+    + '<span>All Sub-types</span>'
+    + '<span class="cat-dd-count">' + countFor(catProds) + '</span>'
+    + '</div>';
   subTypeKeys.forEach(st => {
-    const stCount = buildPillCount(subTypes[st]);
-    const active = filterSubType === st;
-    pillsHtml += ' <button data-sub="' + st + '" '
-      + 'style="padding:6px 16px;border-radius:99px;cursor:pointer;font-size:13px;font-weight:' + (active?'700':'500') + ';white-space:nowrap;'
-      + 'border:2px solid ' + (active ? mc.color : 'var(--border)') + ';'
-      + 'background:' + (active ? mc.color : 'var(--surface)') + ';'
-      + 'color:' + (active ? '#fff' : 'var(--text)') + ';margin:2px 0;">'
-      + st + ' (' + stCount + ')</button>';
+    const checked = activeSet.has(st);
+    const cnt = countFor(subTypes[st]);
+    ddItemsHtml += '<div class="cat-dd-item" data-val="'+st+'" onclick="catDdToggle(\''+catId+'\',\''+mat+'\',\''+st.replace(/'/g,"\\'")+'\')">'
+      + '<span class="cat-dd-check">' + (checked ? '✓' : '') + '</span>'
+      + '<span>' + st + '</span>'
+      + '<span class="cat-dd-count">' + cnt + '</span>'
+      + '</div>';
   });
 
-  // Build product rows
+  // ── Active filter tags ─────────────────────────────────────
+  let tagsHtml = '';
+  if (activeSet.size > 0) {
+    tagsHtml = '<div id="cat-active-tags" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;">';
+    activeSet.forEach(st => {
+      tagsHtml += '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;'
+        + 'background:' + mc.bg + ';color:' + mc.color + ';border:1.5px solid ' + mc.color + ';'
+        + 'border-radius:99px;font-size:12px;font-weight:600;">'
+        + st
+        + '<button onclick="catDdRemove(\''+catId+'\',\''+mat+'\',\''+st.replace(/'/g,"\\'")+'\')" '
+        + 'style="background:none;border:none;cursor:pointer;color:'+mc.color+';font-size:13px;padding:0;line-height:1;margin-left:1px;">✕</button>'
+        + '</span>';
+    });
+    tagsHtml += '<button onclick="catDdSelectAll(\''+catId+'\',\''+mat+'\')" '
+      + 'style="background:none;border:1.5px solid var(--border);color:var(--text-muted);border-radius:99px;'
+      + 'font-size:11px;padding:3px 8px;cursor:pointer;">✕ Clear all</button>';
+    tagsHtml += '</div>';
+  }
+
+  // ── Product rows ───────────────────────────────────────────
   let rowsHtml = '';
   if (!displayProds.length) {
     rowsHtml = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted);">'
       + '<div style="font-size:32px;margin-bottom:10px;">🔍</div>'
-      + '<div style="font-weight:600;margin-bottom:6px;">' + (q ? 'No results for "' + q + '"' : 'No products in this category') + '</div>'
-      + (q ? '<div><button onclick="document.getElementById(\'cat-live-search\').value=\'\';_renderCatSubTypes(\'' + catId + '\',\'' + mat + '\',' + (filterSubType?'\''+filterSubType+'\'':'null') + ',\'\')" style="padding:6px 16px;border-radius:99px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:12px;">✕ Clear search</button></div>' : '')
+      + '<div style="font-weight:600;margin-bottom:6px;">' + (q ? 'No results for "'+q+'"' : 'No products in this sub-type') + '</div>'
+      + (q ? '<div><button onclick="document.getElementById(\'cat-live-search\').value=\'\';_renderCatSubTypes(\''+catId+'\',\''+mat+'\',_catActiveSubTypes,\'\')" style="padding:6px 16px;border-radius:99px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:12px;">✕ Clear search</button></div>' : '')
       + '</td></tr>';
   } else {
     displayProds.forEach(p => {
       const isLow = (p.qty_bv||0)<threshold && (p.qty_is||0)<threshold && (p.qty_sw||0)<threshold;
       const photo = p.photo_url
-        ? '<img src="' + p.photo_url + '" style="width:38px;height:34px;object-fit:cover;border-radius:5px;">'
+        ? '<img src="'+p.photo_url+'" style="width:38px;height:34px;object-fit:cover;border-radius:5px;">'
         : '<span style="opacity:.3;font-size:16px;">📦</span>';
       const subBadge = p.sub_type
-        ? '<span style="background:' + mc.bg + ';color:' + mc.color + ';border:1px solid ' + mc.border + ';padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">' + p.sub_type + '</span>'
+        ? '<span style="background:'+mc.bg+';color:'+mc.color+';border:1px solid '+mc.border+';padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;">'+p.sub_type+'</span>'
         : '<span style="color:var(--text-muted);">—</span>';
-      const bvC = (p.qty_bv||0)<threshold?'#dc2626':'';
-      const isC = (p.qty_is||0)<threshold?'#dc2626':'';
-      const swC = (p.qty_sw||0)<threshold?'#dc2626':'';
-      rowsHtml += '<tr data-id="' + p.id + '" style="cursor:pointer;border-bottom:1px solid var(--border);' + (isLow?'background:#fff5f5;':'') + '">'
-        + '<td style="padding:10px 14px;width:50px;"><div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;">' + photo + '</div></td>'
-        + '<td style="padding:10px 14px;"><div style="font-weight:500;font-size:13px;">' + p.name + '</div><div style="font-size:11px;color:var(--text-muted);">' + (p.code||'') + (p.size?' · '+p.size:'') + '</div></td>'
-        + '<td style="padding:10px 14px;">' + subBadge + '</td>'
-        + '<td style="padding:10px 14px;">'
-        + '<span class="qty-tag qty-bv" style="' + (bvC?'color:'+bvC+';font-weight:700;':'') + '">BV:' + (p.qty_bv||0) + '</span> '
-        + '<span class="qty-tag qty-is" style="' + (isC?'color:'+isC+';font-weight:700;':'') + '">IS:' + (p.qty_is||0) + '</span> '
-        + '<span class="qty-tag qty-sw" style="' + (swC?'color:'+swC+';font-weight:700;':'') + '">SW:' + (p.qty_sw||0) + '</span>'
-        + '</td>'
-        + '<td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">' + (p.price?'SAR '+Number(p.price).toFixed(2):'—') + '</td>'
-        + '</tr>';
+      const bvC=(p.qty_bv||0)<threshold?'#dc2626':'';
+      const isC=(p.qty_is||0)<threshold?'#dc2626':'';
+      const swC=(p.qty_sw||0)<threshold?'#dc2626':'';
+      rowsHtml += '<tr data-id="'+p.id+'" style="cursor:pointer;border-bottom:1px solid var(--border);'+(isLow?'background:#fff5f5;':'')+'">'
+        +'<td style="padding:10px 14px;width:50px;"><div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;">'+photo+'</div></td>'
+        +'<td style="padding:10px 14px;"><div style="font-weight:500;font-size:13px;">'+p.name+'</div><div style="font-size:11px;color:var(--text-muted);">'+(p.code||'')+(p.size?' · '+p.size:'')+'</div></td>'
+        +'<td style="padding:10px 14px;">'+subBadge+'</td>'
+        +'<td style="padding:10px 14px;">'
+        +'<span class="qty-tag qty-bv" style="'+(bvC?'color:'+bvC+';font-weight:700;':'')+'">BV:'+(p.qty_bv||0)+'</span> '
+        +'<span class="qty-tag qty-is" style="'+(isC?'color:'+isC+';font-weight:700;':'')+'">IS:'+(p.qty_is||0)+'</span> '
+        +'<span class="qty-tag qty-sw" style="'+(swC?'color:'+swC+';font-weight:700;':'')+'">SW:'+(p.qty_sw||0)+'</span>'
+        +'</td>'
+        +'<td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">'+(p.price?'SAR '+Number(p.price).toFixed(2):'—')+'</td>'
+        +'</tr>';
     });
   }
 
-  // ── Build full page ──────────────────────────────────────────
+  // ── Build full page ────────────────────────────────────────
   root.innerHTML =
-
     // Breadcrumb
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
-    + '<button id="cat-back-btn" class="btn btn-outline" style="font-size:12px;padding:5px 12px;">← ' + mat + '</button>'
+    + '<button id="cat-back-btn" class="btn btn-outline" style="font-size:12px;padding:5px 12px;">← '+mat+'</button>'
     + '<span style="color:var(--text-muted);">›</span>'
-    + '<span style="font-weight:600;color:var(--text);">' + catId + '</span>'
-    + '<span class="badge badge-blue" style="margin-left:4px;">' + catProds.length + ' total</span>'
+    + '<span style="font-weight:600;color:var(--text);">'+catId+'</span>'
+    + '<span class="badge badge-blue" style="margin-left:4px;">'+catProds.length+' total</span>'
     + '</div>'
 
     // ── STICKY FILTER BAR ──────────────────────────────────────
     + '<div id="cat-filter-bar" style="position:sticky;top:0;z-index:100;background:var(--bg);padding-bottom:10px;">'
 
-      // Search row
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
-      + '<div style="position:relative;flex:1;">'
-      + '<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none;">🔍</span>'
-      + '<input type="text" id="cat-live-search" placeholder="Search by name, code, sub-type, size..." '
-      + 'value="' + (searchQuery||'') + '" '
-      + 'style="width:100%;padding:10px 40px 10px 38px;background:var(--surface);border:1.5px solid var(--border);'
-      + 'border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:14px;outline:none;box-sizing:border-box;">'
-      + '<button id="cat-search-clear" '
-      + 'style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;'
-      + 'color:var(--text-muted);font-size:16px;padding:2px;' + (q?'':'display:none;') + '" '
-      + 'title="Clear search">✕</button>'
-      + '</div>'
-      // Result count
-      + '<div style="font-size:13px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">'
-      + '<strong style="color:' + mc.color + ';">' + displayProds.length + '</strong>'
-      + (catProds.length !== displayProds.length ? ' of ' + catProds.length : '') + ' products'
-      + '</div>'
+      // Search + sub-type dropdown row
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+
+        // Search
+        + '<div style="position:relative;flex:1;">'
+        + '<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none;">🔍</span>'
+        + '<input type="text" id="cat-live-search" placeholder="Search by name, code, sub-type, size..." '
+        + 'value="'+(searchQuery||'')+'" '
+        + 'style="width:100%;padding:10px 40px 10px 38px;background:var(--surface);border:1.5px solid var(--border);'
+        + 'border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:14px;outline:none;box-sizing:border-box;">'
+        + '<button id="cat-search-clear" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;padding:2px;'+(q?'':'display:none;')+'" title="Clear search">✕</button>'
+        + '</div>'
+
+        // Sub-type dropdown button
+        + (subTypeKeys.length > 0
+          ? '<div style="position:relative;flex-shrink:0;" id="cat-subtype-dd-wrap">'
+            + '<button id="cat-subtype-dd-btn" '
+            + 'style="padding:10px 14px;background:var(--surface);border:1.5px solid '+(selCount>0?mc.color:'var(--border)')+';'
+            + 'border-radius:var(--radius-sm);color:'+(selCount>0?mc.color:'var(--text)')+';font-size:13px;font-weight:'+(selCount>0?'700':'400')+';'
+            + 'cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;">'
+            + ddBtnLabel
+            + '</button>'
+            + '<div id="cat-subtype-dd-list" style="display:none;position:absolute;top:calc(100% + 4px);right:0;min-width:220px;'
+            + 'background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);'
+            + 'box-shadow:0 8px 24px rgba(0,0,0,0.13);z-index:9999;max-height:300px;overflow-y:auto;">'
+            + ddItemsHtml
+            + '</div>'
+            + '</div>'
+          : '')
+
+        // Result count
+        + '<div style="font-size:13px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">'
+        + '<strong style="color:'+mc.color+';">'+displayProds.length+'</strong>'
+        + (catProds.length !== displayProds.length ? ' of '+catProds.length : '')+' products'
+        + '</div>'
       + '</div>'
 
-      // Pills row (horizontal scroll)
-      + (subTypeKeys.length > 0
-        ? '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none;" id="cat-sub-pills">'
-          + pillsHtml
-          + '</div>'
-        : '')
+      // Active filter tags row
+      + tagsHtml
 
     + '</div>'
-    // ── END STICKY BAR ─────────────────────────────────────────
 
     // Table
     + '<div class="card" style="padding:0;overflow:hidden;">'
@@ -9132,16 +8891,16 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
     + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Stock</th>'
     + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Price</th>'
     + '</tr></thead>'
-    + '<tbody>' + rowsHtml + '</tbody>'
+    + '<tbody>'+rowsHtml+'</tbody>'
     + '</table></div></div>';
 
-  // ── ATTACH EVENTS ────────────────────────────────────────────
+  // ── ATTACH EVENTS ──────────────────────────────────────────
 
   // Back button
   const backBtn = root.querySelector('#cat-back-btn');
   if (backBtn) backBtn.addEventListener('click', () => _renderCatLevel1(mat));
 
-  // Live search — instant with debounce
+  // Live search
   const searchEl = root.querySelector('#cat-live-search');
   const clearEl  = root.querySelector('#cat-search-clear');
   let searchTimer;
@@ -9151,34 +8910,45 @@ function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
       if (clearEl) clearEl.style.display = val ? '' : 'none';
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => {
-        _renderCatSubTypes(catId, mat, filterSubType, val);
-        // Restore focus + cursor position
+        _catCurrentSearch = val;
+        _renderCatSubTypes(catId, mat, _catActiveSubTypes, val);
         const newEl = document.getElementById('cat-live-search');
         if (newEl) { newEl.focus(); newEl.setSelectionRange(val.length, val.length); }
       }, 180);
     });
-    // Focus the search if there was a query
     if (searchQuery) setTimeout(() => {
       if (searchEl) { searchEl.focus(); searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length); }
     }, 20);
   }
-
-  // Clear button
   if (clearEl) {
     clearEl.addEventListener('click', () => {
-      _renderCatSubTypes(catId, mat, filterSubType, '');
+      _catCurrentSearch = '';
+      _renderCatSubTypes(catId, mat, _catActiveSubTypes, '');
       setTimeout(() => { const el = document.getElementById('cat-live-search'); if (el) el.focus(); }, 20);
     });
   }
 
-  // Sub-type pill clicks
-  root.querySelectorAll('[data-sub]').forEach(btn => {
-    btn.addEventListener('click', function() {
-      const sub = this.dataset.sub || null;
-      const currentSearch = document.getElementById('cat-live-search')?.value || '';
-      _renderCatSubTypes(catId, mat, sub, currentSearch);
+  // Sub-type dropdown toggle
+  const ddBtn = root.querySelector('#cat-subtype-dd-btn');
+  const ddList = root.querySelector('#cat-subtype-dd-list');
+  if (ddBtn && ddList) {
+    ddBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      ddList.style.display = ddList.style.display === 'none' ? 'block' : 'none';
     });
-  });
+  }
+
+  // Close dropdown on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function closeCatDd(e) {
+      const wrap = document.getElementById('cat-subtype-dd-wrap');
+      if (!wrap || !wrap.contains(e.target)) {
+        const list = document.getElementById('cat-subtype-dd-list');
+        if (list) list.style.display = 'none';
+        document.removeEventListener('click', closeCatDd);
+      }
+    });
+  }, 50);
 
   // Product row clicks
   root.querySelectorAll('tr[data-id]').forEach(tr => {
@@ -9644,364 +9414,22 @@ function filterCatSubProducts(query, catId, mat, filterSubType) {
 // ═══════════════════════════════════════════════════════════════
 // PURCHASE ORDERS — CLEAN REWRITE
 // ═══════════════════════════════════════════════════════════════
-let allPOs    = [];
-let poLineIdx = 0;
-let _editPOId = null;
 
 // ── LOAD ─────────────────────────────────────────────────────
-async function loadPOs() {
-  try {
-    const { data, error } = await sb
-      .from('purchase_orders')
-      .select('*, purchase_order_lines(*)')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    allPOs = data || [];
-  } catch(e) {
-    console.warn('loadPOs:', e.message);
-    allPOs = [];
-  }
-}
 
-async function loadAndRenderPOs() {
-  await loadPOs();
-  renderPOs();
-}
 
 // ── RENDER ───────────────────────────────────────────────────
-function renderPOs() {
-  const tbody = document.getElementById('po-tbody');
-  if (!tbody) return;
-
-  const search = (document.getElementById('po-search')?.value || '').toLowerCase();
-  const fc     = document.getElementById('po-filter-company')?.value || '';
-  const fs     = document.getElementById('po-filter-status')?.value || '';
-  const isAdmin = currentProfile?.role === 'admin';
-  const isMgr   = isAdmin || currentProfile?.role === 'manager';
-
-  const BADGE = { draft:'badge-warn', sent:'badge-blue', received:'badge-green', partial:'badge-gold', cancelled:'badge-red' };
-
-  const list = (allPOs || []).filter(po =>
-    po && (!search || (po.supplier||'').toLowerCase().includes(search) || (po.po_no||'').toLowerCase().includes(search))
-       && (!fc || po.company === fc)
-       && (!fs || po.status === fs)
-  );
-
-  // Stats
-  const statsEl = document.getElementById('po-stats-row');
-  if (statsEl) {
-    const tots = [
-      { icon:'📋', label:'Total POs',    val: allPOs.length,                                         cls:'blue'  },
-      { icon:'📤', label:'Pending',       val: allPOs.filter(p=>p.status==='sent').length,             cls:'warn'  },
-      { icon:'✅', label:'Received',      val: allPOs.filter(p=>p.status==='received').length,         cls:'green' },
-      { icon:'💰', label:'Total Value',   val:'SAR ' + allPOs.reduce((s,p)=>s+Number(p.total||0),0).toFixed(0), cls:'gold'  },
-    ];
-    statsEl.innerHTML = tots.map(s =>
-      '<div class="stat-card"><div class="stat-icon-box ' + s.cls + '"><span style="font-size:18px">' + s.icon + '</span></div>'
-      + '<div class="stat-label">' + s.label + '</div><div class="stat-value" style="font-size:22px;">' + s.val + '</div></div>'
-    ).join('');
-  }
-
-  if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:48px;color:var(--text-muted);">'
-      + '<div style="font-size:40px;margin-bottom:12px;">📋</div>'
-      + '<div style="font-weight:700;font-size:16px;margin-bottom:6px;">No Purchase Orders</div>'
-      + '<div style="font-size:13px;">' + (search||fc||fs ? 'No results.' : 'Click <strong>+ New PO</strong> to create one.') + '</div>'
-      + '</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = '';
-  list.forEach(po => {
-    const tr  = document.createElement('tr');
-    tr.style.cursor = 'pointer';
-    tr.addEventListener('click', () => printPO(po));
-
-    const date  = po.po_date||po.created_at ? new Date(po.po_date||po.created_at).toLocaleDateString('en-SA') : '—';
-    const lines = (po.purchase_order_lines||[]).length;
-    const badge = BADGE[po.status] || 'badge-blue';
-    const coName = (typeof COMPANY_NAMES!=='undefined' && COMPANY_NAMES[po.company]) || po.company || '—';
-
-    tr.innerHTML =
-      '<td class="mono" style="font-size:12px;color:var(--gold);font-weight:700;">' + (po.po_no||'—') + '</td>'
-      + '<td style="font-size:13px;">' + date + '</td>'
-      + '<td><div style="font-weight:500;">' + (po.supplier||'—') + '</div>'
-        + (po.contact?'<div style="font-size:11px;color:var(--text-muted);">'+po.contact+'</div>':'') + '</td>'
-      + '<td><span class="badge badge-blue" style="font-size:10px;">' + coName + '</span></td>'
-      + '<td style="text-align:center;">' + lines + '</td>'
-      + '<td class="mono" style="font-weight:600;">SAR ' + Number(po.total||0).toFixed(2) + '</td>'
-      + '<td><span class="badge ' + badge + '">' + (po.status||'draft').toUpperCase() + '</span></td>'
-      + '<td><div style="display:flex;gap:4px;" onclick="event.stopPropagation();"></div></td>';
-
-    const actDiv = tr.querySelector('td:last-child div');
-
-    const printBtn = document.createElement('button');
-    printBtn.className = 'btn btn-sm btn-outline'; printBtn.title = 'Print';
-    printBtn.textContent = '🖨️';
-    printBtn.onclick = e => { e.stopPropagation(); printPO(po); };
-    actDiv.appendChild(printBtn);
-
-    if (isMgr && po.status === 'draft') {
-      const editBtn = document.createElement('button');
-      editBtn.className = 'btn btn-sm btn-outline'; editBtn.title = 'Edit';
-      editBtn.textContent = '✏️';
-      editBtn.onclick = e => { e.stopPropagation(); openEditPO(po); };
-      actDiv.appendChild(editBtn);
-    }
-
-    if (isMgr && !['received','cancelled'].includes(po.status)) {
-      const recvBtn = document.createElement('button');
-      recvBtn.className = 'btn btn-sm btn-success'; recvBtn.title = 'Mark Received';
-      recvBtn.textContent = '✓';
-      recvBtn.onclick = e => { e.stopPropagation(); updatePOStatus(po.id,'received'); };
-      actDiv.appendChild(recvBtn);
-    }
-
-    if (isAdmin) {
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn btn-sm btn-danger'; delBtn.title = 'Delete';
-      delBtn.textContent = '🗑️';
-      delBtn.onclick = e => { e.stopPropagation(); deletePO(po.id, po.po_no||''); };
-      actDiv.appendChild(delBtn);
-    }
-
-    tbody.appendChild(tr);
-  });
-}
 
 // ── OPEN NEW / EDIT ───────────────────────────────────────────
-function openNewPO() {
-  _editPOId = null; poLineIdx = 0;
-  document.getElementById('po-modal-title').textContent = 'New Purchase Order';
-  document.getElementById('po-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('po-status').value = 'draft';
-  document.getElementById('po-delivery-date').value = '';
-  ['po-supplier','po-contact','po-delivery-addr','po-notes'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  document.getElementById('po-lines-body').innerHTML = '';
-  document.getElementById('po-totals').innerHTML = '';
-  addPOLine();
-  openModal('modal-po');
-}
 
-function openEditPO(po) {
-  if (!po) return;
-  _editPOId = po.id; poLineIdx = 0;
-  document.getElementById('po-modal-title').textContent = 'Edit PO — ' + (po.po_no||'');
-  document.getElementById('po-date').value = po.po_date || '';
-  document.getElementById('po-company').value = po.company || 'bv';
-  document.getElementById('po-status').value = po.status || 'draft';
-  document.getElementById('po-supplier').value = po.supplier || '';
-  document.getElementById('po-contact').value = po.contact || '';
-  document.getElementById('po-delivery-date').value = po.delivery_date || '';
-  document.getElementById('po-delivery-addr').value = po.delivery_addr || '';
-  document.getElementById('po-notes').value = po.notes || '';
-  document.getElementById('po-lines-body').innerHTML = '';
-  (po.purchase_order_lines || []).forEach(l => addPOLine(l));
-  if (!po.purchase_order_lines?.length) addPOLine();
-  openModal('modal-po');
-}
 
 // ── LINE ITEMS ────────────────────────────────────────────────
-function addPOLine(existing) {
-  const idx = poLineIdx++;
-  const tr  = document.createElement('tr');
-  tr.id = 'pol-' + idx;
-  tr.style.borderBottom = '1px solid var(--border)';
 
-  // Search input
-  const tdProd = document.createElement('td');
-  tdProd.style.padding = '6px 8px';
-  tdProd.innerHTML =
-    '<div style="position:relative;">'
-    + '<input type="text" id="pol-search-' + idx + '" placeholder="Type product name or code..." autocomplete="off"'
-    + ' style="width:100%;padding:6px 10px;background:var(--surface2);border:1.5px solid var(--border);'
-    + 'color:var(--text);border-radius:6px;font-size:12px;outline:none;"'
-    + ' oninput="filterPolProducts(' + idx + ',this.value)"'
-    + ' onfocus="filterPolProducts(' + idx + ',this.value)"'
-    + ' onblur="setTimeout(()=>hidePolDropdown(' + idx + '),200)">'
-    + '<input type="hidden" id="pol-pid-' + idx + '">'
-    + '<div id="pol-drop-' + idx + '" style="display:none;position:absolute;top:100%;left:0;right:0;'
-    + 'background:var(--surface);border:1.5px solid var(--gold);border-radius:6px;'
-    + 'box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:9999;max-height:200px;overflow-y:auto;margin-top:2px;"></div>'
-    + '</div>'
-    + '<input type="text" id="pol-custom-' + idx + '" placeholder="Custom description..."'
-    + ' style="display:none;width:100%;margin-top:4px;padding:6px 10px;background:var(--surface2);'
-    + 'border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;outline:none;"'
-    + ' oninput="updatePOTotals()">';
-  tr.appendChild(tdProd);
 
-  // Qty
-  const tdQty = document.createElement('td');
-  tdQty.style.padding = '6px 4px';
-  tdQty.innerHTML = '<input type="number" id="pol-qty-' + idx + '" value="' + (existing?.qty||1) + '" min="0.01" step="0.01"'
-    + ' style="width:76px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);'
-    + 'color:var(--text);border-radius:6px;font-size:13px;text-align:center;" oninput="recalcPOL(' + idx + ')">';
-  tr.appendChild(tdQty);
-
-  // Unit
-  const tdUnit = document.createElement('td');
-  tdUnit.style.padding = '6px 4px';
-  const units = ['PCS','MTR','KG','SET','BOX','ROLL','LENGTH','LOT'];
-  tdUnit.innerHTML = '<select id="pol-unit-' + idx + '" style="width:86px;padding:6px;background:var(--surface2);'
-    + 'border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;">'
-    + units.map(u => '<option' + ((existing?.unit||'PCS')===u?' selected':'') + '>' + u + '</option>').join('')
-    + '</select>';
-  tr.appendChild(tdUnit);
-
-  // Price
-  const tdPrice = document.createElement('td');
-  tdPrice.style.padding = '6px 4px';
-  tdPrice.innerHTML = '<input type="number" id="pol-price-' + idx + '" value="' + (existing?.unit_price||0) + '" step="0.01"'
-    + ' style="width:100px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);'
-    + 'color:var(--text);border-radius:6px;font-size:13px;" oninput="recalcPOL(' + idx + ')">';
-  tr.appendChild(tdPrice);
-
-  // Total
-  const tdTotal = document.createElement('td');
-  tdTotal.id = 'pol-total-' + idx;
-  tdTotal.style.cssText = 'padding:6px 8px;font-family:var(--font-mono);font-size:13px;font-weight:600;text-align:right;';
-  tdTotal.textContent = Number((existing?.qty||1)*(existing?.unit_price||0)).toFixed(2);
-  tr.appendChild(tdTotal);
-
-  // Remove
-  const tdDel = document.createElement('td');
-  tdDel.style.padding = '6px 4px';
-  const rb = document.createElement('button');
-  rb.className = 'btn btn-sm btn-danger'; rb.textContent = '×';
-  rb.onclick = () => { tr.remove(); updatePOTotals(); };
-  tdDel.appendChild(rb); tr.appendChild(tdDel);
-
-  document.getElementById('po-lines-body').appendChild(tr);
-
-  if (existing) {
-    const searchEl = document.getElementById('pol-search-' + idx);
-    const pidEl    = document.getElementById('pol-pid-' + idx);
-    if (existing.product_id) {
-      const p = allProducts.find(x => x.id === existing.product_id);
-      if (p && searchEl) searchEl.value = p.name + (p.code?' ('+p.code+')':'');
-      if (pidEl) pidEl.value = existing.product_id;
-    } else if (existing.custom_desc) {
-      if (pidEl) pidEl.value = '_custom';
-      const ce = document.getElementById('pol-custom-' + idx);
-      if (ce) { ce.style.display=''; ce.value=existing.custom_desc; }
-    }
-  }
-  updatePOTotals();
-}
-
-function recalcPOL(idx) {
-  const qty   = parseFloat(document.getElementById('pol-qty-' + idx)?.value) || 0;
-  const price = parseFloat(document.getElementById('pol-price-' + idx)?.value) || 0;
-  const el    = document.getElementById('pol-total-' + idx);
-  if (el) el.textContent = (qty * price).toFixed(2);
-  updatePOTotals();
-}
-
-function updatePOTotals() {
-  const el = document.getElementById('po-totals');
-  if (!el) return;
-  let sub = 0;
-  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
-    const id    = tr.id.replace('pol-','');
-    const qty   = parseFloat(document.getElementById('pol-qty-'+id)?.value)||0;
-    const price = parseFloat(document.getElementById('pol-price-'+id)?.value)||0;
-    sub += qty * price;
-  });
-  const vr  = parseFloat(settings?.vatRate||15)/100;
-  const vat = sub*vr, tot = sub+vat;
-  el.innerHTML = '<div style="display:inline-block;text-align:right;min-width:220px;">'
-    + '<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:3px;">'
-    + '<span style="color:var(--text-muted);">Subtotal</span><span class="mono">SAR '+sub.toFixed(2)+'</span></div>'
-    + '<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:3px;">'
-    + '<span style="color:var(--text-muted);">VAT ('+Math.round(vr*100)+'%)</span><span class="mono">SAR '+vat.toFixed(2)+'</span></div>'
-    + '<div style="display:flex;justify-content:space-between;gap:24px;font-weight:700;font-size:15px;border-top:2px solid var(--border);padding-top:4px;">'
-    + '<span>Total</span><span class="mono">SAR '+tot.toFixed(2)+'</span></div></div>';
-}
 
 // ── SAVE ─────────────────────────────────────────────────────
-async function savePO(statusOverride) {
-  const supplier = document.getElementById('po-supplier')?.value.trim();
-  if (!supplier) { showToast('Supplier name required','error'); return; }
-  const company = document.getElementById('po-company')?.value || 'bv';
-  const status  = statusOverride || document.getElementById('po-status')?.value || 'draft';
-  const lines   = [];
-  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
-    const id     = tr.id.replace('pol-','');
-    const pidEl  = document.getElementById('pol-pid-'+id);
-    const custEl = document.getElementById('pol-custom-'+id);
-    const qty    = parseFloat(document.getElementById('pol-qty-'+id)?.value)||0;
-    const price  = parseFloat(document.getElementById('pol-price-'+id)?.value)||0;
-    if (qty<=0) return;
-    const pid = (pidEl?.value && pidEl.value!=='_custom') ? pidEl.value : null;
-    lines.push({ product_id:pid, custom_desc:(!pid&&custEl?custEl.value.trim():''),
-      qty, unit:document.getElementById('pol-unit-'+id)?.value||'PCS',
-      unit_price:price, total:qty*price, sort_order:lines.length });
-  });
-  const sub  = lines.reduce((a,l)=>a+l.total,0);
-  const vr   = parseFloat(settings?.vatRate||15)/100;
-  const poNo = _editPOId ? null : 'PO-'+company.toUpperCase()+'-'+Date.now().toString().slice(-6);
-  showLoading('SAVING PO...');
-  try {
-    let poId = _editPOId;
-    const poData = { company, supplier, status,
-      contact:document.getElementById('po-contact')?.value||'',
-      delivery_addr:document.getElementById('po-delivery-addr')?.value||'',
-      delivery_date:document.getElementById('po-delivery-date')?.value||null,
-      notes:document.getElementById('po-notes')?.value||'',
-      po_date:document.getElementById('po-date')?.value||null,
-      subtotal:sub, vat:sub*vr, total:sub*(1+vr) };
-    if (_editPOId) {
-      const {error} = await sb.from('purchase_orders').update(poData).eq('id',_editPOId);
-      if (error) throw error;
-      await sb.from('purchase_order_lines').delete().eq('po_id',_editPOId);
-    } else {
-      const {data,error} = await sb.from('purchase_orders').insert({...poData,po_no:poNo,created_by:currentProfile?.id}).select().single();
-      if (error) throw error;
-      poId = data.id;
-    }
-    if (lines.length) {
-      const {error} = await sb.from('purchase_order_lines').insert(lines.map(l=>({...l,po_id:poId})));
-      if (error) console.warn('Lines error:',error.message);
-    }
-    hideLoading();
-    closeModal('modal-po');
-    showToast(_editPOId ? 'PO updated!' : 'PO saved!');
-    _editPOId = null;
-    await loadAndRenderPOs();
-    if (status==='sent') { const po=allPOs.find(p=>p.id===poId); if(po) printPO(po); }
-  } catch(e) {
-    hideLoading();
-    if (e.message?.includes('relation')||e.code==='42P01') {
-      showToast('Run the PO SQL schema first!','error');
-    } else { showToast('Save failed: '+e.message,'error'); }
-  }
-}
 
-async function updatePOStatus(id, status) {
-  try {
-    const {error} = await sb.from('purchase_orders').update({status}).eq('id',id);
-    if (error) throw error;
-    const po = allPOs.find(x=>x.id===id);
-    if (po) po.status = status;
-    renderPOs();
-    showToast('Status: '+status);
-  } catch(e) { showToast('Failed: '+e.message,'error'); }
-}
 
-async function deletePO(id, poNo) {
-  if (currentProfile?.role!=='admin') { showToast('Admin only','error'); return; }
-  if (!confirm('Delete PO '+poNo+'?')) return;
-  showLoading('DELETING...');
-  try {
-    await sb.from('purchase_order_lines').delete().eq('po_id',id);
-    const {error} = await sb.from('purchase_orders').delete().eq('id',id);
-    if (error) throw error;
-    allPOs = allPOs.filter(p=>p.id!==id);
-    hideLoading(); renderPOs(); showToast('PO deleted.');
-  } catch(e) { hideLoading(); showToast('Failed: '+e.message,'error'); }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // PRODUCT CODE BUILDER (dropdown-based)
@@ -10695,6 +10123,93 @@ document.addEventListener('click', function(e) {
   }
 });
 
+
+// ── CATALOGUE MULTI-SELECT SUB-TYPE FILTER ───────────────────
+let _catActiveSubTypes = new Set(); // currently selected sub-types
+let _catCurrentSearch  = '';        // current search query
+let _catCurrentCatId   = '';        // current category being viewed
+let _catCurrentMat2    = '';        // current material being viewed
+
+// Select All (clear filter)
+function catDdSelectAll(catId, mat) {
+  _catActiveSubTypes = new Set();
+  _catCurrentCatId   = catId;
+  _catCurrentMat2    = mat;
+  const list = document.getElementById('cat-subtype-dd-list');
+  if (list) list.style.display = 'none';
+  _renderCatSubTypes(catId, mat, _catActiveSubTypes, _catCurrentSearch);
+}
+
+// Toggle a sub-type in the multi-select
+function catDdToggle(catId, mat, subType) {
+  _catCurrentCatId = catId;
+  _catCurrentMat2  = mat;
+  if (_catActiveSubTypes.has(subType)) {
+    _catActiveSubTypes.delete(subType);
+  } else {
+    _catActiveSubTypes.add(subType);
+  }
+  _renderCatSubTypes(catId, mat, _catActiveSubTypes, _catCurrentSearch);
+  // Re-open dropdown after re-render
+  setTimeout(() => {
+    const list = document.getElementById('cat-subtype-dd-list');
+    if (list) list.style.display = 'block';
+  }, 20);
+}
+
+// Remove a single sub-type tag
+function catDdRemove(catId, mat, subType) {
+  _catActiveSubTypes.delete(subType);
+  _renderCatSubTypes(catId, mat, _catActiveSubTypes, _catCurrentSearch);
+}
+
+// Reset state when navigating to a new category
+const _origOpenCatCategory2 = _openCatCategory;
+_openCatCategory = function(catId, mat) {
+  _catActiveSubTypes = new Set();
+  _catCurrentSearch  = '';
+  _catCurrentCatId   = catId;
+  _catCurrentMat2    = mat;
+  _origOpenCatCategory2(catId, mat);
+};
+
+
+function initSidebarCollapse() {
+  const collapsed = localStorage.getItem('bims_sidebar_collapsed') === 'true';
+  const sidebar   = document.querySelector('.sidebar');
+  const main      = document.querySelector('.main');
+  const showBtn   = document.getElementById('sidebar-show-btn');
+
+  if (collapsed) {
+    if (sidebar) sidebar.classList.add('collapsed');
+    if (main)    main.style.marginLeft = '56px';
+    if (showBtn) showBtn.style.display = '';
+  } else {
+    if (sidebar) sidebar.classList.remove('collapsed');
+    if (main)    main.style.marginLeft = '';
+    if (showBtn) showBtn.style.display = 'none';
+  }
+}
+
+function toggleSidebarCollapse() {
+  const sidebar  = document.querySelector('.sidebar');
+  const main     = document.querySelector('.main');
+  const showBtn  = document.getElementById('sidebar-show-btn');
+  const collapsed = sidebar?.classList.contains('collapsed');
+
+  if (collapsed) {
+    sidebar?.classList.remove('collapsed');
+    if (main) main.style.marginLeft = '';
+    if (showBtn) showBtn.style.display = 'none';
+    localStorage.setItem('bims_sidebar_collapsed', 'false');
+  } else {
+    sidebar?.classList.add('collapsed');
+    if (main) main.style.marginLeft = '56px';
+    if (showBtn) showBtn.style.display = '';
+    localStorage.setItem('bims_sidebar_collapsed', 'true');
+  }
+}
+
 window.addEventListener('DOMContentLoaded', init);
 </script>
 
@@ -10940,10 +10455,7 @@ window.addEventListener('DOMContentLoaded', init);
       </div>
       <span style="margin-top:14px">Quotes</span>
     </button>
-    <button class="bottom-nav-item" onclick="showPage('purchase-orders')" id="bnav-pos">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-      POs
-    </button>
+    
     <button class="bottom-nav-item" onclick="toggleSidebar()" id="bnav-menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       Menu
@@ -10952,58 +10464,7 @@ window.addEventListener('DOMContentLoaded', init);
 </nav>
 
 <!-- PURCHASE ORDER MODAL -->
-<div class="modal-overlay" id="modal-po">
-  <div class="modal" style="max-width:860px;width:96vw;max-height:92vh;overflow-y:auto;">
-    <div class="modal-title" id="po-modal-title">New Purchase Order</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
-      <div class="field"><label>PO Date</label><input type="date" id="po-date"></div>
-      <div class="field"><label>Company</label>
-        <select id="po-company">
-          <option value="bv">Barakah Valves (BV)</option>
-          <option value="is">Iron Spring (IS)</option>
-          <option value="sw">Stable Way (SW)</option>
-        </select>
-      </div>
-      <div class="field"><label>Status</label>
-        <select id="po-status">
-          <option value="draft">Draft</option><option value="sent">Sent</option>
-          <option value="received">Received</option><option value="partial">Partial</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-      </div>
-      <div class="field"><label>Supplier *</label><input type="text" id="po-supplier" placeholder="Supplier name"></div>
-      <div class="field"><label>Contact</label><input type="text" id="po-contact" placeholder="+966..."></div>
-      <div class="field"><label>Delivery Date</label><input type="date" id="po-delivery-date"></div>
-    </div>
-    <div class="field"><label>Delivery Address</label><input type="text" id="po-delivery-addr" placeholder="Full delivery address"></div>
-    <div class="field"><label>Notes</label><textarea id="po-notes" rows="2" placeholder="Terms, instructions..."></textarea></div>
-    <div style="margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center;">
-      <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);">Line Items</label>
-      <button class="btn btn-sm btn-outline" onclick="addPOLine()">+ Add Line</button>
-    </div>
-    <div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:12px;">
-      <div style="overflow-x:auto;max-height:280px;overflow-y:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:640px;">
-          <thead><tr style="background:var(--surface2);">
-            <th style="padding:8px 10px;text-align:left;min-width:260px;">Product / Description</th>
-            <th style="padding:8px 10px;width:80px;">Qty</th>
-            <th style="padding:8px 10px;width:90px;">Unit</th>
-            <th style="padding:8px 10px;width:110px;">Unit Price</th>
-            <th style="padding:8px 10px;width:100px;">Total</th>
-            <th style="padding:8px 10px;width:40px;"></th>
-          </tr></thead>
-          <tbody id="po-lines-body"></tbody>
-        </table>
-      </div>
-    </div>
-    <div id="po-totals" style="text-align:right;padding:8px 0;font-size:13px;border-top:1px solid var(--border);"></div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
-      <button class="btn btn-outline" onclick="savePO('draft')">💾 Save Draft</button>
-      <button class="btn btn-gold" onclick="savePO('sent')">📤 Save & Print</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- DELETE QUOTATION MODAL -->
 <div class="modal-overlay" id="modal-delete-quot">
