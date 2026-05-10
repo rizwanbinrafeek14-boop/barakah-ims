@@ -2345,7 +2345,7 @@ function renderDashboard() {
   const threshold = parseInt(settings.lowStockThreshold || 10);
   const totalQty = allProducts.reduce((a, p) => a + (p.qty_bv||0) + (p.qty_is||0) + (p.qty_sw||0), 0);
   const totalValue = allProducts.reduce((a, p) => a + ((p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0))*(p.price||0), 0);
-  const lowCount = allProducts.filter(p => (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold).length;
+  const lowCount = allProducts.filter(p => (p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold).length;
 
   document.getElementById('dashboard-stats').innerHTML = [
     { label:'Total Products', value:allProducts.length, sub:'Across all companies', icon:'📦' },
@@ -2377,7 +2377,7 @@ function renderDashboard() {
       }).join('')
     : '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">No movements yet</div>';
 
-  const low = allProducts.filter(p=>(p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold).slice(0,5);
+  const low = allProducts.filter(p=>(p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold).slice(0,5);
   document.getElementById('dash-low-stock').innerHTML = low.length
     ? low.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><div style="font-size:13px">${p.name}</div><span class="badge badge-red">LOW</span></div>`).join('')
     : '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">✓ All stock levels OK</div>';
@@ -2406,7 +2406,7 @@ function renderInventory() {
     const s = !search || p.name.toLowerCase().includes(search) || (p.code||'').toLowerCase().includes(search) || (p.material||'').toLowerCase().includes(search) || (p.size||'').toLowerCase().includes(search);
     const m = !filterMat || p.material===filterMat;
     const c = !filterCo || (p['qty_'+filterCo]||0)>0;
-    const st = !filterStk || (filterStk==='low'&&((p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold)) || (filterStk==='ok'&&(p.qty_bv||0)>=threshold&&(p.qty_is||0)>=threshold&&(p.qty_sw||0)>=threshold);
+    const st = !filterStk || (filterStk==='low'&&((p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold)) || (filterStk==='ok'&&(p.qty_bv||0)>=threshold&&(p.qty_is||0)>=threshold&&(p.qty_sw||0)>=threshold);
     return s&&m&&c&&st;
   });
 
@@ -2424,7 +2424,7 @@ function renderInventory() {
 
 function renderProductCard(p, threshold) {
   const total = (p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0);
-  const isLow = (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold;
+  const isLow = (p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold;
   return `<div class="product-card" onclick="viewProduct('${p.id}')">
     <div class="product-card-img">${p.photo_url?`<img src="${p.photo_url}" alt="${p.name}">`:'<div style="font-size:36px;opacity:.15">📦</div>'}</div>
     <div class="product-card-body">
@@ -2444,7 +2444,7 @@ function renderProductCard(p, threshold) {
 }
 
 function renderProductRow(p, threshold, canEdit) {
-  const isLow = (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold;
+  const isLow = (p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold;
   return `<tr onclick="viewProduct('${p.id}')">
     <td><div style="width:38px;height:34px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;display:flex;align-items:center;justify-content:center">${p.photo_url?`<img src="${p.photo_url}" style="width:38px;height:34px;object-fit:cover">`:' 📦'}</div></td>
     <td class="mono" style="font-size:12px">${p.code||'-'}</td>
@@ -2640,7 +2640,7 @@ async function viewProduct(id) {
   if (!p) return;
   const threshold = parseInt(settings.lowStockThreshold||10);
   const total = (p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0);
-  const isLow = (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold;
+  const isLow = (p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold;
   const canEdit = currentProfile?.role==='admin'||currentProfile?.role==='manager';
   const recentMov = allMovements.filter(m=>m.product_id===id).slice(0,5);
 
@@ -2976,14 +2976,14 @@ async function updateQuotStatus(id, status) {
 // ─── LOW STOCK ────────────────────────────────────────────────
 function checkLowStock() {
   const threshold = parseInt(settings.lowStockThreshold||10);
-  const count = allProducts.filter(p=>(p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold).length;
+  const count = allProducts.filter(p=>(p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold).length;
   const dot = document.getElementById('low-stock-dot');
   if (dot) dot.style.display = count>0?'inline-block':'none';
 }
 
 function renderLowStock() {
   const threshold = parseInt(settings.lowStockThreshold||10);
-  const low = allProducts.filter(p=>(p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold);
+  const low = allProducts.filter(p=>(p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold);
   const container = document.getElementById('low-stock-content');
   if(!low.length){container.innerHTML=`<div class="alert alert-success">✓ All stock levels are above the minimum threshold of ${threshold} units</div>`;return;}
   const canEdit=currentProfile?.role==='admin'||currentProfile?.role==='manager';
@@ -3050,7 +3050,7 @@ async function openEmailReport() {
   const totalIn=filtered.filter(m=>m.type==='in').reduce((a,m)=>a+m.qty,0);
   const totalOut=filtered.filter(m=>m.type==='out').reduce((a,m)=>a+m.qty,0);
   const threshold=parseInt(settings.lowStockThreshold||10);
-  const lowCount=allProducts.filter(p=>(p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold).length;
+  const lowCount=allProducts.filter(p=>(p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold).length;
   const totalValue=allProducts.reduce((a,p)=>a+((p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0))*(p.price||0),0);
   document.getElementById('email-preview').innerHTML=`<div style="font-weight:600;color:var(--text);margin-bottom:7px">Summary — ${monthName}</div><div>• Movements: ${filtered.length} (In: ${totalIn} / Out: ${totalOut})</div><div>• Products: ${allProducts.length}</div><div>• Inventory Value: SAR ${totalValue.toLocaleString('en',{maximumFractionDigits:0})}</div><div>• Low Stock Alerts: ${lowCount}</div>`;
   openModal('modal-email-report');
@@ -3061,7 +3061,7 @@ function sendEmailReport() {
   const cc=document.getElementById('email-cc').value.trim();
   const period=document.getElementById('email-period').value;
   const threshold=parseInt(settings.lowStockThreshold||10);
-  const lowItems=allProducts.filter(p=>(p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold);
+  const lowItems=allProducts.filter(p=>(p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold);
   const body=`BARAKAH GROUP INVENTORY REPORT%0A${period}%0A${'='.repeat(40)}%0A%0ACURRENT STOCK%0A${allProducts.map(p=>`${p.name}: BV${p.qty_bv||0} IS${p.qty_is||0} SW${p.qty_sw||0}`).join('%0A')}%0A%0ALOW STOCK%0A${lowItems.length?lowItems.map(p=>`⚠ ${p.name}: BV${p.qty_bv||0} IS${p.qty_is||0} SW${p.qty_sw||0}`).join('%0A'):'All OK'}%0A%0AGenerated ${new Date().toLocaleString()}`;
   window.location.href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent('Barakah Group — Inventory Report ('+period+')')}${cc?'&cc='+encodeURIComponent(cc):''}&body=${body}`;
   closeModal('modal-email-report');showToast('Email client opened!');exportReportCSV();
@@ -3561,7 +3561,7 @@ function exportProductsExcel() {
 
   // Apply low-stock row highlight
   allProducts.forEach((p, ri) => {
-    const isLow = (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold;
+    const isLow = (p.qty_bv||0) < threshold && (p.qty_is||0) < threshold && (p.qty_sw||0) < threshold;
     if (isLow) {
       headers.forEach((_, ci) => {
         const cellRef = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
@@ -3574,7 +3574,7 @@ function exportProductsExcel() {
   const totalProducts = allProducts.length;
   const totalUnits    = allProducts.reduce((a, p) => a + (p.qty_bv||0) + (p.qty_is||0) + (p.qty_sw||0), 0);
   const totalValue    = allProducts.reduce((a, p) => a + ((p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0))*(p.price||0), 0);
-  const lowCount      = allProducts.filter(p => (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold).length;
+  const lowCount      = allProducts.filter(p => (p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold).length;
   const bvUnits       = allProducts.reduce((a,p)=>a+(p.qty_bv||0),0);
   const isUnits       = allProducts.reduce((a,p)=>a+(p.qty_is||0),0);
   const swUnits       = allProducts.reduce((a,p)=>a+(p.qty_sw||0),0);
@@ -6945,7 +6945,7 @@ function renderGroupedProductsV2() {
           <table style="width:100%">
             <tbody>
               ${prods.map(p => {
-                const isLow = (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold;
+                const isLow = (p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold;
                 return `<tr onclick="viewProduct('${p.id}')"
                   style="border-bottom:1px solid var(--border);cursor:pointer;${isLow?'background:#fff5f5;':''}">
                   <td style="padding:8px 10px;width:44px">
@@ -8635,7 +8635,7 @@ function _renderCatLevel1(mat) {
     const prods    = matProducts.filter(p => normalizeCatName(p.category) === cat.id);
     const count    = prods.length;
     const lowCount = prods.filter(p =>
-      (p.qty_bv||0) < threshold || (p.qty_is||0) < threshold || (p.qty_sw||0) < threshold
+      (p.qty_bv||0) < threshold && (p.qty_is||0) < threshold && (p.qty_sw||0) < threshold
     ).length;
     const empty = count === 0;
 
@@ -9275,7 +9275,7 @@ function catSearchLevel1(query, mat) {
   const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
   let rowsHtml = '';
   matching.forEach(p => {
-    const isLow = (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold;
+    const isLow = (p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold;
     const photo = p.photo_url ? '<img src="' + p.photo_url + '" style="width:38px;height:34px;object-fit:cover;border-radius:5px;">' : '<span style="opacity:.3;font-size:16px;">📦</span>';
     rowsHtml += '<tr data-id="' + p.id + '" style="cursor:pointer;border-bottom:1px solid var(--border);' + (isLow?'background:#fff5f5;':'') + '">'
       + '<td style="padding:9px 12px;width:44px;"><div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;">' + photo + '</div></td>'
