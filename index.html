@@ -1121,6 +1121,7 @@ window.onerror = function(msg, src, line, col, err) {
             <button class="btn btn-sm btn-outline" onclick="selectAllProducts()">Select All</button>
             <button class="btn btn-sm btn-outline" onclick="clearSelection()">Clear</button>
             <button class="btn btn-sm btn-outline admin-only" onclick="openBulkEditCategoryModal()" style="border-color:rgba(37,99,235,0.4);color:var(--steel)">✏️ Edit Category</button>
+            <button class="btn btn-sm btn-outline admin-only" onclick="openAiFixCodesModal()" style="border-color:rgba(217,119,6,0.5);color:var(--gold);">🤖 AI Fix Codes</button>
             <button class="btn btn-sm btn-danger admin-only" onclick="bulkDeleteSelected()">🗑️ Delete Selected</button>
           </div>
         </div>
@@ -10386,6 +10387,192 @@ openEditProduct = function(id) {
   setTimeout(filterCategoryByMaterial, 120);
 };
 
+// ═══════════════════════════════════════════════════════════════
+// AI FIX PRODUCT CODES — Admin bulk tool
+// Uses Claude to suggest correct codes for selected products
+// ═══════════════════════════════════════════════════════════════
+
+let _afcResults = []; // { product, suggestedCode, approved }
+
+function openAiFixCodesModal() {
+  if (currentProfile?.role !== 'admin') { showToast('Admin only', 'error'); return; }
+  const ids = [...selectedProductIds];
+  if (!ids.length) { showToast('Select products first', 'error'); return; }
+
+  _afcResults = [];
+  const tbody = document.getElementById('afc-tbody');
+  const progressWrap = document.getElementById('afc-progress-wrap');
+  const applyBtn = document.getElementById('afc-apply-btn');
+
+  if (tbody) tbody.innerHTML = '';
+  if (progressWrap) progressWrap.style.display = 'none';
+  if (applyBtn) applyBtn.disabled = true;
+  document.getElementById('afc-approved-count').textContent = '0';
+
+  openModal('modal-ai-fix-codes');
+
+  // Start AI analysis
+  runAiCodeFix(ids);
+}
+
+async function runAiCodeFix(ids) {
+  const products = ids.map(id => allProducts.find(p => p.id === id)).filter(Boolean);
+  const total = products.length;
+  const tbody = document.getElementById('afc-tbody');
+  const progressWrap = document.getElementById('afc-progress-wrap');
+  const progressBar = document.getElementById('afc-progress-bar');
+  const progressLabel = document.getElementById('afc-progress-label');
+  const progressPct = document.getElementById('afc-progress-pct');
+
+  if (progressWrap) progressWrap.style.display = 'block';
+
+  // Build the prompt for Claude
+  const productList = products.map((p, i) =>
+    `${i+1}. Name: "${p.name}" | Material: ${p.material||'?'} | Category: ${p.category||'?'} | Sub-type: ${p.sub_type||'?'} | Size: ${p.size||'?'} | Current Code: ${p.code||'none'}`
+  ).join('\n');
+
+  const prompt = `You are a product code generator for an industrial piping and valve inventory system.
+
+Generate a product code for each product below using this exact format:
+[MATERIAL][TYPE][SCHEDULE]-[SIZECODE]
+
+Rules:
+- Material codes: CS, SS, GI, BMI, BRS (Brass), BRZ (Bronze), CP (CPVC), PVC, PPR, HDP (HDPE)
+- Type codes: GV (Gate Valve), BV (Ball Valve), CVT (Check Valve), GLV (Globe Valve), BFV (Butterfly), YS (Y-Strainer), EL (Elbow), EL45 (45° Elbow), EL90 (90° Elbow), TEE, CAP (End Cap), CPL (Coupling), BSH (Bush), PNPL (Pipe Nipple), SN (Swage Nipple), FA (Female Adapter), FLSO (Slip-On Flange), FLBL (Blind Flange), PS (Seamless Pipe), PERW (ERW Pipe)
+- Schedule: extract from name (S/40→40, S/80→80, S/160→160, PN16→P16, 150LB→150)  
+- Size codes: 001=1/8", 002=1/4", 003=3/8", 004=1/2", 005=3/4", 006=1", 007=1¼", 008=1½", 009=2", 010=2½", 011=3", 012=3½", 013=4", 014=5", 015=6", 016=8", 017=10", 018=12"
+
+Products to code:
+${productList}
+
+Respond ONLY with a JSON array, no other text:
+[{"index":1,"code":"CSCAP40-008"},{"index":2,"code":"SSGV80-009"},...]`;
+
+  try {
+    if (progressLabel) progressLabel.textContent = 'Sending to AI...';
+    if (progressBar) progressBar.style.width = '20%';
+    if (progressPct) progressPct.textContent = '20%';
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (progressBar) progressBar.style.width = '70%';
+    if (progressPct) progressPct.textContent = '70%';
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+
+    // Parse JSON response
+    let suggestions = [];
+    try {
+      const clean = text.replace(/```json|```/g, '').trim();
+      suggestions = JSON.parse(clean);
+    } catch(e) {
+      // Try extracting JSON from text
+      const match = text.match(/\[[\s\S]+\]/);
+      if (match) suggestions = JSON.parse(match[0]);
+    }
+
+    if (progressBar) progressBar.style.width = '100%';
+    if (progressPct) progressPct.textContent = '100%';
+    setTimeout(() => { if (progressWrap) progressWrap.style.display = 'none'; }, 500);
+
+    // Build results
+    _afcResults = products.map((p, i) => {
+      const suggestion = suggestions.find(s => s.index === i+1);
+      return {
+        product: p,
+        suggestedCode: suggestion?.code || '',
+        approved: !!suggestion?.code
+      };
+    });
+
+    renderAfcResults();
+
+  } catch(e) {
+    if (progressWrap) progressWrap.style.display = 'none';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:#dc2626;">AI Error: ' + (e.message||'Failed') + '</td></tr>';
+    showToast('AI analysis failed: ' + (e.message||''), 'error');
+  }
+}
+
+function renderAfcResults() {
+  const tbody = document.getElementById('afc-tbody');
+  const applyBtn = document.getElementById('afc-apply-btn');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  _afcResults.forEach((item, idx) => {
+    const p = item.product;
+    const changed = item.suggestedCode && item.suggestedCode !== (p.code || '');
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border)';
+    if (!changed) tr.style.opacity = '0.5';
+
+    tr.innerHTML =
+      '<td style="padding:10px 12px;width:40px;">'
+      + '<input type="checkbox" ' + (item.approved && changed ? 'checked' : '') + (changed ? '' : ' disabled')
+      + ' onchange="_afcResults[' + idx + '].approved=this.checked;updateAfcCount()"'
+      + ' style="width:16px;height:16px;cursor:pointer;">'
+      + '</td>'
+      + '<td style="padding:10px 12px;">'
+      + '<div style="font-weight:500;font-size:13px;">' + p.name + '</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);">' + (p.material||'') + (p.category?' · '+p.category:'') + (p.size?' · '+p.size:'') + '</div>'
+      + '</td>'
+      + '<td style="padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">' + (p.code||'—') + '</td>'
+      + '<td style="padding:10px 12px;">'
+      + (item.suggestedCode
+        ? (changed
+          ? '<span style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--gold);background:var(--gold-light,#fffbeb);padding:3px 8px;border-radius:5px;border:1px solid var(--gold);">' + item.suggestedCode + '</span>'
+          : '<span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">' + item.suggestedCode + ' (same)</span>')
+        : '<span style="color:#dc2626;font-size:12px;">No suggestion</span>')
+      + '</td>';
+
+    tbody.appendChild(tr);
+  });
+
+  updateAfcCount();
+}
+
+function updateAfcCount() {
+  const count = _afcResults.filter(r => r.approved && r.suggestedCode && r.suggestedCode !== (r.product.code||'')).length;
+  const el = document.getElementById('afc-approved-count');
+  if (el) el.textContent = count;
+  const btn = document.getElementById('afc-apply-btn');
+  if (btn) btn.disabled = count === 0;
+}
+
+async function applyAiFixCodes() {
+  const toApply = _afcResults.filter(r => r.approved && r.suggestedCode && r.suggestedCode !== (r.product.code||''));
+  if (!toApply.length) return;
+
+  showLoading('SAVING ' + toApply.length + ' CODES...');
+  let success = 0;
+
+  for (const item of toApply) {
+    try {
+      const { error } = await sb.from('products').update({ code: item.suggestedCode }).eq('id', item.product.id);
+      if (!error) {
+        const p = allProducts.find(x => x.id === item.product.id);
+        if (p) p.code = item.suggestedCode;
+        success++;
+      }
+    } catch(e) { console.warn('Code update failed:', e.message); }
+  }
+
+  hideLoading();
+  closeModal('modal-ai-fix-codes');
+  renderInventory();
+  showToast(success + ' product codes updated!');
+}
+
 window.addEventListener('DOMContentLoaded', init);
 </script>
 
@@ -10798,6 +10985,55 @@ window.addEventListener('DOMContentLoaded', init);
       <button class="btn btn-gold" id="assign-confirm-btn" onclick="confirmAssignPhoto()">
         📌 Assign to <span id="assign-btn-count">0</span> Products
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- AI FIX PRODUCT CODES MODAL -->
+<div class="modal-overlay" id="modal-ai-fix-codes">
+  <div class="modal" style="max-width:760px;width:96vw;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-title">🤖 AI Fix Product Codes</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
+      AI will analyse each selected product's name, material, category and size, then generate a correct product code. 
+      Review and approve each one before saving.
+    </p>
+
+    <!-- Progress bar (shown during AI run) -->
+    <div id="afc-progress-wrap" style="display:none;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:4px;">
+        <span id="afc-progress-label">Analysing products...</span>
+        <span id="afc-progress-pct">0%</span>
+      </div>
+      <div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;">
+        <div id="afc-progress-bar" style="height:100%;background:var(--gold);border-radius:99px;transition:width .3s;width:0%;"></div>
+      </div>
+    </div>
+
+    <!-- Results table -->
+    <div style="flex:1;overflow-y:auto;max-height:440px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--surface2);position:sticky;top:0;z-index:1;">
+            <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);">✓</th>
+            <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);">Product</th>
+            <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);">Current Code</th>
+            <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);">AI Suggested Code</th>
+          </tr>
+        </thead>
+        <tbody id="afc-tbody"></tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--border);">
+      <div style="font-size:12px;color:var(--text-muted);">
+        <span id="afc-approved-count">0</span> approved — click checkboxes to select which codes to save
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="closeModal('modal-ai-fix-codes')">Cancel</button>
+        <button class="btn btn-gold" onclick="applyAiFixCodes()" id="afc-apply-btn" disabled>
+          💾 Apply Approved Codes
+        </button>
+      </div>
     </div>
   </div>
 </div>
