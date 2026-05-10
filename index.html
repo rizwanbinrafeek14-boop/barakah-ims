@@ -1271,18 +1271,17 @@ window.onerror = function(msg, src, line, col, err) {
       <div class="page-header">
         <div class="page-header-title">
           <h1>Purchase Orders</h1>
-          <p>Manage supplier purchase orders</p>
+          <p>Create and manage supplier POs</p>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline" onclick="loadAndRenderPOs()" title="Refresh">🔄 Refresh</button>
+          <button class="btn btn-outline" onclick="loadAndRenderPOs()">🔄 Refresh</button>
           <button class="btn btn-gold manager-only" onclick="openNewPO()">+ New PO</button>
         </div>
       </div>
-      <!-- Filters -->
+      <div class="grid-4" style="margin-bottom:16px;" id="po-stats-row"></div>
       <div class="card" style="margin-bottom:14px;">
         <div class="filter-bar">
-          <input class="search-input" type="text" id="po-search"
-            placeholder="🔍 Search PO number or supplier..." oninput="renderPOs()">
+          <input class="search-input" type="text" id="po-search" placeholder="🔍 Search PO no. or supplier..." oninput="renderPOs()">
           <select class="filter-select" id="po-filter-company" onchange="renderPOs()">
             <option value="">All Companies</option>
             <option value="bv">Barakah Valves</option>
@@ -1299,27 +1298,14 @@ window.onerror = function(msg, src, line, col, err) {
           </select>
         </div>
       </div>
-      <!-- Stats row -->
-      <div class="grid-4" style="margin-bottom:14px;" id="po-stats-row"></div>
-      <!-- Table -->
       <div class="card" style="padding:0;">
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>PO No.</th>
-              <th>Date</th>
-              <th>Supplier</th>
-              <th>Company</th>
-              <th>Items</th>
-              <th>Total (SAR)</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th>PO No.</th><th>Date</th><th>Supplier</th>
+              <th>Company</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th>
             </tr></thead>
-            <tbody id="po-tbody">
-              <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted);">
-                Loading...
-              </td></tr>
-            </tbody>
+            <tbody id="po-tbody"><tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1892,12 +1878,6 @@ window.onerror = function(msg, src, line, col, err) {
           <div style="font-size:15px;font-weight:600" id="preview-title"></div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="preview-subtitle"></div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn btn-sm btn-outline" onclick="regenerateAllImportCodes()"
-            style="border-color:var(--gold);color:var(--gold);font-size:11px;">
-            ⚡ Regenerate All Codes
-          </button>
-        </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline btn-sm" onclick="selectAllPreviewRows()">Select All</button>
           <button class="btn btn-outline btn-sm" onclick="deselectAllPreviewRows()">Deselect All</button>
@@ -2342,10 +2322,7 @@ function showPage(id) {
   }
   if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
   if (id === 'purchase-orders') {
-    // Force browser reflow to ensure page is visible
-    const poPage = document.getElementById('page-purchase-orders');
-    if (poPage) { poPage.style.display = 'block'; poPage.offsetHeight; } // trigger reflow
-    setTimeout(() => { loadAndRenderPOs(); }, 50);
+    setTimeout(() => loadAndRenderPOs(), 80);
   }
   // Update bottom nav
   if (typeof updateBottomNav === 'function') updateBottomNav(id);
@@ -5195,12 +5172,6 @@ async function startSmartImport() {
 
   // Mark duplicates
   _importPreview.forEach(p => {
-    // Auto-generate code if missing
-    if (!p.code && p.name) {
-      const sv = [p.size, p.grade].filter(Boolean).join(' ');
-      const generated = generateImportCode(p.material||'', p.type||'', p.sub_type||'', sv, p.name||'');
-      if (generated) { p.code = generated; p._autoCode = true; }
-    }
     if (p.code) {
       const exists = allProducts.find(x => x.code && x.code.toLowerCase().trim() === p.code.toLowerCase().trim());
       if (exists) { p._status = 'duplicate'; p._duplicateName = exists.name; }
@@ -5471,26 +5442,9 @@ async function confirmImport() {
 
     // Duplicate check moved to after code generation (handled in auto-code logic above)
 
-    // Auto-generate code if not provided in Excel
-    const sizeVal = [p.size, p.grade].filter(Boolean).join(' ');
-    let autoCode = p.code || null;
-    if (!autoCode) {
-      autoCode = generateImportCode(p.material||'', p.type||'', p.sub_type||'', sizeVal, p.name||'');
-      // If duplicate generated code exists, append counter
-      if (autoCode) {
-        let finalCode = autoCode;
-        let counter = 1;
-        while (allProducts.find(x => x.code && x.code === finalCode)) {
-          finalCode = autoCode + '-' + String(counter).padStart(2,'0');
-          counter++;
-        }
-        autoCode = finalCode;
-      }
-    }
-
     const product = {
       name: p.name,
-      code: autoCode,
+      code: p.code || null,
       category: p.type || 'Other',
       material: p.material||'Other',
       size: [p.size,p.grade].filter(Boolean).join(' · ')||null,
@@ -8724,6 +8678,14 @@ function _renderCatLevel1(mat) {
       <span>${mc.label || mat}</span>
     </div>
 
+    <!-- Search bar -->
+    <div style="margin-bottom:14px;">
+      <input type="text" id="cat-search-input" placeholder="🔍 Search products by name, code, size..."
+        style="width:100%;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);
+               border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:14px;outline:none;box-sizing:border-box;"
+        oninput="catSearchLevel1(this.value,'${mat}')">
+    </div>
+
     <!-- Material header card -->
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:16px 20px;
                 background:${mc.bg};border-radius:var(--radius);border:2px solid ${mc.border};">
@@ -8754,7 +8716,7 @@ function _openCatCategory(catId, mat) {
   _renderCatSubTypes(catId, mat, null); // null = show all sub-types
 }
 
-function _renderCatSubTypes(catId, mat, filterSubType) {
+function _renderCatSubTypes(catId, mat, filterSubType, searchQuery) {
   const root = document.getElementById('cat-root');
   if (!root) return;
 
@@ -8780,10 +8742,19 @@ function _renderCatSubTypes(catId, mat, filterSubType) {
     return a.localeCompare(b);
   });
 
-  // Display products: filtered or all
-  const displayProds = filterSubType
+  // Display products: filtered by sub-type and/or search
+  let displayProds = filterSubType
     ? catProds.filter(p => (p.sub_type || 'General') === filterSubType)
     : catProds;
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    displayProds = displayProds.filter(p =>
+      (p.name||'').toLowerCase().includes(q) ||
+      (p.code||'').toLowerCase().includes(q) ||
+      (p.sub_type||'').toLowerCase().includes(q) ||
+      (p.size||'').toLowerCase().includes(q)
+    );
+  }
 
   // Build sub-type filter pills
   let pillsHtml = '<button id="cat-sub-all" data-sub="" style="padding:5px 14px;border-radius:99px;cursor:pointer;font-size:12px;font-weight:600;border:1.5px solid ' + (filterSubType ? 'var(--border)' : mc.color) + ';background:' + (filterSubType ? 'var(--surface)' : mc.bg) + ';color:' + (filterSubType ? 'var(--text-muted)' : mc.color) + ';">All (' + catProds.length + ')</button> ';
@@ -9061,485 +9032,53 @@ function hidePolDropdown(idx) {
 // PURCHASE ORDERS — COMPLETE REWRITE
 // ═══════════════════════════════════════════════════════════════
 
-let allPOs     = [];
-let poLineIdx  = 0;
-let _editPOId  = null;
-
 // ── LOAD ─────────────────────────────────────────────────────
-async function loadPOs() {
-  try {
-    const { data, error } = await sb
-      .from('purchase_orders')
-      .select('*, purchase_order_lines(*)')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    allPOs = data || [];
-  } catch(e) {
-    console.warn('loadPOs:', e.message);
-    allPOs = [];
-  }
-}
+// loadPOs removed
 
-async function loadAndRenderPOs() {
-  renderPOs(); // show immediately with cached/empty data
-  await loadPOs(); // fetch from DB
-  renderPOs(); // re-render with fresh data
-}
+
+// loadAndRenderPOs removed
+
 
 // ── RENDER LIST ───────────────────────────────────────────────
-function renderPOs() {
-  const tbody = document.getElementById('po-tbody');
-  if (!tbody) return;
+// renderPOs removed
 
-  const search  = (document.getElementById('po-search')?.value || '').toLowerCase();
-  const fc      = document.getElementById('po-filter-company')?.value || '';
-  const fs      = document.getElementById('po-filter-status')?.value || '';
-  const isAdmin = currentProfile?.role === 'admin';
-  const isMgr   = isAdmin || currentProfile?.role === 'manager';
-
-  const STATUS_BADGE = {
-    draft:'badge-warn', sent:'badge-blue', received:'badge-green',
-    partial:'badge-gold', cancelled:'badge-red'
-  };
-
-  const list = allPOs.filter(po => {
-    if (!po) return false;
-    return (!search || (po.supplier||'').toLowerCase().includes(search) || (po.po_no||'').toLowerCase().includes(search))
-        && (!fc || po.company === fc)
-        && (!fs || po.status === fs);
-  });
-
-  // Stats
-  const statsEl = document.getElementById('po-stats-row');
-  if (statsEl) {
-    const total   = allPOs.length;
-    const pending = allPOs.filter(p => p.status === 'sent').length;
-    const recv    = allPOs.filter(p => p.status === 'received').length;
-    const value   = allPOs.reduce((s,p) => s + Number(p.total||0), 0);
-    statsEl.innerHTML = [
-      {icon:'📋', label:'Total POs',     val: total,                  cls:'blue'},
-      {icon:'📤', label:'Pending',        val: pending,                cls:'warn'},
-      {icon:'✅', label:'Received',       val: recv,                   cls:'green'},
-      {icon:'💰', label:'Total Value',    val:'SAR '+value.toFixed(0), cls:'gold'},
-    ].map(s => `<div class="stat-card">
-      <div class="stat-icon-box ${s.cls}"><span style="font-size:18px;">${s.icon}</span></div>
-      <div class="stat-label">${s.label}</div>
-      <div class="stat-value" style="font-size:22px;">${s.val}</div>
-    </div>`).join('');
-  }
-
-  if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:48px;color:var(--text-muted);">'
-      + '<div style="font-size:40px;margin-bottom:12px;">📋</div>'
-      + '<div style="font-weight:700;font-size:16px;margin-bottom:6px;">No Purchase Orders</div>'
-      + '<div style="font-size:13px;">' + (search||fc||fs ? 'No results match your filters.' : 'Click <strong>+ New PO</strong> to create your first purchase order.') + '</div>'
-      + '</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = '';
-  list.forEach(po => {
-    const tr = document.createElement('tr');
-    tr.style.cursor = 'pointer';
-    tr.addEventListener('click', () => printPO(po));
-
-    const date  = (po.po_date || po.created_at) ? new Date(po.po_date || po.created_at).toLocaleDateString('en-SA') : '—';
-    const lines = (po.purchase_order_lines || []).length;
-    const total = Number(po.total || 0).toFixed(2);
-    const badge = STATUS_BADGE[po.status] || 'badge-blue';
-    const coName = (typeof COMPANY_NAMES !== 'undefined' && COMPANY_NAMES[po.company]) || po.company || '—';
-
-    tr.innerHTML =
-        '<td class="mono" style="font-size:12px;color:var(--gold);font-weight:700;">' + (po.po_no||'—') + '</td>'
-      + '<td style="font-size:13px;">' + date + '</td>'
-      + '<td><div style="font-weight:500;">' + (po.supplier||'—') + '</div>'
-        + (po.contact ? '<div style="font-size:11px;color:var(--text-muted);">' + po.contact + '</div>' : '')
-        + '</td>'
-      + '<td><span class="badge badge-blue" style="font-size:10px;">' + coName + '</span></td>'
-      + '<td style="text-align:center;">' + lines + '</td>'
-      + '<td class="mono" style="font-weight:600;">SAR ' + total + '</td>'
-      + '<td><span class="badge ' + badge + '">' + (po.status||'draft').toUpperCase() + '</span></td>'
-      + '<td><div style="display:flex;gap:4px;" onclick="event.stopPropagation();"></div></td>';
-
-    const actionsDiv = tr.querySelector('td:last-child div');
-
-    // Print button — all roles
-    const printBtn = document.createElement('button');
-    printBtn.className = 'btn btn-sm btn-outline';
-    printBtn.innerHTML = '🖨️';
-    printBtn.title = 'Print PO';
-    printBtn.addEventListener('click', e => { e.stopPropagation(); printPO(po); });
-    actionsDiv.appendChild(printBtn);
-
-    // Edit button — manager+
-    if (isMgr && po.status === 'draft') {
-      const editBtn = document.createElement('button');
-      editBtn.className = 'btn btn-sm btn-outline';
-      editBtn.innerHTML = '✏️';
-      editBtn.title = 'Edit PO';
-      editBtn.addEventListener('click', e => { e.stopPropagation(); openEditPO(po); });
-      actionsDiv.appendChild(editBtn);
-    }
-
-    // Mark received — manager+
-    if (isMgr && !['received','cancelled'].includes(po.status)) {
-      const recvBtn = document.createElement('button');
-      recvBtn.className = 'btn btn-sm btn-success';
-      recvBtn.innerHTML = '✓';
-      recvBtn.title = 'Mark as Received';
-      recvBtn.addEventListener('click', e => { e.stopPropagation(); updatePOStatus(po.id, 'received'); });
-      actionsDiv.appendChild(recvBtn);
-    }
-
-    // Delete — admin only
-    if (isAdmin) {
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn btn-sm btn-danger';
-      delBtn.innerHTML = '🗑️';
-      delBtn.title = 'Delete PO';
-      delBtn.addEventListener('click', e => { e.stopPropagation(); deletePO(po.id, po.po_no||''); });
-      actionsDiv.appendChild(delBtn);
-    }
-
-    tbody.appendChild(tr);
-  });
-}
 
 // ── OPEN NEW PO ───────────────────────────────────────────────
-function openNewPO() {
-  _editPOId = null;
-  poLineIdx = 0;
-  document.getElementById('po-modal-title').textContent = 'New Purchase Order';
-  document.getElementById('po-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('po-delivery-date').value = '';
-  document.getElementById('po-status').value = 'draft';
-  ['po-supplier','po-contact','po-delivery-addr','po-notes'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  document.getElementById('po-lines-body').innerHTML = '';
-  document.getElementById('po-totals').innerHTML = '';
-  addPOLine();
-  openModal('modal-po');
-}
+// openNewPO removed
+
 
 // ── OPEN EDIT PO ──────────────────────────────────────────────
-function openEditPO(po) {
-  if (!po) return;
-  _editPOId = po.id;
-  poLineIdx = 0;
-  document.getElementById('po-modal-title').textContent = 'Edit PO — ' + (po.po_no||'');
-  document.getElementById('po-date').value = po.po_date || '';
-  document.getElementById('po-company').value = po.company || 'bv';
-  document.getElementById('po-status').value = po.status || 'draft';
-  document.getElementById('po-supplier').value = po.supplier || '';
-  document.getElementById('po-contact').value = po.contact || '';
-  document.getElementById('po-delivery-date').value = po.delivery_date || '';
-  document.getElementById('po-delivery-addr').value = po.delivery_addr || '';
-  document.getElementById('po-notes').value = po.notes || '';
-  document.getElementById('po-lines-body').innerHTML = '';
-  document.getElementById('po-totals').innerHTML = '';
-  const lines = po.purchase_order_lines || [];
-  if (lines.length) {
-    lines.forEach(l => addPOLine(l));
-  } else {
-    addPOLine();
-  }
-  openModal('modal-po');
-}
+// openEditPO removed
+
 
 // ── ADD LINE ──────────────────────────────────────────────────
-function addPOLine(existingLine) {
-  const idx = poLineIdx++;
-  const tr = document.createElement('tr');
-  tr.id = 'pol-' + idx;
-  tr.style.borderBottom = '1px solid var(--border)';
+// addPOLine removed
 
-  // Product search cell
-  const tdProd = document.createElement('td');
-  tdProd.style.padding = '6px 8px';
-  tdProd.innerHTML = '<div style="position:relative;">'
-    + '<input type="text" id="pol-search-' + idx + '" placeholder="Type to search product..." autocomplete="off"'
-    + ' style="width:100%;padding:6px 10px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;outline:none;"'
-    + ' oninput="filterPolProducts(' + idx + ',this.value)" onfocus="filterPolProducts(' + idx + ',this.value)"'
-    + ' onblur="setTimeout(()=>hidePolDropdown(' + idx + '),200)">'
-    + '<input type="hidden" id="pol-pid-' + idx + '" value="">'
-    + '<div id="pol-drop-' + idx + '" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);'
-    + 'border:1.5px solid var(--gold);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:9999;max-height:200px;overflow-y:auto;margin-top:2px;"></div>'
-    + '</div>'
-    + '<input type="text" id="pol-custom-' + idx + '" placeholder="Custom description..." '
-    + ' style="display:none;width:100%;margin-top:4px;padding:6px 10px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;outline:none;"'
-    + ' oninput="recalcPOL(' + idx + ')">';
-  tr.appendChild(tdProd);
 
-  // Qty
-  const tdQty = document.createElement('td');
-  tdQty.style.padding = '6px 4px';
-  tdQty.innerHTML = '<input type="number" id="pol-qty-' + idx + '" value="' + (existingLine?.qty||1) + '" min="0.01" step="0.01"'
-    + ' style="width:76px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:13px;text-align:center;"'
-    + ' oninput="recalcPOL(' + idx + ')">';
-  tr.appendChild(tdQty);
+// recalcPOL removed
 
-  // Unit
-  const tdUnit = document.createElement('td');
-  tdUnit.style.padding = '6px 4px';
-  tdUnit.innerHTML = '<select id="pol-unit-' + idx + '"'
-    + ' style="width:86px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;">'
-    + ['PCS','MTR','KG','SET','BOX','ROLL','LENGTH','LOT'].map(u =>
-        '<option' + ((existingLine?.unit||'PCS')===u?' selected':'') + '>' + u + '</option>').join('')
-    + '</select>';
-  tr.appendChild(tdUnit);
 
-  // Unit price
-  const tdPrice = document.createElement('td');
-  tdPrice.style.padding = '6px 4px';
-  tdPrice.innerHTML = '<input type="number" id="pol-price-' + idx + '" value="' + (existingLine?.unit_price||0) + '" step="0.01"'
-    + ' style="width:100px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:13px;"'
-    + ' oninput="recalcPOL(' + idx + ')">';
-  tr.appendChild(tdPrice);
+// removePOL removed
 
-  // Total
-  const tdTotal = document.createElement('td');
-  tdTotal.id = 'pol-total-' + idx;
-  tdTotal.style.cssText = 'padding:6px 8px;font-family:var(--font-mono);font-size:13px;font-weight:600;text-align:right;';
-  tdTotal.textContent = Number((existingLine?.qty||1)*(existingLine?.unit_price||0)).toFixed(2);
-  tr.appendChild(tdTotal);
 
-  // Remove btn
-  const tdDel = document.createElement('td');
-  tdDel.style.padding = '6px 4px';
-  const removeBtn = document.createElement('button');
-  removeBtn.className = 'btn btn-sm btn-danger';
-  removeBtn.innerHTML = '×';
-  removeBtn.addEventListener('click', () => { tr.remove(); updatePOTotals(); });
-  tdDel.appendChild(removeBtn);
-  tr.appendChild(tdDel);
+// updatePOTotals removed
 
-  document.getElementById('po-lines-body').appendChild(tr);
-
-  // Pre-fill if editing existing line
-  if (existingLine) {
-    const searchEl = document.getElementById('pol-search-' + idx);
-    const pidEl    = document.getElementById('pol-pid-' + idx);
-    if (existingLine.product_id) {
-      const p = allProducts.find(x => x.id === existingLine.product_id);
-      if (searchEl && p) searchEl.value = p.name + (p.code ? ' (' + p.code + ')' : '');
-      if (pidEl) pidEl.value = existingLine.product_id;
-    } else if (existingLine.custom_desc) {
-      if (pidEl) pidEl.value = '_custom';
-      const custEl = document.getElementById('pol-custom-' + idx);
-      if (custEl) { custEl.style.display = ''; custEl.value = existingLine.custom_desc; }
-    }
-  }
-
-  updatePOTotals();
-}
-
-function recalcPOL(idx) {
-  const qty   = parseFloat(document.getElementById('pol-qty-' + idx)?.value) || 0;
-  const price = parseFloat(document.getElementById('pol-price-' + idx)?.value) || 0;
-  const el    = document.getElementById('pol-total-' + idx);
-  if (el) el.textContent = (qty * price).toFixed(2);
-  updatePOTotals();
-}
-
-function removePOL(idx) {
-  const tr = document.getElementById('pol-' + idx);
-  if (tr) tr.remove();
-  updatePOTotals();
-}
-
-function updatePOTotals() {
-  const el = document.getElementById('po-totals');
-  if (!el) return;
-  let sub = 0;
-  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
-    const id = tr.id.replace('pol-','');
-    const qty   = parseFloat(document.getElementById('pol-qty-'+id)?.value) || 0;
-    const price = parseFloat(document.getElementById('pol-price-'+id)?.value) || 0;
-    sub += qty * price;
-  });
-  const vr  = parseFloat((settings && settings.vatRate) || 15) / 100;
-  const vat = sub * vr;
-  const tot = sub + vat;
-  el.innerHTML = '<div style="display:inline-block;text-align:right;min-width:220px;">'
-    + '<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:3px;">'
-    + '<span style="color:var(--text-muted);">Subtotal</span>'
-    + '<span class="mono">SAR ' + sub.toFixed(2) + '</span></div>'
-    + '<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:3px;">'
-    + '<span style="color:var(--text-muted);">VAT (' + Math.round(vr*100) + '%)</span>'
-    + '<span class="mono">SAR ' + vat.toFixed(2) + '</span></div>'
-    + '<div style="display:flex;justify-content:space-between;gap:24px;font-weight:700;font-size:15px;border-top:2px solid var(--border);padding-top:4px;">'
-    + '<span>Total</span>'
-    + '<span class="mono">SAR ' + tot.toFixed(2) + '</span></div>'
-    + '</div>';
-}
 
 // ── SAVE PO ───────────────────────────────────────────────────
-async function savePO(statusOverride) {
-  const supplier = document.getElementById('po-supplier')?.value.trim();
-  if (!supplier) { showToast('Supplier name required', 'error'); return; }
+// savePO removed
 
-  const company  = document.getElementById('po-company')?.value || 'bv';
-  const status   = statusOverride || document.getElementById('po-status')?.value || 'draft';
-
-  // Collect lines
-  const lines = [];
-  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
-    const id       = tr.id.replace('pol-','');
-    const pidEl    = document.getElementById('pol-pid-' + id);
-    const custEl   = document.getElementById('pol-custom-' + id);
-    const qty      = parseFloat(document.getElementById('pol-qty-' + id)?.value) || 0;
-    const price    = parseFloat(document.getElementById('pol-price-' + id)?.value) || 0;
-    if (qty <= 0) return;
-    const pidVal = pidEl?.value || '';
-    const pid    = (pidVal && pidVal !== '_custom') ? pidVal : null;
-    const pObj   = pid ? allProducts.find(x => x.id === pid) : null;
-    lines.push({
-      product_id:   pid,
-      custom_desc:  (!pid && custEl ? custEl.value.trim() : '') || (pObj ? '' : ''),
-      qty, unit:    document.getElementById('pol-unit-' + id)?.value || 'PCS',
-      unit_price:   price,
-      total:        qty * price,
-      sort_order:   lines.length
-    });
-  });
-
-  const sub = lines.reduce((a,l) => a + l.total, 0);
-  const vr  = parseFloat((settings && settings.vatRate) || 15) / 100;
-  const now = Date.now().toString().slice(-6);
-  const poNo = _editPOId ? null : 'PO-' + company.toUpperCase() + '-' + now;
-
-  showLoading('SAVING PO...');
-  try {
-    let poId = _editPOId;
-
-    if (_editPOId) {
-      // Update existing
-      const { error } = await sb.from('purchase_orders').update({
-        company, supplier, status,
-        contact:       document.getElementById('po-contact')?.value || '',
-        delivery_addr: document.getElementById('po-delivery-addr')?.value || '',
-        delivery_date: document.getElementById('po-delivery-date')?.value || null,
-        notes:         document.getElementById('po-notes')?.value || '',
-        po_date:       document.getElementById('po-date')?.value || null,
-        subtotal: sub, vat: sub*vr, total: sub*(1+vr)
-      }).eq('id', _editPOId);
-      if (error) throw error;
-      await sb.from('purchase_order_lines').delete().eq('po_id', _editPOId);
-    } else {
-      // Insert new
-      const { data: poData, error } = await sb.from('purchase_orders').insert({
-        po_no: poNo, company, supplier, status,
-        contact:       document.getElementById('po-contact')?.value || '',
-        delivery_addr: document.getElementById('po-delivery-addr')?.value || '',
-        delivery_date: document.getElementById('po-delivery-date')?.value || null,
-        notes:         document.getElementById('po-notes')?.value || '',
-        po_date:       document.getElementById('po-date')?.value || null,
-        subtotal: sub, vat: sub*vr, total: sub*(1+vr),
-        created_by: currentProfile?.id || null
-      }).select().single();
-      if (error) throw error;
-      poId = poData.id;
-    }
-
-    // Insert lines
-    if (lines.length) {
-      const lineInserts = lines.map(l => ({ ...l, po_id: poId }));
-      const { error: lErr } = await sb.from('purchase_order_lines').insert(lineInserts);
-      if (lErr) console.warn('Lines insert error:', lErr.message);
-    }
-
-    hideLoading();
-    closeModal('modal-po');
-    showToast(_editPOId ? 'PO updated!' : 'Purchase Order saved!');
-    _editPOId = null;
-    await loadAndRenderPOs();
-
-    if (status === 'sent') {
-      const po = allPOs.find(p => p.po_no === poNo || p.id === poId);
-      if (po) printPO(po);
-    }
-  } catch(e) {
-    hideLoading();
-    if (e.message?.includes('relation') || e.code === '42P01') {
-      showToast('Run the PO SQL schema first!', 'error');
-      showPOSchemaNotice();
-    } else {
-      showToast('Save failed: ' + e.message, 'error');
-    }
-  }
-}
 
 // ── UPDATE STATUS ─────────────────────────────────────────────
-async function updatePOStatus(id, status) {
-  try {
-    const { error } = await sb.from('purchase_orders').update({ status }).eq('id', id);
-    if (error) throw error;
-    const po = allPOs.find(x => x.id === id);
-    if (po) po.status = status;
-    renderPOs();
-    showToast('Status updated to ' + status + '!');
-  } catch(e) {
-    showToast('Update failed: ' + e.message, 'error');
-  }
-}
+// updatePOStatus removed
+
 
 // ── DELETE PO ─────────────────────────────────────────────────
-async function deletePO(id, poNo) {
-  if (currentProfile?.role !== 'admin') { showToast('Admin only', 'error'); return; }
-  if (!confirm('Delete PO ' + poNo + '? This cannot be undone.')) return;
-  showLoading('DELETING...');
-  try {
-    await sb.from('purchase_order_lines').delete().eq('po_id', id);
-    const { error } = await sb.from('purchase_orders').delete().eq('id', id);
-    if (error) throw error;
-    allPOs = allPOs.filter(p => p.id !== id);
-    hideLoading();
-    renderPOs();
-    showToast('PO deleted.');
-  } catch(e) {
-    hideLoading();
-    showToast('Delete failed: ' + e.message, 'error');
-  }
-}
+// deletePO removed
+
 
 // ── SCHEMA NOTICE ─────────────────────────────────────────────
-function showPOSchemaNotice() {
-  const sql = `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE TABLE IF NOT EXISTS purchase_orders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  po_no TEXT UNIQUE NOT NULL, company TEXT NOT NULL, supplier TEXT NOT NULL,
-  contact TEXT, delivery_addr TEXT, delivery_date DATE, status TEXT DEFAULT 'draft',
-  subtotal NUMERIC(12,2) DEFAULT 0, vat NUMERIC(12,2) DEFAULT 0, total NUMERIC(12,2) DEFAULT 0,
-  notes TEXT, po_date DATE, created_by UUID, created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS purchase_order_lines (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  po_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-  product_id UUID REFERENCES products(id), custom_desc TEXT,
-  qty NUMERIC(10,2) DEFAULT 1, unit TEXT DEFAULT 'PCS',
-  unit_price NUMERIC(12,2) DEFAULT 0, total NUMERIC(12,2) DEFAULT 0, sort_order INTEGER DEFAULT 0
-);
-ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_order_lines ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "po_all" ON purchase_orders;
-DROP POLICY IF EXISTS "pol_all" ON purchase_order_lines;
-CREATE POLICY "po_all" ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "pol_all" ON purchase_order_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
+// showPOSchemaNotice removed
 
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
-  overlay.innerHTML = '<div style="background:var(--surface);border-radius:14px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;">'
-    + '<div style="font-family:var(--font-display);font-size:20px;color:var(--gold);margin-bottom:10px;">PO Table SQL Setup</div>'
-    + '<p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Run this in Supabase → SQL Editor → click Run:</p>'
-    + '<pre style="background:var(--surface2);border-radius:8px;padding:14px;font-size:11px;overflow-x:auto;color:var(--text);white-space:pre-wrap;">' + sql + '</pre>'
-    + '<div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">'
-    + '<button class="btn btn-outline" onclick="navigator.clipboard.writeText(this.closest(\'div[style*=fixed]\').querySelector(\'pre\').textContent).then(()=>showToast(\'Copied!\'))">📋 Copy</button>'
-    + '<button class="btn btn-gold" onclick="this.closest(\'div[style*=fixed]\').remove()">Close</button>'
-    + '</div></div>';
-  document.body.appendChild(overlay);
-}
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -9702,422 +9241,437 @@ function autoFillCode() {
 }
 
 // Regenerate button next to code field (added via JS)
-// addCodeGenButton removed - using addAutoCodeButton instead
+function catSearchLevel1(query, mat) {
+  // On level 1, clicking a category still works, but filter category cards
+  // by whether any of their products match the search
+  const q = query.toLowerCase().trim();
+  if (!q) { _renderCatLevel1(mat); return; }
 
+  const CATEGORY_PAGES = ['Electrical','Safety Equipment','Hardware & Tools'];
+  const matProds = CATEGORY_PAGES.includes(mat)
+    ? allProducts.filter(p => (p.category||'Other') === mat)
+    : allProducts.filter(p => (p.material||'Other') === mat);
 
-// Hook into form events to auto-generate on blur
-// hookAutoCode removed - using addAutoCodeButton instead
+  const matching = matProds.filter(p =>
+    (p.name||'').toLowerCase().includes(q) ||
+    (p.code||'').toLowerCase().includes(q) ||
+    (p.sub_type||'').toLowerCase().includes(q) ||
+    (p.size||'').toLowerCase().includes(q)
+  );
 
-
-// Hook into openAddProduct to setup auto-code
-// hookAutoCode now handled by _origOpenAddProduct_code wrapper
-
-// Also hook into openEditProduct (don't auto-fill when editing)
-// old edit wrapper removed
-
-
-// ═══════════════════════════════════════════════════════════════
-// AUTO PRODUCT CODE GENERATOR
-// Format: MAT-CAT/SUB-SIZE-PRESSURE
-// e.g. CS-GV-009-P16 = Carbon Steel Gate Valve 2" PN16
-// ═══════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════
-// PRODUCT CODE GENERATOR — Based on actual inventory sequences
-// Examples: CSCAP40-008, BRZBV-006-APP600, CSPNPL40-001-008
-// ═══════════════════════════════════════════════════════════════
-
-// Size codes (from chart: 001=1/8" to 027=30")
-const SIZE_CODE_MAP = {
-  '1/8':'001','1/4':'002','3/8':'003','1/2':'004','3/4':'005',
-  '1':'006','1"':'006','1 inch':'006',
-  '1 1/4':'007','1-1/4':'007','1.25':'007',
-  '1 1/2':'008','1-1/2':'008','1.5':'008',
-  '2':'009','2"':'009','2 inch':'009',
-  '2 1/2':'010','2-1/2':'010','2.5':'010',
-  '3':'011','3"':'011','3 inch':'011',
-  '3 1/2':'012','3-1/2':'012',
-  '4':'013','4"':'013','4 inch':'013',
-  '5':'014','5"':'014','6':'015','6"':'015',
-  '8':'016','8"':'016','10':'017','12':'018',
-  '14':'019','16':'020','18':'021','20':'022',
-  '22':'023','24':'024','26':'025','28':'026','30':'027'
-};
-
-// Material prefix codes
-const MAT_PREFIX = {
-  'CS':'CS','SS':'SS','GI':'GI','BMI':'BMI','Brass':'BRS',
-  'Bronze':'BRZ','Copper':'COP','PVC':'PVC','CPVC':'CP',
-  'PPR':'PPR','HDPE':'HDP','Other':'OT'
-};
-
-// Type codes matching your examples
-const TYPE_CODE = {
-  // Valves
-  'Gate Valve':'GV','Ball Valve':'BV','Check Valve':'CVT',
-  'Globe Valve':'GLV','Butterfly Valve':'BFV','Y Stainer':'YS',
-  'Air Vents':'AV','Storm Valve':'STV','Angle Valve':'ANV',
-  'Hose Valve':'HV','Vertical Check Valve':'VCV',
-  // Fittings
-  'Coupling':'CPL','Bush':'BSH','End Cap':'CAP',
-  'Sockolet':'SOL','Weld Olet':'WOL',
-  'Tee':'TEE','Elbow':'EL','45 Elbow':'EL45','90 Elbow':'EL90',
-  'Con Red':'CR','Ecc Red':'ER',
-  'Pipe Nipple':'PNPL','Swage Nipple':'SN',
-  'Female Adapter':'FA','Male Adapter':'MA',
-  'Union':'UN','Reducer':'RED',
-  // Flanges
-  'Slip-On':'FLSO','Socket Weld':'FLSW','Blind':'FLBL',
-  'Threaded':'FLTH','Lap Joint':'FLLJ',
-  // Pipes
-  'Seamless Pipe':'PS','ERW Pipe':'PERW','Welded Pipe':'PWLD',
-  'Square Tube':'TSQ','Rectangular Tube':'TRC',
-  // Hardware
-  'Bolt & Nut':'BN','Stud Bolt':'SB','Gasket':'GSK','O-Ring':'OR',
-};
-
-// Name keyword → type code (from your examples)
-const NAME_PATTERNS = [
-  // Pipe types
-  [/\bSMLS\b/i,                'PS'],
-  [/SEAMLESS/i,                'PS'],
-  [/\bERW\b/i,                 'PERW'],
-  [/WELDED/i,                  'PWLD'],
-  [/\bPIPE\b/i,                'PP'],
-  // Valve types
-  [/GATE\s+VALVE/i,            'GV'],
-  [/BALL\s+VALVE/i,            'BV'],
-  [/CHECK\s+VALVE/i,           'CVT'],
-  [/GLOBE\s+VALVE/i,           'GLV'],
-  [/BUTTERFLY/i,               'BFV'],
-  [/VERT[A-Z]*\s+[A-Z]*VALVE/i,'VCV'],
-  [/Y[\s-]?STAINER|Y[\s-]?STRAINER/i,'YS'],
-  // Fitting types
-  [/ELBOW\s+45|45[°\s]+ELBOW/i,'EL45'],
-  [/ELBOW\s+90|90[°\s]+ELBOW/i,'EL90'],
-  [/\bELBOW\b/i,               'EL'],
-  [/\bTEE\b/i,                 'TEE'],
-  [/END\s+CAP|\bCAP\b/i,       'CAP'],
-  [/COUPLING|COUPL/i,          'CPL'],
-  [/PIPE\s+NIPPLE|NIPPLE/i,    'PNPL'],
-  [/SWAGE/i,                   'SN'],
-  [/FEMALE\s+ADAPTER/i,        'FA'],
-  [/MALE\s+ADAPTER/i,          'MA'],
-  [/SOCKOLET/i,                'SOL'],
-  [/WELD\s*OLET/i,             'WOL'],
-  [/\bUNION\b/i,               'UN'],
-  [/CON\s+RED|CONC\s+RED/i,   'CR'],
-  [/ECC\s+RED/i,               'ER'],
-  [/REDUCER/i,                 'RED'],
-  // Flange types
-  [/BLIND\s+FLANGE|BLIND\s+FL/i,'FLBL'],
-  [/SLIP[\s-]ON/i,             'FLSO'],
-  [/SOCKET\s+WELD\s+FLANGE/i, 'FLSW'],
-  [/LAP\s+JOINT/i,             'FLLJ'],
-  // Hardware
-  [/GASKET/i,                  'GSK'],
-  [/O[\s-]RING/i,              'OR'],
-  [/STUD\s+BOLT/i,             'SB'],
-];
-
-// Schedule/pressure codes from name
-const SCHEDULE_PATTERNS = [
-  [/S\/160|SCH\s*160|S-160/i, '160'],
-  [/S\/80|SCH\s*80|S-80/i,   '80'],
-  [/S\/40|SCH\s*40|S-40/i,   '40'],
-  [/S\/20|SCH\s*20/i,         '20'],
-  [/PN40/i, 'P40'],[/PN25/i, 'P25'],[/PN16/i, 'P16'],[/PN10/i, 'P10'],
-  [/150\s*#|150LB|CL150|CLASS\s*150/i, '150'],
-  [/300\s*#|300LB|CL300/i, '300'],
-  [/600\s*#|600LB|CL600/i, '600'],
-  [/\bBSPT\b/i, 'BSP'],
-  [/\bNPT\b/i,  'NPT'],
-];
-
-// Grade codes from name
-const GRADE_PATTERNS = [
-  [/A316|316L?/i, '316'],
-  [/A304|304L?/i, '304'],
-  [/A234|WPB/i,   'WPB'],
-  [/A105/i, 'A105'],
-  [/A312/i, 'A312'],
-  [/A216|WCB/i, 'WCB'],
-];
-
-function extractSizeCode(str) {
-  if (!str) return null;
-  const s = str.trim();
-  // Direct lookup
-  if (SIZE_CODE_MAP[s]) return SIZE_CODE_MAP[s];
-  // Patterns: "1 1/2\"", "3/4 inch", "1.5", etc.
-  const patterns = [
-    /(\d+\s+\d+\/\d+)\s*(?:inch|in|"|')?/,  // "1 1/2"
-    /(\d+\/\d+)\s*(?:inch|in|"|')?/,          // "3/4"
-    /(\d+)\s*(?:inch|in|"|')/i,               // "2 inch"
-    /DN\s*(\d+)/i,                            // DN50
-    /NPS\s*(\d+)/i,                           // NPS4
-  ];
-  for (const pat of patterns) {
-    const m = s.match(pat);
-    if (m) {
-      const val = m[1].trim().replace(/"/g,'');
-      if (SIZE_CODE_MAP[val]) return SIZE_CODE_MAP[val];
-    }
+  if (!matching.length) {
+    const root = document.getElementById('cat-root');
+    if (!root) return;
+    // Just show empty results message preserving search bar
+    const searchBar = root.querySelector('#cat-search-input');
+    const cards = root.querySelector('.card');
+    if (cards) cards.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted);">'
+      + '<div style="font-size:32px;margin-bottom:10px;">🔍</div>'
+      + '<div>No products matching "' + query + '"</div></div>';
+    return;
   }
-  // DN → inch conversion
-  const dn = s.match(/DN\s*(\d+)/i);
-  if (dn) {
-    const dnMap = {'15':'004','20':'006','25':'007','32':'008','40':'009',
-      '50':'011','65':'012','80':'013','100':'014','125':'015',
-      '150':'015','200':'016','250':'017','300':'018','350':'019','400':'020'};
-    if (dnMap[dn[1]]) return dnMap[dn[1]];
-  }
-  return null;
-}
 
-function extractSizeFromText(text) {
-  if (!text) return null;
-  // Look for size patterns in full text string
-  const patterns = [
-    /(\d+\s+\d+\/\d+)\s*(?:inch|in|"|x\s*\d)/i,
-    /(\d+\/\d+)\s*(?:inch|in|"|x)/i,
-    /\b(\d+)\s*"\s/,
-    /(\d+)\s*inch/i,
-    /\b(\d+\.?\d*)\s*"\s*(?:china|italy|$)/i,
-  ];
-  for (const pat of patterns) {
-    const m = text.match(pat);
-    if (m) {
-      const code = extractSizeCode(m[1].trim());
-      if (code) return code;
-    }
-  }
-  return null;
-}
-
-function getTypeCode(subtype, name) {
-  // 1. From sub-type dropdown
-  if (subtype && TYPE_CODE[subtype]) return TYPE_CODE[subtype];
-  // 2. From name patterns
-  const n = (name || '').toUpperCase();
-  for (const [pat, code] of NAME_PATTERNS) {
-    if (pat.test(name)) return code;
-  }
-  return null;
-}
-
-function getScheduleCode(name) {
-  for (const [pat, code] of SCHEDULE_PATTERNS) {
-    if (pat.test(name)) return code;
-  }
-  return null;
-}
-
-function getGradeCode(name) {
-  for (const [pat, code] of GRADE_PATTERNS) {
-    if (pat.test(name)) return code;
-  }
-  return null;
-}
-
-// ── MAIN CODE GENERATOR ───────────────────────────────────────
-// Generates codes matching your examples:
-// CS + CAP + 40 + 008 → CSCAP40-008
-// CS + PNPL + 40 + 004 + 003 → CSPNPL40-004-003
-// BRZ + BV + 006 + APP600 → BRZBV-006-APP600
-
-function buildProductCode(material, category, subtype, sizeStr, name, brand) {
-  const mat  = MAT_PREFIX[material] || (material||'').substring(0,3).toUpperCase() || 'XX';
-  const type = getTypeCode(subtype, name) || 'OT';
-  const sch  = getScheduleCode(name) || '';
-  const size = extractSizeCode(sizeStr) || extractSizeFromText(name) || '';
-  const grade = getGradeCode(name) || '';
-
-  // Build code based on type
-  let code = mat + type;
-  if (sch) code += sch;
-  if (grade && grade !== 'WPB' && grade !== 'WCB') code += grade; // only show grade for special
-  if (size) code += '-' + size;
-
-  return code;
-}
-
-// ── DOM VERSION (for Add/Edit Product form) ───────────────────
-function autoGenerateCode() {
-  const codeEl   = document.getElementById('p-code');
-  if (!codeEl) return;
-
-  const material = document.getElementById('p-material')?.value || '';
-  const category = document.getElementById('p-category')?.value || '';
-  const subtype  = getSubtypeValue ? (getSubtypeValue() || '') : '';
-  const sizeRaw  = document.getElementById('p-size')?.value?.trim() || '';
-  const name     = document.getElementById('p-name')?.value?.trim() || '';
-  const brand    = document.getElementById('p-brand')?.value?.trim() || '';
-
-  const generated = buildProductCode(material, category, subtype, sizeRaw, name, brand);
-  if (!generated || generated === 'XXOT') return;
-
-  codeEl.value = generated;
-  codeEl.dataset.autoGenerated = 'true';
-  codeEl.style.background = 'var(--gold-light)';
-  codeEl.style.borderColor = 'var(--gold)';
-  setTimeout(() => {
-    if (codeEl) { codeEl.style.background = ''; codeEl.style.borderColor = ''; }
-  }, 1500);
-  return generated;
-}
-
-// ── IMPORT VERSION (no DOM) ───────────────────────────────────
-function generateImportCode(material, category, subtype, sizeStr, name) {
-  return buildProductCode(material, category, subtype, sizeStr, name, '');
-}
-
-
-
-// Attach auto-generate triggers
-function attachAutoCodeListeners() {
-  const triggers = ['p-material','p-category','p-subtype-select','p-size'];
-  triggers.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('change', () => {
-        // Only auto-generate if code is empty or was previously auto-generated
-        const codeEl = document.getElementById('p-code');
-        if (codeEl && (!codeEl.value || codeEl.dataset.autoGenerated === 'true')) {
-          autoGenerateCode();
-          if (codeEl) codeEl.dataset.autoGenerated = 'true';
-        }
-      });
-    }
+  // Show matching products directly as a flat list
+  const threshold = parseInt((settings && settings.lowStockThreshold) || 10);
+  let rowsHtml = '';
+  matching.forEach(p => {
+    const isLow = (p.qty_bv||0)<threshold||(p.qty_is||0)<threshold||(p.qty_sw||0)<threshold;
+    const photo = p.photo_url ? '<img src="' + p.photo_url + '" style="width:38px;height:34px;object-fit:cover;border-radius:5px;">' : '<span style="opacity:.3;font-size:16px;">📦</span>';
+    rowsHtml += '<tr data-id="' + p.id + '" style="cursor:pointer;border-bottom:1px solid var(--border);' + (isLow?'background:#fff5f5;':'') + '">'
+      + '<td style="padding:9px 12px;width:44px;"><div style="width:38px;height:34px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;">' + photo + '</div></td>'
+      + '<td style="padding:9px 12px;"><div style="font-weight:500;font-size:13px;">' + p.name + '</div><div style="font-size:11px;color:var(--text-muted);">' + (p.code||'') + (p.size?' · '+p.size:'') + '</div></td>'
+      + '<td style="padding:9px 12px;font-size:12px;color:var(--text-muted);">' + (p.sub_type||'—') + '</td>'
+      + '<td style="padding:9px 12px;"><span class="qty-tag qty-bv">BV:' + (p.qty_bv||0) + '</span> <span class="qty-tag qty-is">IS:' + (p.qty_is||0) + '</span> <span class="qty-tag qty-sw">SW:' + (p.qty_sw||0) + '</span></td>'
+      + '</tr>';
   });
 
-  // Size field - trigger on input with small debounce
-  const sizeEl = document.getElementById('p-size');
-  if (sizeEl) {
-    let sizeTimer;
-    sizeEl.addEventListener('input', () => {
-      clearTimeout(sizeTimer);
-      sizeTimer = setTimeout(() => {
-        const codeEl = document.getElementById('p-code');
-        if (codeEl && (!codeEl.value || codeEl.dataset.autoGenerated === 'true')) {
-          autoGenerateCode();
-          if (codeEl) codeEl.dataset.autoGenerated = 'true';
-        }
-      }, 400);
-    });
-  }
-
-  // Name field - suggest from name
-  const nameEl = document.getElementById('p-name');
-  if (nameEl) {
-    let nameTimer;
-    nameEl.addEventListener('input', () => {
-      clearTimeout(nameTimer);
-      nameTimer = setTimeout(() => {
-        const codeEl = document.getElementById('p-code');
-        if (codeEl && (!codeEl.value || codeEl.dataset.autoGenerated === 'true')) {
-          autoGenerateCode();
-          if (codeEl) codeEl.dataset.autoGenerated = 'true';
-        }
-      }, 600);
-    });
-  }
-
-  // Mark code as manually edited if user types in it
-  const codeEl = document.getElementById('p-code');
-  if (codeEl) {
-    codeEl.addEventListener('input', () => {
-      codeEl.dataset.autoGenerated = 'false';
+  const root = document.getElementById('cat-root');
+  if (!root) return;
+  // Replace only the card content, keep search bar
+  const card = root.querySelector('.card');
+  if (card) {
+    card.style.padding = '0';
+    card.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--text-muted);border-bottom:1px solid var(--border);">' + matching.length + ' products matching "' + query + '"</div>'
+      + '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;">'
+      + '<thead><tr style="background:var(--surface2);">'
+      + '<th style="padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;width:44px;">Photo</th>'
+      + '<th style="padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Name</th>'
+      + '<th style="padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Sub-type</th>'
+      + '<th style="padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Stock</th>'
+      + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+    // Attach row clicks
+    root.querySelectorAll('tr[data-id]').forEach(tr => {
+      tr.addEventListener('click', () => viewProduct(tr.dataset.id));
     });
   }
 }
 
-// Add auto-generate button next to code field
-function addAutoCodeButton() {
-  const codeEl = document.getElementById('p-code');
-  if (!codeEl || document.getElementById('auto-code-btn')) return;
-
-  const btn = document.createElement('button');
-  btn.id = 'auto-code-btn';
-  btn.type = 'button';
-  btn.textContent = '⚡ Auto';
-  btn.title = 'Auto-generate product code';
-  btn.style.cssText = 'padding:6px 12px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold-light);color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;margin-left:6px;';
-  btn.addEventListener('click', () => {
-    autoGenerateCode();
-    const codeEl = document.getElementById('p-code');
-    if (codeEl) codeEl.dataset.autoGenerated = 'false'; // don't override after manual click
-  });
-
-  // Wrap the code input and button in a flex container
-  const parent = codeEl.parentElement;
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'display:flex;align-items:center;gap:0;';
-  codeEl.style.flex = '1';
-  parent.insertBefore(wrapper, codeEl);
-  wrapper.appendChild(codeEl);
-  wrapper.appendChild(btn);
+function filterCatSubProducts(query, catId, mat, filterSubType) {
+  // Re-render with search filter applied
+  _renderCatSubTypes(catId, mat, filterSubType, query);
 }
 
-// Hook into openAddProduct to attach listeners
-const _origOpenAddProduct_code = openAddProduct;
-openAddProduct = function() {
-  _origOpenAddProduct_code();
-  setTimeout(() => {
-    addAutoCodeButton();
-    attachAutoCodeListeners();
-    // Clear auto-generated flag for new product
-    const codeEl = document.getElementById('p-code');
-    if (codeEl) codeEl.dataset.autoGenerated = 'true';
-  }, 60);
-};
+// ═══════════════════════════════════════════════════════════════
+// PURCHASE ORDERS — CLEAN REWRITE
+// ═══════════════════════════════════════════════════════════════
+let allPOs    = [];
+let poLineIdx = 0;
+let _editPOId = null;
 
-// Hook into openEditProduct to attach listeners
-const _origOpenEditProduct_code = openEditProduct;
-openEditProduct = function(id) {
-  _origOpenEditProduct_code(id);
-  setTimeout(() => {
-    addAutoCodeButton();
-    attachAutoCodeListeners();
-    // Mark as NOT auto-generated (editing existing code)
-    const codeEl = document.getElementById('p-code');
-    if (codeEl) codeEl.dataset.autoGenerated = 'false';
-  }, 80);
-};
+// ── LOAD ─────────────────────────────────────────────────────
+async function loadPOs() {
+  try {
+    const { data, error } = await sb
+      .from('purchase_orders')
+      .select('*, purchase_order_lines(*)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    allPOs = data || [];
+  } catch(e) {
+    console.warn('loadPOs:', e.message);
+    allPOs = [];
+  }
+}
 
+async function loadAndRenderPOs() {
+  renderPOs(); // show immediately
+  await loadPOs();
+  renderPOs(); // refresh with data
+}
 
-// Regenerate all auto codes in import preview
-function regenerateAllImportCodes() {
-  let count = 0;
-  const usedCodes = new Set(allProducts.map(p => p.code).filter(Boolean));
+// ── RENDER ───────────────────────────────────────────────────
+function renderPOs() {
+  const tbody = document.getElementById('po-tbody');
+  if (!tbody) return;
 
-  _importPreview.forEach((p, i) => {
-    if (!p.name) return;
-    const sizeVal = [p.size, p.grade].filter(Boolean).join(' ');
-    let base = generateImportCode(p.material||'', p.type||'', p.sub_type||'', sizeVal, p.name||'');
-    if (!base) return;
+  const search = (document.getElementById('po-search')?.value || '').toLowerCase();
+  const fc     = document.getElementById('po-filter-company')?.value || '';
+  const fs     = document.getElementById('po-filter-status')?.value || '';
+  const isAdmin = currentProfile?.role === 'admin';
+  const isMgr   = isAdmin || currentProfile?.role === 'manager';
 
-    // Ensure unique
-    let finalCode = base;
-    let counter = 1;
-    while (usedCodes.has(finalCode)) {
-      finalCode = base + '-' + String(counter).padStart(2,'0');
-      counter++;
+  const BADGE = { draft:'badge-warn', sent:'badge-blue', received:'badge-green', partial:'badge-gold', cancelled:'badge-red' };
+
+  const list = (allPOs || []).filter(po =>
+    po && (!search || (po.supplier||'').toLowerCase().includes(search) || (po.po_no||'').toLowerCase().includes(search))
+       && (!fc || po.company === fc)
+       && (!fs || po.status === fs)
+  );
+
+  // Stats
+  const statsEl = document.getElementById('po-stats-row');
+  if (statsEl) {
+    const tots = [
+      { icon:'📋', label:'Total POs',    val: allPOs.length,                                         cls:'blue'  },
+      { icon:'📤', label:'Pending',       val: allPOs.filter(p=>p.status==='sent').length,             cls:'warn'  },
+      { icon:'✅', label:'Received',      val: allPOs.filter(p=>p.status==='received').length,         cls:'green' },
+      { icon:'💰', label:'Total Value',   val:'SAR ' + allPOs.reduce((s,p)=>s+Number(p.total||0),0).toFixed(0), cls:'gold'  },
+    ];
+    statsEl.innerHTML = tots.map(s =>
+      '<div class="stat-card"><div class="stat-icon-box ' + s.cls + '"><span style="font-size:18px">' + s.icon + '</span></div>'
+      + '<div class="stat-label">' + s.label + '</div><div class="stat-value" style="font-size:22px;">' + s.val + '</div></div>'
+    ).join('');
+  }
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:48px;color:var(--text-muted);">'
+      + '<div style="font-size:40px;margin-bottom:12px;">📋</div>'
+      + '<div style="font-weight:700;font-size:16px;margin-bottom:6px;">No Purchase Orders</div>'
+      + '<div style="font-size:13px;">' + (search||fc||fs ? 'No results.' : 'Click <strong>+ New PO</strong> to create one.') + '</div>'
+      + '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  list.forEach(po => {
+    const tr  = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => printPO(po));
+
+    const date  = po.po_date||po.created_at ? new Date(po.po_date||po.created_at).toLocaleDateString('en-SA') : '—';
+    const lines = (po.purchase_order_lines||[]).length;
+    const badge = BADGE[po.status] || 'badge-blue';
+    const coName = (typeof COMPANY_NAMES!=='undefined' && COMPANY_NAMES[po.company]) || po.company || '—';
+
+    tr.innerHTML =
+      '<td class="mono" style="font-size:12px;color:var(--gold);font-weight:700;">' + (po.po_no||'—') + '</td>'
+      + '<td style="font-size:13px;">' + date + '</td>'
+      + '<td><div style="font-weight:500;">' + (po.supplier||'—') + '</div>'
+        + (po.contact?'<div style="font-size:11px;color:var(--text-muted);">'+po.contact+'</div>':'') + '</td>'
+      + '<td><span class="badge badge-blue" style="font-size:10px;">' + coName + '</span></td>'
+      + '<td style="text-align:center;">' + lines + '</td>'
+      + '<td class="mono" style="font-weight:600;">SAR ' + Number(po.total||0).toFixed(2) + '</td>'
+      + '<td><span class="badge ' + badge + '">' + (po.status||'draft').toUpperCase() + '</span></td>'
+      + '<td><div style="display:flex;gap:4px;" onclick="event.stopPropagation();"></div></td>';
+
+    const actDiv = tr.querySelector('td:last-child div');
+
+    const printBtn = document.createElement('button');
+    printBtn.className = 'btn btn-sm btn-outline'; printBtn.title = 'Print';
+    printBtn.textContent = '🖨️';
+    printBtn.onclick = e => { e.stopPropagation(); printPO(po); };
+    actDiv.appendChild(printBtn);
+
+    if (isMgr && po.status === 'draft') {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn btn-sm btn-outline'; editBtn.title = 'Edit';
+      editBtn.textContent = '✏️';
+      editBtn.onclick = e => { e.stopPropagation(); openEditPO(po); };
+      actDiv.appendChild(editBtn);
     }
-    usedCodes.add(finalCode);
-    p.code = finalCode;
-    p._autoCode = true;
 
-    // Update the input in preview table
-    const inp = document.querySelector(`#prev-row-${i} input[oninput*="code"]`);
-    if (inp) {
-      inp.value = finalCode;
-      inp.style.background = 'var(--gold-light)';
-      setTimeout(() => { if(inp) inp.style.background = ''; }, 1500);
+    if (isMgr && !['received','cancelled'].includes(po.status)) {
+      const recvBtn = document.createElement('button');
+      recvBtn.className = 'btn btn-sm btn-success'; recvBtn.title = 'Mark Received';
+      recvBtn.textContent = '✓';
+      recvBtn.onclick = e => { e.stopPropagation(); updatePOStatus(po.id,'received'); };
+      actDiv.appendChild(recvBtn);
     }
-    count++;
+
+    if (isAdmin) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-sm btn-danger'; delBtn.title = 'Delete';
+      delBtn.textContent = '🗑️';
+      delBtn.onclick = e => { e.stopPropagation(); deletePO(po.id, po.po_no||''); };
+      actDiv.appendChild(delBtn);
+    }
+
+    tbody.appendChild(tr);
   });
-  showToast('Generated ' + count + ' product codes!');
+}
+
+// ── OPEN NEW / EDIT ───────────────────────────────────────────
+function openNewPO() {
+  _editPOId = null; poLineIdx = 0;
+  document.getElementById('po-modal-title').textContent = 'New Purchase Order';
+  document.getElementById('po-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('po-status').value = 'draft';
+  document.getElementById('po-delivery-date').value = '';
+  ['po-supplier','po-contact','po-delivery-addr','po-notes'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('po-lines-body').innerHTML = '';
+  document.getElementById('po-totals').innerHTML = '';
+  addPOLine();
+  openModal('modal-po');
+}
+
+function openEditPO(po) {
+  if (!po) return;
+  _editPOId = po.id; poLineIdx = 0;
+  document.getElementById('po-modal-title').textContent = 'Edit PO — ' + (po.po_no||'');
+  document.getElementById('po-date').value = po.po_date || '';
+  document.getElementById('po-company').value = po.company || 'bv';
+  document.getElementById('po-status').value = po.status || 'draft';
+  document.getElementById('po-supplier').value = po.supplier || '';
+  document.getElementById('po-contact').value = po.contact || '';
+  document.getElementById('po-delivery-date').value = po.delivery_date || '';
+  document.getElementById('po-delivery-addr').value = po.delivery_addr || '';
+  document.getElementById('po-notes').value = po.notes || '';
+  document.getElementById('po-lines-body').innerHTML = '';
+  (po.purchase_order_lines || []).forEach(l => addPOLine(l));
+  if (!po.purchase_order_lines?.length) addPOLine();
+  openModal('modal-po');
+}
+
+// ── LINE ITEMS ────────────────────────────────────────────────
+function addPOLine(existing) {
+  const idx = poLineIdx++;
+  const tr  = document.createElement('tr');
+  tr.id = 'pol-' + idx;
+  tr.style.borderBottom = '1px solid var(--border)';
+
+  // Search input
+  const tdProd = document.createElement('td');
+  tdProd.style.padding = '6px 8px';
+  tdProd.innerHTML =
+    '<div style="position:relative;">'
+    + '<input type="text" id="pol-search-' + idx + '" placeholder="Type product name or code..." autocomplete="off"'
+    + ' style="width:100%;padding:6px 10px;background:var(--surface2);border:1.5px solid var(--border);'
+    + 'color:var(--text);border-radius:6px;font-size:12px;outline:none;"'
+    + ' oninput="filterPolProducts(' + idx + ',this.value)"'
+    + ' onfocus="filterPolProducts(' + idx + ',this.value)"'
+    + ' onblur="setTimeout(()=>hidePolDropdown(' + idx + '),200)">'
+    + '<input type="hidden" id="pol-pid-' + idx + '">'
+    + '<div id="pol-drop-' + idx + '" style="display:none;position:absolute;top:100%;left:0;right:0;'
+    + 'background:var(--surface);border:1.5px solid var(--gold);border-radius:6px;'
+    + 'box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:9999;max-height:200px;overflow-y:auto;margin-top:2px;"></div>'
+    + '</div>'
+    + '<input type="text" id="pol-custom-' + idx + '" placeholder="Custom description..."'
+    + ' style="display:none;width:100%;margin-top:4px;padding:6px 10px;background:var(--surface2);'
+    + 'border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;outline:none;"'
+    + ' oninput="updatePOTotals()">';
+  tr.appendChild(tdProd);
+
+  // Qty
+  const tdQty = document.createElement('td');
+  tdQty.style.padding = '6px 4px';
+  tdQty.innerHTML = '<input type="number" id="pol-qty-' + idx + '" value="' + (existing?.qty||1) + '" min="0.01" step="0.01"'
+    + ' style="width:76px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);'
+    + 'color:var(--text);border-radius:6px;font-size:13px;text-align:center;" oninput="recalcPOL(' + idx + ')">';
+  tr.appendChild(tdQty);
+
+  // Unit
+  const tdUnit = document.createElement('td');
+  tdUnit.style.padding = '6px 4px';
+  const units = ['PCS','MTR','KG','SET','BOX','ROLL','LENGTH','LOT'];
+  tdUnit.innerHTML = '<select id="pol-unit-' + idx + '" style="width:86px;padding:6px;background:var(--surface2);'
+    + 'border:1.5px solid var(--border);color:var(--text);border-radius:6px;font-size:12px;">'
+    + units.map(u => '<option' + ((existing?.unit||'PCS')===u?' selected':'') + '>' + u + '</option>').join('')
+    + '</select>';
+  tr.appendChild(tdUnit);
+
+  // Price
+  const tdPrice = document.createElement('td');
+  tdPrice.style.padding = '6px 4px';
+  tdPrice.innerHTML = '<input type="number" id="pol-price-' + idx + '" value="' + (existing?.unit_price||0) + '" step="0.01"'
+    + ' style="width:100px;padding:6px;background:var(--surface2);border:1.5px solid var(--border);'
+    + 'color:var(--text);border-radius:6px;font-size:13px;" oninput="recalcPOL(' + idx + ')">';
+  tr.appendChild(tdPrice);
+
+  // Total
+  const tdTotal = document.createElement('td');
+  tdTotal.id = 'pol-total-' + idx;
+  tdTotal.style.cssText = 'padding:6px 8px;font-family:var(--font-mono);font-size:13px;font-weight:600;text-align:right;';
+  tdTotal.textContent = Number((existing?.qty||1)*(existing?.unit_price||0)).toFixed(2);
+  tr.appendChild(tdTotal);
+
+  // Remove
+  const tdDel = document.createElement('td');
+  tdDel.style.padding = '6px 4px';
+  const rb = document.createElement('button');
+  rb.className = 'btn btn-sm btn-danger'; rb.textContent = '×';
+  rb.onclick = () => { tr.remove(); updatePOTotals(); };
+  tdDel.appendChild(rb); tr.appendChild(tdDel);
+
+  document.getElementById('po-lines-body').appendChild(tr);
+
+  if (existing) {
+    const searchEl = document.getElementById('pol-search-' + idx);
+    const pidEl    = document.getElementById('pol-pid-' + idx);
+    if (existing.product_id) {
+      const p = allProducts.find(x => x.id === existing.product_id);
+      if (p && searchEl) searchEl.value = p.name + (p.code?' ('+p.code+')':'');
+      if (pidEl) pidEl.value = existing.product_id;
+    } else if (existing.custom_desc) {
+      if (pidEl) pidEl.value = '_custom';
+      const ce = document.getElementById('pol-custom-' + idx);
+      if (ce) { ce.style.display=''; ce.value=existing.custom_desc; }
+    }
+  }
+  updatePOTotals();
+}
+
+function recalcPOL(idx) {
+  const qty   = parseFloat(document.getElementById('pol-qty-' + idx)?.value) || 0;
+  const price = parseFloat(document.getElementById('pol-price-' + idx)?.value) || 0;
+  const el    = document.getElementById('pol-total-' + idx);
+  if (el) el.textContent = (qty * price).toFixed(2);
+  updatePOTotals();
+}
+
+function updatePOTotals() {
+  const el = document.getElementById('po-totals');
+  if (!el) return;
+  let sub = 0;
+  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
+    const id    = tr.id.replace('pol-','');
+    const qty   = parseFloat(document.getElementById('pol-qty-'+id)?.value)||0;
+    const price = parseFloat(document.getElementById('pol-price-'+id)?.value)||0;
+    sub += qty * price;
+  });
+  const vr  = parseFloat(settings?.vatRate||15)/100;
+  const vat = sub*vr, tot = sub+vat;
+  el.innerHTML = '<div style="display:inline-block;text-align:right;min-width:220px;">'
+    + '<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:3px;">'
+    + '<span style="color:var(--text-muted);">Subtotal</span><span class="mono">SAR '+sub.toFixed(2)+'</span></div>'
+    + '<div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:3px;">'
+    + '<span style="color:var(--text-muted);">VAT ('+Math.round(vr*100)+'%)</span><span class="mono">SAR '+vat.toFixed(2)+'</span></div>'
+    + '<div style="display:flex;justify-content:space-between;gap:24px;font-weight:700;font-size:15px;border-top:2px solid var(--border);padding-top:4px;">'
+    + '<span>Total</span><span class="mono">SAR '+tot.toFixed(2)+'</span></div></div>';
+}
+
+// ── SAVE ─────────────────────────────────────────────────────
+async function savePO(statusOverride) {
+  const supplier = document.getElementById('po-supplier')?.value.trim();
+  if (!supplier) { showToast('Supplier name required','error'); return; }
+  const company = document.getElementById('po-company')?.value || 'bv';
+  const status  = statusOverride || document.getElementById('po-status')?.value || 'draft';
+  const lines   = [];
+  document.querySelectorAll('#po-lines-body tr').forEach(tr => {
+    const id     = tr.id.replace('pol-','');
+    const pidEl  = document.getElementById('pol-pid-'+id);
+    const custEl = document.getElementById('pol-custom-'+id);
+    const qty    = parseFloat(document.getElementById('pol-qty-'+id)?.value)||0;
+    const price  = parseFloat(document.getElementById('pol-price-'+id)?.value)||0;
+    if (qty<=0) return;
+    const pid = (pidEl?.value && pidEl.value!=='_custom') ? pidEl.value : null;
+    lines.push({ product_id:pid, custom_desc:(!pid&&custEl?custEl.value.trim():''),
+      qty, unit:document.getElementById('pol-unit-'+id)?.value||'PCS',
+      unit_price:price, total:qty*price, sort_order:lines.length });
+  });
+  const sub  = lines.reduce((a,l)=>a+l.total,0);
+  const vr   = parseFloat(settings?.vatRate||15)/100;
+  const poNo = _editPOId ? null : 'PO-'+company.toUpperCase()+'-'+Date.now().toString().slice(-6);
+  showLoading('SAVING PO...');
+  try {
+    let poId = _editPOId;
+    const poData = { company, supplier, status,
+      contact:document.getElementById('po-contact')?.value||'',
+      delivery_addr:document.getElementById('po-delivery-addr')?.value||'',
+      delivery_date:document.getElementById('po-delivery-date')?.value||null,
+      notes:document.getElementById('po-notes')?.value||'',
+      po_date:document.getElementById('po-date')?.value||null,
+      subtotal:sub, vat:sub*vr, total:sub*(1+vr) };
+    if (_editPOId) {
+      const {error} = await sb.from('purchase_orders').update(poData).eq('id',_editPOId);
+      if (error) throw error;
+      await sb.from('purchase_order_lines').delete().eq('po_id',_editPOId);
+    } else {
+      const {data,error} = await sb.from('purchase_orders').insert({...poData,po_no:poNo,created_by:currentProfile?.id}).select().single();
+      if (error) throw error;
+      poId = data.id;
+    }
+    if (lines.length) {
+      const {error} = await sb.from('purchase_order_lines').insert(lines.map(l=>({...l,po_id:poId})));
+      if (error) console.warn('Lines error:',error.message);
+    }
+    hideLoading();
+    closeModal('modal-po');
+    showToast(_editPOId ? 'PO updated!' : 'PO saved!');
+    _editPOId = null;
+    await loadAndRenderPOs();
+    if (status==='sent') { const po=allPOs.find(p=>p.id===poId); if(po) printPO(po); }
+  } catch(e) {
+    hideLoading();
+    if (e.message?.includes('relation')||e.code==='42P01') {
+      showToast('Run the PO SQL schema first!','error');
+    } else { showToast('Save failed: '+e.message,'error'); }
+  }
+}
+
+async function updatePOStatus(id, status) {
+  try {
+    const {error} = await sb.from('purchase_orders').update({status}).eq('id',id);
+    if (error) throw error;
+    const po = allPOs.find(x=>x.id===id);
+    if (po) po.status = status;
+    renderPOs();
+    showToast('Status: '+status);
+  } catch(e) { showToast('Failed: '+e.message,'error'); }
+}
+
+async function deletePO(id, poNo) {
+  if (currentProfile?.role!=='admin') { showToast('Admin only','error'); return; }
+  if (!confirm('Delete PO '+poNo+'?')) return;
+  showLoading('DELETING...');
+  try {
+    await sb.from('purchase_order_lines').delete().eq('po_id',id);
+    const {error} = await sb.from('purchase_orders').delete().eq('id',id);
+    if (error) throw error;
+    allPOs = allPOs.filter(p=>p.id!==id);
+    hideLoading(); renderPOs(); showToast('PO deleted.');
+  } catch(e) { hideLoading(); showToast('Failed: '+e.message,'error'); }
 }
 
 window.addEventListener('DOMContentLoaded', init);
@@ -10380,79 +9934,48 @@ window.addEventListener('DOMContentLoaded', init);
 <div class="modal-overlay" id="modal-po">
   <div class="modal" style="max-width:860px;width:96vw;max-height:92vh;overflow-y:auto;">
     <div class="modal-title" id="po-modal-title">New Purchase Order</div>
-
-    <!-- Header fields -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
-      <div class="field">
-        <label>PO Date</label>
-        <input type="date" id="po-date">
-      </div>
-      <div class="field">
-        <label>Company</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+      <div class="field"><label>PO Date</label><input type="date" id="po-date"></div>
+      <div class="field"><label>Company</label>
         <select id="po-company">
           <option value="bv">Barakah Valves (BV)</option>
           <option value="is">Iron Spring (IS)</option>
           <option value="sw">Stable Way (SW)</option>
         </select>
       </div>
-      <div class="field">
-        <label>Status</label>
+      <div class="field"><label>Status</label>
         <select id="po-status">
-          <option value="draft">Draft</option>
-          <option value="sent">Sent</option>
-          <option value="received">Received</option>
-          <option value="partial">Partial</option>
+          <option value="draft">Draft</option><option value="sent">Sent</option>
+          <option value="received">Received</option><option value="partial">Partial</option>
           <option value="cancelled">Cancelled</option>
         </select>
       </div>
-      <div class="field">
-        <label>Supplier Name *</label>
-        <input type="text" id="po-supplier" placeholder="e.g. Al-Malik Trading Co.">
-      </div>
-      <div class="field">
-        <label>Contact Person / Phone</label>
-        <input type="text" id="po-contact" placeholder="Name or +966...">
-      </div>
-      <div class="field">
-        <label>Expected Delivery Date</label>
-        <input type="date" id="po-delivery-date">
-      </div>
+      <div class="field"><label>Supplier *</label><input type="text" id="po-supplier" placeholder="Supplier name"></div>
+      <div class="field"><label>Contact</label><input type="text" id="po-contact" placeholder="+966..."></div>
+      <div class="field"><label>Delivery Date</label><input type="date" id="po-delivery-date"></div>
     </div>
-    <div class="field">
-      <label>Delivery Address</label>
-      <input type="text" id="po-delivery-addr" placeholder="Full delivery address">
-    </div>
-    <div class="field">
-      <label>Notes / Terms</label>
-      <textarea id="po-notes" rows="2" placeholder="Payment terms, special instructions..."></textarea>
-    </div>
-
-    <!-- Line items -->
-    <div style="margin:16px 0 8px;display:flex;justify-content:space-between;align-items:center;">
+    <div class="field"><label>Delivery Address</label><input type="text" id="po-delivery-addr" placeholder="Full delivery address"></div>
+    <div class="field"><label>Notes</label><textarea id="po-notes" rows="2" placeholder="Terms, instructions..."></textarea></div>
+    <div style="margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center;">
       <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);">Line Items</label>
       <button class="btn btn-sm btn-outline" onclick="addPOLine()">+ Add Line</button>
     </div>
     <div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:12px;">
-      <div style="overflow-x:auto;max-height:300px;overflow-y:auto;">
+      <div style="overflow-x:auto;max-height:280px;overflow-y:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:640px;">
-          <thead>
-            <tr style="background:var(--surface2);">
-              <th style="padding:8px 10px;text-align:left;min-width:280px;">Product / Description</th>
-              <th style="padding:8px 10px;width:80px;">Qty</th>
-              <th style="padding:8px 10px;width:90px;">Unit</th>
-              <th style="padding:8px 10px;width:110px;">Unit Price</th>
-              <th style="padding:8px 10px;width:100px;">Total</th>
-              <th style="padding:8px 10px;width:40px;"></th>
-            </tr>
-          </thead>
+          <thead><tr style="background:var(--surface2);">
+            <th style="padding:8px 10px;text-align:left;min-width:260px;">Product / Description</th>
+            <th style="padding:8px 10px;width:80px;">Qty</th>
+            <th style="padding:8px 10px;width:90px;">Unit</th>
+            <th style="padding:8px 10px;width:110px;">Unit Price</th>
+            <th style="padding:8px 10px;width:100px;">Total</th>
+            <th style="padding:8px 10px;width:40px;"></th>
+          </tr></thead>
           <tbody id="po-lines-body"></tbody>
         </table>
       </div>
     </div>
-
-    <!-- Totals -->
     <div id="po-totals" style="text-align:right;padding:8px 0;font-size:13px;border-top:1px solid var(--border);"></div>
-
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
       <button class="btn btn-outline" onclick="savePO('draft')">💾 Save Draft</button>
