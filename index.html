@@ -820,6 +820,16 @@ input[type=file].photo-picker { position: absolute; width: 1px; height: 1px; opa
 #sidebar-show-btn { display: none; }
 @media (max-width: 768px) { #sidebar-show-btn { display: none !important; } }
 @media (min-width: 769px) { #sidebar-show-btn.visible { display: flex !important; } }
+.inv-dropdown { position: relative; flex-shrink: 0; }
+.inv-dd-btn { white-space: nowrap; min-width: 130px; text-align: left; }
+.inv-dd-btn:hover { border-color: var(--gold); }
+.inv-dd-list { position: absolute; top: calc(100% + 4px); left: 0; min-width: 200px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 500; overflow: hidden; }
+.inv-dd-item { padding: 10px 14px; font-size: 13px; cursor: pointer; transition: background .1s; border-bottom: 1px solid var(--border); }
+.inv-dd-item:last-child { border-bottom: none; }
+.inv-dd-item:hover { background: var(--surface2); }
+.inv-dd-item.active { font-weight: 700; color: var(--gold); background: var(--gold-light, #fffbeb); }
 </style>
 
 
@@ -1103,16 +1113,59 @@ window.onerror = function(msg, src, line, col, err) {
       <div class="card" style="margin-bottom:14px">
         <div class="filter-bar">
           <input class="search-input" type="text" placeholder="Search name, code, material..." id="inv-search" oninput="renderInventory()">
-          <select class="filter-select" id="inv-filter-company" onchange="renderInventory()">
-            <option value="">All Companies</option><option value="bv">Barakah Valves</option><option value="is">Iron Spring</option><option value="sw">Stable Way</option>
-          </select>
-          <select class="filter-select" id="inv-filter-material" onchange="renderInventory()">
-            <option value="">All Materials</option>
-            <option>CS</option><option>SS</option><option>GI</option><option>BMI</option><option>Brass</option><option>Bronze</option><option>Copper</option><option>PVC</option><option>CPVC</option><option>PPR</option><option>HDPE</option><option>Other</option>
-          </select>
-          <select class="filter-select" id="inv-filter-stock" onchange="renderInventory()">
-            <option value="">All Levels</option><option value="low">Low Stock</option><option value="ok">Normal</option>
-          </select>
+          <!-- Company dropdown -->
+          <div class="inv-dropdown" id="dd-company">
+            <button class="filter-select inv-dd-btn" onclick="toggleInvDropdown('dd-company')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;user-select:none;">
+              <span id="dd-company-label">All Companies</span>
+              <span style="font-size:10px;opacity:.6;">▼</span>
+            </button>
+            <div class="inv-dd-list" id="dd-company-list" style="display:none;">
+              <div class="inv-dd-item active" data-val="" onclick="setInvFilter('company','','All Companies',this)">All Companies</div>
+              <div class="inv-dd-item" data-val="bv" onclick="setInvFilter('company','bv','Barakah Valves (BV)',this)">Barakah Valves (BV)</div>
+              <div class="inv-dd-item" data-val="is" onclick="setInvFilter('company','is','Iron Spring (IS)',this)">Iron Spring (IS)</div>
+              <div class="inv-dd-item" data-val="sw" onclick="setInvFilter('company','sw','Stable Way (SW)',this)">Stable Way (SW)</div>
+            </div>
+          </div>
+
+          <!-- Material dropdown -->
+          <div class="inv-dropdown" id="dd-material">
+            <button class="filter-select inv-dd-btn" onclick="toggleInvDropdown('dd-material')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;user-select:none;">
+              <span id="dd-material-label">All Materials</span>
+              <span style="font-size:10px;opacity:.6;">▼</span>
+            </button>
+            <div class="inv-dd-list" id="dd-material-list" style="display:none;">
+              <div class="inv-dd-item active" data-val="" onclick="setInvFilter('material','','All Materials',this)">All Materials</div>
+              <div class="inv-dd-item" data-val="CS" onclick="setInvFilter('material','CS','CS',this)">CS — Carbon Steel</div>
+              <div class="inv-dd-item" data-val="SS" onclick="setInvFilter('material','SS','SS',this)">SS — Stainless Steel</div>
+              <div class="inv-dd-item" data-val="GI" onclick="setInvFilter('material','GI','GI',this)">GI — Galvanized Iron</div>
+              <div class="inv-dd-item" data-val="BMI" onclick="setInvFilter('material','BMI','BMI',this)">BMI — Black Malleable Iron</div>
+              <div class="inv-dd-item" data-val="Brass" onclick="setInvFilter('material','Brass','Brass',this)">Brass</div>
+              <div class="inv-dd-item" data-val="Bronze" onclick="setInvFilter('material','Bronze','Bronze',this)">Bronze</div>
+              <div class="inv-dd-item" data-val="Copper" onclick="setInvFilter('material','Copper','Copper',this)">Copper</div>
+              <div class="inv-dd-item" data-val="PVC" onclick="setInvFilter('material','PVC','PVC',this)">PVC</div>
+              <div class="inv-dd-item" data-val="CPVC" onclick="setInvFilter('material','CPVC','CPVC',this)">CPVC</div>
+              <div class="inv-dd-item" data-val="PPR" onclick="setInvFilter('material','PPR','PPR',this)">PPR</div>
+              <div class="inv-dd-item" data-val="HDPE" onclick="setInvFilter('material','HDPE','HDPE',this)">HDPE</div>
+              <div class="inv-dd-item" data-val="Other" onclick="setInvFilter('material','Other','Other',this)">Other</div>
+            </div>
+          </div>
+
+          <!-- Stock Level dropdown -->
+          <div class="inv-dropdown" id="dd-stock">
+            <button class="filter-select inv-dd-btn" onclick="toggleInvDropdown('dd-stock')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;user-select:none;">
+              <span id="dd-stock-label">All Levels</span>
+              <span style="font-size:10px;opacity:.6;">▼</span>
+            </button>
+            <div class="inv-dd-list" id="dd-stock-list" style="display:none;">
+              <div class="inv-dd-item active" data-val="" onclick="setInvFilter('stock','','All Levels',this)">All Levels</div>
+              <div class="inv-dd-item" data-val="low" onclick="setInvFilter('stock','low','Low Stock 🔴',this)">Low Stock 🔴</div>
+              <div class="inv-dd-item" data-val="ok" onclick="setInvFilter('stock','ok','Normal ✅',this)">Normal ✅</div>
+            </div>
+          </div>
+          <!-- Hidden inputs for renderInventory to read -->
+          <input type="hidden" id="inv-filter-company" value="">
+          <input type="hidden" id="inv-filter-material" value="">
+          <input type="hidden" id="inv-filter-stock" value="">
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
           <div id="inv-count" style="font-size:12px;color:var(--text-muted)"></div>
@@ -10589,6 +10642,58 @@ async function applyAiFixCodes() {
   renderInventory();
   showToast(success + ' product codes updated!');
 }
+
+
+// ── INVENTORY CUSTOM DROPDOWNS ────────────────────────────────
+function toggleInvDropdown(id) {
+  const allLists = document.querySelectorAll('.inv-dd-list');
+  allLists.forEach(l => {
+    if (l.id !== id + '-list') l.style.display = 'none';
+  });
+  const list = document.getElementById(id + '-list');
+  if (list) list.style.display = list.style.display === 'none' ? 'block' : 'none';
+}
+
+function setInvFilter(type, val, label, el) {
+  // Update hidden input
+  const inputId = type === 'company' ? 'inv-filter-company'
+                : type === 'material' ? 'inv-filter-material'
+                : 'inv-filter-stock';
+  const inp = document.getElementById(inputId);
+  if (inp) inp.value = val;
+
+  // Update button label
+  const labelId = type === 'company' ? 'dd-company-label'
+                : type === 'material' ? 'dd-material-label'
+                : 'dd-stock-label';
+  const labelEl = document.getElementById(labelId);
+  if (labelEl) labelEl.textContent = label;
+
+  // Update active state
+  const listId = type === 'company' ? 'dd-company-list'
+               : type === 'material' ? 'dd-material-list'
+               : 'dd-stock-list';
+  const list = document.getElementById(listId);
+  if (list) {
+    list.querySelectorAll('.inv-dd-item').forEach(i => i.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
+
+  // Close dropdown
+  const ddId = type === 'company' ? 'dd-company' : type === 'material' ? 'dd-material' : 'dd-stock';
+  const ddList = document.getElementById(ddId + '-list');
+  if (ddList) ddList.style.display = 'none';
+
+  // Trigger re-render
+  renderInventory();
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.inv-dropdown')) {
+    document.querySelectorAll('.inv-dd-list').forEach(l => l.style.display = 'none');
+  }
+});
 
 window.addEventListener('DOMContentLoaded', init);
 </script>
