@@ -10001,16 +10001,33 @@ function assembleCode() {
   const suffix   = (document.getElementById('cb-suffix')?.value || '').trim().toUpperCase();
 
   const matCode  = CB_MAT_CODES[mat] || mat.substring(0,3).toUpperCase();
-  const typeCode = (CB_TYPE_CODES[cat] && CB_TYPE_CODES[cat][subtype]) || subtype.replace(/\s+/g,'').substring(0,4).toUpperCase() || cat.substring(0,2).toUpperCase();
-
-  const parts = [matCode + typeCode];
+  // Get type code: from lookup → from subtype text → empty if no subtype
+  let typeCode = '';
+  if (CB_TYPE_CODES[cat] && CB_TYPE_CODES[cat][subtype]) {
+    typeCode = CB_TYPE_CODES[cat][subtype];
+  } else if (subtype && subtype.trim()) {
+    typeCode = subtype.replace(/\s+/g,'').substring(0,4).toUpperCase();
+  }
+  // Only include type if we have one
+  const baseCode = matCode + typeCode;
+  const parts = [baseCode];
   if (schedule) parts[0] += schedule;
   if (size) parts.push(size);
   if (suffix) parts.push(suffix);
 
-  const code = parts.join('-');
+  const code = typeCode ? parts.join('-') : '';
   const preview = document.getElementById('cb-preview');
-  if (preview) preview.textContent = code || '—';
+  if (preview) {
+    if (!typeCode && !schedule && !size) {
+      preview.textContent = matCode + ' — select sub-type';
+      preview.style.fontSize = '11px';
+      preview.style.color = 'var(--text-muted)';
+    } else {
+      preview.textContent = code || matCode;
+      preview.style.fontSize = '13px';
+      preview.style.color = 'var(--gold)';
+    }
+  }
   return code;
 }
 
