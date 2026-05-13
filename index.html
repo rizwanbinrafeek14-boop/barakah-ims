@@ -741,7 +741,7 @@ tbody tr:last-child td { border-bottom: none; }
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"
-  onload="if(window.supabase){var _sc=supabase.createClient||supabase.default?.createClient;if(_sc&&typeof sb!=='undefined'&&!sb){try{sb=_sc('https://cmxmqofpnwyftliwuvgp.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteG1xb2Zwbnd5ZnRsaXd1dmdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMjI2MDcsImV4cCI6MjA5MjY5ODYwN30.P-Sc5gD3dOAAgtrH7-80JSo_IO6yFkct1jQDyKgrEoA');}catch(e){}}}"
+  onload="console.log('Supabase SDK loaded')"
 ></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -2088,6 +2088,7 @@ window.onerror = function(msg, src, line, col, err) {
 <script>
 const SUPABASE_URL = 'https://cmxmqofpnwyftliwuvgp.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteG1xb2Zwbnd5ZnRsaXd1dmdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMjI2MDcsImV4cCI6MjA5MjY5ODYwN30.P-Sc5gD3dOAAgtrH7-80JSo_IO6yFkct1jQDyKgrEoA';
+const SUPABASE_ANON_KEY = SUPABASE_KEY; // alias — original app uses this name
 // Initialise sb immediately so handleLogin can use it
 let sb = (function() {
   try {
