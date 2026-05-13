@@ -115,6 +115,7 @@ img { max-width: 100%; display: block; }
   transition: transform var(--dur) var(--ease);
   overflow: hidden;
   box-shadow: 1px 0 0 var(--border);
+  height: 100vh; /* ensure full height for scroll */
 }
 
 /* Sidebar logo area */
@@ -143,6 +144,8 @@ img { max-width: 100%; display: block; }
 .sidebar-body {
   flex: 1; overflow-y: auto; overflow-x: hidden;
   padding: 10px 8px;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0; /* critical for flex children to scroll */
 }
 
 /* Section labels */
@@ -741,7 +744,7 @@ tbody tr:last-child td { border-bottom: none; }
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"
-  onload="console.log('Supabase SDK loaded')"
+  
 ></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -2089,14 +2092,8 @@ window.onerror = function(msg, src, line, col, err) {
 const SUPABASE_URL = 'https://cmxmqofpnwyftliwuvgp.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteG1xb2Zwbnd5ZnRsaXd1dmdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMjI2MDcsImV4cCI6MjA5MjY5ODYwN30.P-Sc5gD3dOAAgtrH7-80JSo_IO6yFkct1jQDyKgrEoA';
 const SUPABASE_ANON_KEY = SUPABASE_KEY; // alias — original app uses this name
-// Initialise sb immediately so handleLogin can use it
-let sb = (function() {
-  try {
-    const _sc = window.supabase?.createClient || window.supabase?.default?.createClient;
-    if (_sc) return _sc(SUPABASE_URL, SUPABASE_KEY);
-  } catch(e) { console.warn('Supabase early init:', e); }
-  return null;
-})();
+// sb will be initialised by init() — declared here for scope
+let sb = null;
 async function handleLogin() {
   const email = (document.getElementById('login-email')?.value || '').trim();
   const pass  = document.getElementById('login-password')?.value || '';
@@ -2355,13 +2352,25 @@ async function launchApp() {
 
 async function preloadData() {
   try {
-    const [p, m, q] = await Promise.all([
-      sb.from('products').select('*').order('name'),
-      sb.from('stock_movements').select('*, profiles(full_name)').order('created_at', { ascending: false }),
-      sb.from('quotations').select('*, quotation_lines(*)').order('created_at', { ascending: false })
+    // Fetch ALL products using pagination (Supabase default limit = 1000)
+    let allProds = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data, error } = await sb.from('products').select('*').order('name').range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (data && data.length > 0) allProds = allProds.concat(data);
+      if (!data || data.length < PAGE) break; // last page
+      from += PAGE;
+    }
+    allProducts = allProds;
+
+    // Movements and quotations — single fetch (usually < 1000)
+    const [m, q] = await Promise.all([
+      sb.from('stock_movements').select('*, profiles(full_name)').order('created_at', { ascending: false }).limit(2000),
+      sb.from('quotations').select('*, quotation_lines(*)').order('created_at', { ascending: false }).limit(2000)
     ]);
-    allProducts  = p.data || [];
-    allMovements = m.data || [];
+    allMovements  = m.data || [];
     allQuotations = q.data || [];
   } catch(e) {
     console.error('preloadData failed:', e);
