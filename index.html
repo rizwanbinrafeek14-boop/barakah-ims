@@ -715,6 +715,25 @@ tbody tr:last-child td { border-bottom: none; }
 .ai-panel { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px; margin-top: 12px; }
 .ai-suggestion { padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; font-size: 13px; }
 
+
+/* ── SIDEBAR COLLAPSED STATE ─────────────────────────────────── */
+.sidebar.collapsed { width: 56px !important; }
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .nav-section-label,
+.sidebar.collapsed .nav-badge,
+.sidebar.collapsed .sidebar-logo-name,
+.sidebar.collapsed .sidebar-user-info,
+.sidebar.collapsed .sidebar-logout { display: none !important; }
+.sidebar.collapsed .sidebar-logo { justify-content: center !important; padding: 0 !important; }
+.sidebar.collapsed .sidebar-user { justify-content: center !important; padding: 8px !important; }
+.sidebar.collapsed .nav-item { justify-content: center !important; padding: 9px !important; }
+.sidebar.collapsed .nav-sub-item { display: none !important; }
+.main.collapsed-sidebar { margin-left: 56px !important; }
+
+/* ── STACK GRID (dashboard) ──────────────────────────────────── */
+.stack { }
+@media (max-width: 900px) { .stack { grid-template-columns: 1fr !important; } }
+
 </style>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 </head>
@@ -10148,34 +10167,26 @@ function initSidebarCollapse() {
   const collapsed = localStorage.getItem('bims_sidebar_collapsed') === 'true';
   const sidebar   = document.querySelector('.sidebar');
   const main      = document.querySelector('.main');
-  const showBtn   = document.getElementById('sidebar-show-btn');
-
   if (collapsed) {
     if (sidebar) sidebar.classList.add('collapsed');
-    if (main)    main.style.marginLeft = '56px';
-    if (showBtn) showBtn.style.display = '';
+    if (main)    { main.style.marginLeft = '56px'; main.classList.add('collapsed-sidebar'); }
   } else {
     if (sidebar) sidebar.classList.remove('collapsed');
-    if (main)    main.style.marginLeft = '';
-    if (showBtn) showBtn.style.display = 'none';
+    if (main)    { main.style.marginLeft = ''; main.classList.remove('collapsed-sidebar'); }
   }
 }
 
 function toggleSidebarCollapse() {
-  const sidebar  = document.querySelector('.sidebar');
-  const main     = document.querySelector('.main');
-  const showBtn  = document.getElementById('sidebar-show-btn');
+  const sidebar   = document.querySelector('.sidebar');
+  const main      = document.querySelector('.main');
   const collapsed = sidebar?.classList.contains('collapsed');
-
   if (collapsed) {
     sidebar?.classList.remove('collapsed');
-    if (main) main.style.marginLeft = '';
-    if (showBtn) showBtn.style.display = 'none';
+    if (main) { main.style.marginLeft = ''; main.classList.remove('collapsed-sidebar'); }
     localStorage.setItem('bims_sidebar_collapsed', 'false');
   } else {
     sidebar?.classList.add('collapsed');
-    if (main) main.style.marginLeft = '56px';
-    if (showBtn) showBtn.style.display = '';
+    if (main) { main.style.marginLeft = '56px'; main.classList.add('collapsed-sidebar'); }
     localStorage.setItem('bims_sidebar_collapsed', 'true');
   }
 }
