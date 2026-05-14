@@ -1845,15 +1845,15 @@ function renderMore() {
   const el = document.getElementById('more-grid');
   if (!el) return;
   const items = [
-    { icon:'📋', label:'Quotations', sub:'Create & manage', fn:'showTab("quotations");updateSubtitle("Quotations")' },
-    { icon:'📂', label:'Catalogue', sub:'Browse products', fn:'showTab("catalogue");updateSubtitle("Catalogue")' },
-    { icon:'⚠️', label:'Low Stock', sub:'Items need attention', fn:'showTab("lowstock");updateSubtitle("Low Stock")' },
-    { icon:'📊', label:'Reports', sub:'Stock analysis', fn:'showTab("reports");updateSubtitle("Reports")' },
-    { icon:'📝', label:'Activity Log', sub:'Recent actions', fn:'showMoreSection("activity")' },
-    ...(isMgr ? [{ icon:'⚙️', label:'Settings', sub:'System config', fn:'showMoreSection("settings")' }] : []),
-    ...(isAdmin ? [{ icon:'👥', label:'Users', sub:'Manage users', fn:'showMoreSection("users")' }] : []),
-    { icon:'🖥️', label:'Desktop Mode', sub:'Switch to full version', fn:'window.open("https://barakah-ims-rnqh.vercel.app","_blank")' },
-    { icon:'🚪', label:'Sign Out', sub:'Logout', fn:'doLogout()' },
+    { icon:'📋', label:'Quotations',     sub:'Create & manage',        fn:"showTab('quotations');updateSubtitle('Quotations')" },
+    { icon:'📂', label:'Catalogue',      sub:'Browse products',         fn:"showTab('catalogue');updateSubtitle('Catalogue')" },
+    { icon:'⚠️', label:'Low Stock',      sub:'Items need attention',    fn:"showTab('lowstock');updateSubtitle('Low Stock')" },
+    { icon:'📊', label:'Reports',        sub:'Stock analysis',          fn:"showTab('reports');updateSubtitle('Reports')" },
+    { icon:'📝', label:'Activity Log',   sub:'Recent actions',          fn:"showMoreSection('activity')" },
+    ...(isMgr ? [{ icon:'⚙️', label:'Settings', sub:'System config',  fn:"showMoreSection('settings')" }] : []),
+    ...(isAdmin ? [{ icon:'👥', label:'Users',   sub:'Manage users',   fn:"showMoreSection('users')" }] : []),
+    { icon:'🖥️', label:'Desktop Mode',  sub:'Switch to full version',  fn:"window.open('https://barakah-ims-rnqh.vercel.app','_blank')" },
+    { icon:'🚪', label:'Sign Out',       sub:'Logout',                  fn:'doLogout()' },
   ];
   el.innerHTML = items.map(i => `<div class="m-more-item" onclick="${i.fn}">
     <div class="m-more-icon">${i.icon}</div>
