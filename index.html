@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1e3a5f">
 <title>Barakah IMS</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231e3a5f'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-weight='900' font-size='36' fill='%23d97706'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231e3a5f'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-weight='900' font-size='36' fill='%23d97706'%3EB%3C/text%3E%3C/svg%3E">
 <style>
 /* ============================================================
    BARAKAH GROUP IMS — PREMIUM WHITE UI
@@ -702,6 +704,33 @@ tbody tr:last-child td { border-bottom: none; }
 
 
 /* ── DYNAMIC CLASSES (used in JS templates) ─────────────────── */
+
+/* ── ROW ACTION MENU (⋮ dropdown) ───────────────────────────── */
+.row-menu-wrap { position: relative; display: inline-block; }
+.row-menu-btn {
+  background: none; border: 1px solid transparent; cursor: pointer;
+  font-size: 18px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+  color: var(--text-muted); line-height: 1; transition: all .15s;
+  font-family: var(--font);
+}
+.row-menu-btn:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
+.row-menu-dropdown {
+  display: none; position: fixed; z-index: 9999;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.14);
+  min-width: 175px; padding: 5px; pointer-events: auto;
+}
+.row-menu-dropdown.open { display: block; }
+.row-menu-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  text-align: left; padding: 9px 12px; background: none; border: none;
+  cursor: pointer; font-size: 13px; border-radius: 7px; color: var(--text);
+  font-family: var(--font); white-space: nowrap; transition: background .12s;
+}
+.row-menu-item:hover { background: var(--surface2); }
+.row-menu-item.danger { color: var(--red); }
+.row-menu-item.danger:hover { background: var(--red-light); }
+.row-menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
 .badge-warn    { background: var(--warn-light); color: var(--warn); }
 .alert-danger  { background: var(--red-light); color: var(--red); border: 1px solid rgba(220,38,38,0.2); padding: 10px 13px; border-radius: var(--radius-sm); font-size: 13px; }
 .alert-success { background: var(--green-light); color: var(--green); border: 1px solid rgba(5,150,105,0.2); padding: 10px 13px; border-radius: var(--radius-sm); font-size: 13px; }
@@ -1063,6 +1092,8 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
         <div class="page-header-title"><h1>Dashboard</h1><p>Barakah Group — live inventory overview</p></div>
         <button class="btn btn-gold manager-only" onclick="openAddProduct()">+ Add Product</button>
       </div>
+      <!-- TODAY AT A GLANCE -->
+      <div id="dash-glance" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px"></div>
       <div class="grid-4" style="margin-bottom:18px" id="dashboard-stats"></div>
       <div class="grid-2 stack" style="margin-bottom:18px">
         <div class="card">
@@ -2998,6 +3029,39 @@ function renderDashboard() {
   const totalValue = allProducts.reduce((a, p) => a + ((p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0))*(p.price||0), 0);
   const lowCount = allProducts.filter(p => (p.qty_bv||0)<threshold&&(p.qty_is||0)<threshold&&(p.qty_sw||0)<threshold).length;
 
+  // ── TODAY AT A GLANCE ──────────────────────────────────────
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weekFromNow = new Date(today); weekFromNow.setDate(today.getDate()+7);
+  const pendingPOs = allPurchaseOrders.filter(po=>po.status==='pending'||po.status==='partial').length;
+  const overduePOs = allPurchaseOrders.filter(po=>{
+    if (po.status==='received'||po.status==='cancelled') return false;
+    if (!po.expected_date) return false;
+    return new Date(po.expected_date) < today;
+  }).length;
+  const expiringQuots = allQuotations.filter(q=>{
+    if (q.status==='accepted'||q.status==='rejected') return false;
+    const d = new Date(q.quot_date||q.created_at);
+    d.setDate(d.getDate()+30);
+    return d >= today && d <= weekFromNow;
+  }).length;
+  const glanceEl = document.getElementById('dash-glance');
+  if (glanceEl) {
+    const glanceItems = [
+      { icon:'🕐', label:'Pending POs', value:pendingPOs, color: pendingPOs>0?'var(--warn)':'var(--green)', action:"showPage('purchase-orders')" },
+      { icon:'⏰', label:'Overdue POs', value:overduePOs, color: overduePOs>0?'var(--red)':'var(--green)', action:"showPage('purchase-orders')" },
+      { icon:'📋', label:'Expiring Quotes', value:expiringQuots, color: expiringQuots>0?'var(--warn)':'var(--green)', action:"showPage('quotations')" },
+      { icon:'⚠️', label:'Low Stock Items', value:lowCount, color: lowCount>0?'var(--warn)':'var(--green)', action:"showPage('low-stock')" },
+    ];
+    glanceEl.innerHTML = glanceItems.map(g=>`
+      <div onclick="${g.action}" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow=''">
+        <div style="font-size:22px">${g.icon}</div>
+        <div>
+          <div style="font-size:20px;font-weight:800;color:${g.color}">${g.value}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${g.label}</div>
+        </div>
+      </div>`).join('');
+  }
+
   document.getElementById('dashboard-stats').innerHTML = [
     { label:'Total Products', value:allProducts.length, sub:'Across all companies', icon:'📦' },
     { label:'Total Stock Units', value:totalQty.toLocaleString(), sub:'Combined inventory', icon:'🗂️' },
@@ -3108,9 +3172,16 @@ function renderProductRow(p, threshold, canEdit) {
     <td class="mono">${p.price?'SAR '+Number(p.price).toFixed(2):'-'}</td>
     <td><span class="badge ${isLow?'badge-red':'badge-green'}" style="font-size:10px">${isLow?'LOW':'OK'}</span></td>
     <td onclick="event.stopPropagation()" style="white-space:nowrap">
-      ${canEdit?`<button class="btn btn-sm" style="background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:var(--gold);font-size:11px" onclick="openStockUpdate('${p.id}')">📦 Update</button>
-      <button class="btn btn-sm btn-outline" onclick="openEditProduct('${p.id}')">Edit</button>
-      <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteProduct('${p.id}')">🗑️ Del</button>`:''}
+      <div class="row-menu-wrap">
+        <button class="row-menu-btn" onclick="toggleRowMenu(this,event)">⋮</button>
+        <div class="row-menu-dropdown">
+          <button class="row-menu-item" onclick="openProductDetail('${p.id}')">🔍 View Details</button>
+          ${canEdit?`<button class="row-menu-item" onclick="openStockUpdate('${p.id}')">📦 Update Stock</button>
+          <button class="row-menu-item" onclick="openEditProduct('${p.id}')">✏️ Edit Product</button>
+          <div class="row-menu-sep"></div>
+          <button class="row-menu-item danger" onclick="deleteProduct('${p.id}')">🗑️ Delete</button>`:''}
+        </div>
+      </div>
     </td>
   </tr>`;
 }
@@ -3652,13 +3723,25 @@ function renderQuotations() {
   document.getElementById('quotations-tbody').innerHTML=list.map(q=>`
     <tr><td class="mono" style="font-size:12px;color:var(--gold)">${q.quot_no}</td><td style="font-size:13px">${new Date(q.quot_date||q.created_at).toLocaleDateString()}</td><td><div style="font-weight:500">${q.client}</div><div style="font-size:11px;color:var(--text-muted)">${q.client_ref||''}</div></td><td><span class="badge badge-blue" style="font-size:10px">${COMPANY_NAMES[q.company]||q.company}</span></td><td>${(q.quotation_lines||[]).length} items</td><td class="mono" style="font-weight:600">SAR ${Number(q.total||0).toFixed(2)}</td><td><span class="badge ${statusColors[q.status]||'badge-blue'}">${(q.status||'').toUpperCase()}</span></td>
     <td onclick="event.stopPropagation()" style="white-space:nowrap">
-      <button class="btn btn-sm btn-outline" style="border-color:rgba(22,163,74,.4);color:#16a34a" onclick="printDeliveryNote(allQuotations.find(x=>x.id==='${q.id}'))">🚚 D.Note</button>
-      <button class="btn btn-sm btn-outline" style="border-color:rgba(37,99,235,.4);color:#2563eb" onclick="printQuotation(allQuotations.find(x=>x.id==='${q.id}'))">📄 Quote</button>
-      <button class="btn btn-sm" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600" onclick="shareOnWhatsApp(allQuotations.find(x=>x.id==='${q.id}'))">📱 WA</button>
-      <button class="btn btn-sm btn-success" onclick="updateQuotStatus('${q.id}','accepted')">✓</button>
-      <button class="btn btn-sm btn-danger" onclick="updateQuotStatus('${q.id}','rejected')">✗</button>
-      <button class="btn btn-sm btn-outline admin-only" onclick="openEditQuotation('${q.id}')" style="border-color:rgba(201,168,76,0.4);color:var(--gold)" ${currentProfile?.role!=='admin'?'style="display:none"':''}>✏️</button>
-      <button class="btn btn-sm btn-danger admin-only" onclick="deleteQuotation('${q.id}','${q.quot_no}')" ${currentProfile?.role==='admin'?'':'style="display:none"'}>🗑️</button>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;font-size:11px;font-weight:600">
+          <button onclick="updateQuotStatus('${q.id}','draft')" style="padding:4px 8px;border:none;cursor:pointer;background:${q.status==='draft'?'var(--warn)':'transparent'};color:${q.status==='draft'?'#fff':'var(--text-muted)'};transition:all .15s" title="Draft">Draft</button>
+          <button onclick="updateQuotStatus('${q.id}','sent')" style="padding:4px 8px;border:none;border-left:1px solid var(--border);cursor:pointer;background:${q.status==='sent'?'var(--steel)':'transparent'};color:${q.status==='sent'?'#fff':'var(--text-muted)'};transition:all .15s" title="Sent">Sent</button>
+          <button onclick="updateQuotStatus('${q.id}','accepted')" style="padding:4px 8px;border:none;border-left:1px solid var(--border);cursor:pointer;background:${q.status==='accepted'?'var(--green)':'transparent'};color:${q.status==='accepted'?'#fff':'var(--text-muted)'};transition:all .15s" title="Accepted">✓</button>
+          <button onclick="updateQuotStatus('${q.id}','rejected')" style="padding:4px 8px;border:none;border-left:1px solid var(--border);cursor:pointer;background:${q.status==='rejected'?'var(--red)':'transparent'};color:${q.status==='rejected'?'#fff':'var(--text-muted)'};transition:all .15s" title="Rejected">✗</button>
+        </div>
+        <div class="row-menu-wrap">
+          <button class="row-menu-btn" onclick="toggleRowMenu(this,event)">⋮</button>
+          <div class="row-menu-dropdown">
+            <button class="row-menu-item" onclick="printQuotation(allQuotations.find(x=>x.id==='${q.id}'))">📄 Print Quote</button>
+            <button class="row-menu-item" onclick="printDeliveryNote(allQuotations.find(x=>x.id==='${q.id}'))">🚚 Print D.Note</button>
+            <button class="row-menu-item" onclick="shareOnWhatsApp(allQuotations.find(x=>x.id==='${q.id}'))">📱 Share WhatsApp</button>
+            <button class="row-menu-item admin-only" onclick="openEditQuotation('${q.id}')">✏️ Edit</button>
+            <div class="row-menu-sep"></div>
+            <button class="row-menu-item danger admin-only" onclick="deleteQuotation('${q.id}','${q.quot_no}')">🗑️ Delete</button>
+          </div>
+        </div>
+      </div>
     </td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:28px">No quotations yet</td></tr>';
 }
 
@@ -3964,6 +4047,41 @@ async function uploadLetterhead(input) {
 // ─── MODAL HELPERS ────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+/* ── ROW ACTION MENU ─────────────────────────────────────────── */
+function toggleRowMenu(btn, e) {
+  e.stopPropagation();
+  const dropdown = btn.nextElementSibling;
+  const isOpen = dropdown.classList.contains('open');
+  closeAllRowMenus();
+  if (!isOpen) {
+    dropdown.classList.add('open');
+    // Position using fixed coords so it doesn't clip inside overflow:hidden tables
+    const rect = btn.getBoundingClientRect();
+    dropdown.style.top  = (rect.bottom + 4) + 'px';
+    dropdown.style.left = Math.min(rect.right - 175, window.innerWidth - 185) + 'px';
+  }
+}
+function closeAllRowMenus() {
+  document.querySelectorAll('.row-menu-dropdown.open').forEach(d => d.classList.remove('open'));
+}
+document.addEventListener('click', closeAllRowMenus);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllRowMenus(); });
+
+// Global search shortcut: / or Ctrl+K focuses the active page's search input
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement?.tagName;
+  const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable;
+  if (isTyping) return;
+  if (e.key === '/' || (e.ctrlKey && e.key === 'k')) {
+    e.preventDefault();
+    const searchIds = ['inv-search','po-search','cust-search','supplier-search','quot-search'];
+    for (const id of searchIds) {
+      const el = document.getElementById(id);
+      if (el && el.offsetParent !== null) { el.focus(); el.select(); break; }
+    }
+  }
+});
 document.addEventListener('click',e=>{if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');});
 document.addEventListener('keydown',e=>{if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));});
 
@@ -5173,10 +5291,13 @@ function executePrint(q, printCo) {
   }
   /* ── PRINT BUTTON (screen only) ── */
   .print-btn {
-    display: block; margin: 16px auto; padding: 9px 24px;
-    background: ${info.accentColor}; color: #fff; border: none;
-    border-radius: 6px; font-size: 13px; cursor: pointer;
+    position: fixed; top: 14px; right: 14px; z-index: 9999;
+    padding: 9px 20px; background: ${info.accentColor}; color: #fff;
+    border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.2);
+    font-family: 'Inter', sans-serif;
   }
+  .print-btn:hover { opacity: .92; }
   @media print {
     .print-btn { display: none !important; }
     @page { size: A4; margin: 0mm; }
@@ -5608,7 +5729,8 @@ function _buildPoHtml(po, docType) {
   .lh-footer{background:${accentColor};color:rgba(255,255,255,.92);padding:9px 28px;font-size:10px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;margin-top:auto}
   .footer-ar{direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif}
   .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:70px;font-weight:900;color:rgba(0,0,0,.025);pointer-events:none;z-index:0;white-space:nowrap}
-  .print-btn{display:block;margin:16px auto;padding:9px 24px;background:${accentColor};color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif}
+  .print-btn{position:fixed;top:14px;right:14px;z-index:9999;padding:9px 20px;background:${accentColor};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.2);font-family:'Inter',sans-serif}
+  .print-btn:hover{opacity:.92}
   @media print{.print-btn{display:none!important}@page{size:A4;margin:0mm}html,body{width:210mm;height:297mm}.page{height:297mm;page-break-after:avoid}}
 </style></head>
 <body>
@@ -10767,11 +10889,17 @@ function renderPurchaseOrders() {
       <td class="mono" style="font-weight:600">SAR ${total.toFixed(2)}</td>
       <td><span class="badge ${statusColors[po.status]||'badge-warn'}">${(po.status||'').toUpperCase()}</span></td>
       <td onclick="event.stopPropagation()" style="white-space:nowrap">
-        ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-sm btn-success" onclick="openReceivePo('${po.id}')">📦 Receive</button>`:''}
-        <button class="btn btn-sm btn-outline" style="border-color:rgba(37,99,235,.4);color:#2563eb" onclick="printPO(allPurchaseOrders.find(x=>x.id==='${po.id}'))">📄 PO</button>
-        <button class="btn btn-sm btn-outline" style="border-color:rgba(22,163,74,.4);color:#16a34a" onclick="printPoDeliveryNote(allPurchaseOrders.find(x=>x.id==='${po.id}'))">🚚 D.Note</button>
-        <button class="btn btn-sm btn-outline" onclick="editPo('${po.id}')">✏️</button>
-        <button class="btn btn-sm btn-danger admin-only" onclick="deletePo('${po.id}','${po.po_no}')">🗑️</button>
+        <div class="row-menu-wrap">
+          <button class="row-menu-btn" onclick="toggleRowMenu(this,event)">⋮</button>
+          <div class="row-menu-dropdown">
+            ${po.status!=='received'&&po.status!=='cancelled'?`<button class="row-menu-item" onclick="openReceivePo('${po.id}')">📦 Receive Stock</button>`:''}
+            <button class="row-menu-item" onclick="printPO(allPurchaseOrders.find(x=>x.id==='${po.id}'))">📄 Print PO</button>
+            <button class="row-menu-item" onclick="printPoDeliveryNote(allPurchaseOrders.find(x=>x.id==='${po.id}'))">🚚 Print D.Note</button>
+            <button class="row-menu-item" onclick="editPo('${po.id}')">✏️ Edit</button>
+            <div class="row-menu-sep"></div>
+            <button class="row-menu-item danger admin-only" onclick="deletePo('${po.id}','${po.po_no}')">🗑️ Delete</button>
+          </div>
+        </div>
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text-muted)">No purchase orders yet</td></tr>';
@@ -11109,13 +11237,20 @@ function renderSuppliers() {
       <td class="mono">${s.poCount||0}</td>
       <td style="font-size:12px">${lastStr}</td>
       <td style="font-size:13px">${prodCount} product${prodCount!==1?'s':''}</td>
-      <td onclick="event.stopPropagation()" style="white-space:nowrap;display:flex;gap:6px;align-items:center">
-        <button class="btn btn-sm btn-outline" onclick="viewSupplierProducts(${_supplierList.indexOf(s)})">View Products</button>
-        ${s.fromDb
-          ? `<button class="btn btn-sm btn-outline" onclick="openSupplierModal('${s.id}')">✏️</button>
-             <button class="btn btn-sm btn-danger" onclick="deleteSupplier('${s.id}','${s.name.replace(/'/g,"\\'")}')">🗑️</button>`
-          : `<button class="btn btn-sm btn-outline" onclick="openSupplierModalWithName('${s.name.replace(/'/g,"\\'")}')">+ Register</button>`
-        }
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <div class="row-menu-wrap">
+          <button class="row-menu-btn" onclick="toggleRowMenu(this,event)">⋮</button>
+          <div class="row-menu-dropdown">
+            <button class="row-menu-item" onclick="viewSupplierProducts(${_supplierList.indexOf(s)})">🔍 View Products</button>
+            <button class="row-menu-item" onclick="openPoModalWithSupplier();_viewingSupplierName='${s.name.replace(/'/g,"\\'")}';openPoModalWithSupplier()">📋 New PO</button>
+            ${s.fromDb
+              ? `<button class="row-menu-item" onclick="openSupplierModal('${s.id}')">✏️ Edit</button>
+                 <div class="row-menu-sep"></div>
+                 <button class="row-menu-item danger" onclick="deleteSupplier('${s.id}','${s.name.replace(/'/g,"\\'")}')">🗑️ Delete</button>`
+              : `<button class="row-menu-item" onclick="openSupplierModalWithName('${s.name.replace(/'/g,"\\'")}')">➕ Register Supplier</button>`
+            }
+          </div>
+        </div>
       </td>
     </tr>`;
   }).join('') : '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">No suppliers found. Create purchase orders or add a supplier manually.</td></tr>';
@@ -11283,8 +11418,14 @@ function renderCustomers() {
     <td style="font-size:12px">${c.email||'—'}</td>
     <td class="mono" style="font-size:11px;color:var(--text-muted)">${c.vat_number||'—'}</td>
     <td onclick="event.stopPropagation()" style="white-space:nowrap">
-      <button class="btn btn-sm btn-outline" onclick="openCustomerModal('${c.id}')">✏️ Edit</button>
-      <button class="btn btn-sm btn-danger admin-only" onclick="deleteCustomer('${c.id}','${c.name.replace(/'/g,"'")}')">🗑️</button>
+      <div class="row-menu-wrap">
+        <button class="row-menu-btn" onclick="toggleRowMenu(this,event)">⋮</button>
+        <div class="row-menu-dropdown">
+          <button class="row-menu-item" onclick="openCustomerModal('${c.id}')">✏️ Edit</button>
+          <div class="row-menu-sep"></div>
+          <button class="row-menu-item danger admin-only" onclick="deleteCustomer('${c.id}','${c.name.replace(/'/g,"\\'")}')">🗑️ Delete</button>
+        </div>
+      </div>
     </td>
   </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-muted)">No customers yet. Add your first customer.</td></tr>';
 }
