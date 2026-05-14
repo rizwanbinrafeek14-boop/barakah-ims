@@ -1037,7 +1037,7 @@ async function init() {
     const errEl = document.getElementById('login-error');
     if (errEl && !errEl.textContent) errEl.textContent = 'Connection timed out. Check your internet.';
     document.getElementById('auth-screen').style.display = 'flex';
-  }, 5000);
+  }, 12000);
 
   try {
     // Init Supabase with safe storage (Edge Tracking Prevention workaround)
@@ -1064,25 +1064,24 @@ async function init() {
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session?.user && !_appLaunched) {
           await launchApp(session.user);
-        }
-        // TOKEN_REFRESHED / SIGNED_IN while app already running — just update user
-        if (session?.user && _appLaunched) {
+        } else if (session?.user && _appLaunched) {
           currentUser = session.user;
+        } else if (!session?.user) {
+          // No session on initial load — show login screen
+          hideLoading();
+          document.getElementById('auth-screen').style.display = 'flex';
         }
       } else if (event === 'TOKEN_REFRESHED') {
         if (session?.user) currentUser = session.user;
       } else if (event === 'SIGNED_OUT') {
-        // Only truly sign out if this wasn't a forced page refresh
-        // Try to recover the session once before giving up
         if (_appLaunched) {
           try {
             const { data: recovered } = await sb.auth.getSession();
             if (recovered?.session?.user) {
               currentUser = recovered.session.user;
-              return; // Session recovered — stay in app
+              return;
             }
           } catch(e) {}
-          // Genuine sign-out
           _appLaunched = false;
           currentUser = null; currentProfile = null;
           hideLoading();

@@ -2522,24 +2522,18 @@ async function launchApp() {
   }
 
   await loadSettings();
-  try {
-    await preloadData();
-  } catch(e) {
-    console.warn('preloadData error:', e);
-  }
-  populateMonthFilter();
   clearTimeout(window._loadingTimeout);
   hideLoading();
   showPage('dashboard');
 
-  // Run post-launch tasks in parallel (non-blocking)
+  // Load all data in background — don't block the UI
   Promise.all([
-
+    preloadData().catch(e => console.warn('preloadData error:', e)),
     loadPhotoLibrary().then(()=>{ renderLibraryGrid(); ensurePhotoLibraryTable(); }).catch(()=>{}),
     loadActivityLog().catch(()=>{}),
     Promise.resolve().then(()=>{ updateCatNavBadges(); if(typeof loadCatMatrix==='function') loadCatMatrix(); }),
     logActivity('login','Logged in').catch(()=>{}),
-  ]).catch(()=>{});
+  ]).then(() => { populateMonthFilter(); }).catch(()=>{});
 }
 
 async function preloadData() {
