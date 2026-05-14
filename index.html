@@ -11054,7 +11054,7 @@ function renderCustomers() {
     <td class="mono" style="font-size:11px;color:var(--text-muted)">${c.vat_number||'—'}</td>
     <td onclick="event.stopPropagation()" style="white-space:nowrap">
       <button class="btn btn-sm btn-outline" onclick="openCustomerModal('${c.id}')">✏️ Edit</button>
-      <button class="btn btn-sm btn-danger admin-only" onclick="deleteCustomer('${c.id}','${c.name.replace(/'/g,&quot;\\&quot;)}')">🗑️</button>
+      <button class="btn btn-sm btn-danger admin-only" onclick="deleteCustomer('${c.id}','${c.name.replace(/'/g,"'")}')">🗑️</button>
     </td>
   </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-muted)">No customers yet. Add your first customer.</td></tr>';
 }
