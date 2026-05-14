@@ -2136,6 +2136,51 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
   </div>
 </div>
 
+<!-- BULK EDIT CATEGORY MODAL -->
+<div class="modal-overlay" id="modal-bulk-edit-cat">
+  <div class="modal" style="max-width:560px;width:96vw;">
+    <div class="modal-title">✏️ Bulk Edit — <span id="bulk-edit-count-label">0</span> Products</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Leave a field blank to keep each product's existing value.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="field">
+        <label>Category</label>
+        <select id="bulk-cat-select" class="input" onchange="onBulkCatChange()">
+          <option value="">— Keep existing —</option>
+          <option>Valves</option><option>Flanges</option><option>Fittings</option>
+          <option>Forged Steel Fittings</option><option>Pipes</option><option>Electrical</option>
+          <option>Safety Equipment</option><option>Hardware &amp; Tools</option>
+          <option>Clamps</option><option>Fasteners</option><option>Gaskets</option>
+          <option>Instruments</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Material</label>
+        <select id="bulk-material-select" class="input">
+          <option value="">— Keep existing —</option>
+          <option>SS</option><option>CS</option><option>GI</option><option>BMI</option>
+          <option>Brass</option><option>Bronze</option><option>PVC</option>
+          <option>CPVC</option><option>PPR</option><option>HDPE</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>Sub-type</label>
+      <select id="bulk-subtype-select" class="input" onchange="onBulkSubtypeChange()">
+        <option value="">— Keep existing sub-type —</option>
+      </select>
+      <input type="text" id="bulk-subtype-custom" class="input" placeholder="Type custom sub-type..." style="display:none;margin-top:6px;">
+    </div>
+    <div class="field" style="margin-bottom:14px;">
+      <label>Preview (<span id="bulk-edit-apply-count">0</span> products to update)</label>
+      <div id="bulk-edit-preview" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal('modal-bulk-edit-cat')">Cancel</button>
+      <button class="btn btn-gold" onclick="applyBulkEditCategory()">Apply to <span id="bulk-edit-apply-count2"></span> Products</button>
+    </div>
+  </div>
+</div>
+
 <!-- AI FIX CODES MODAL -->
 <div class="modal-overlay" id="modal-ai-fix-codes">
   <div class="modal" style="max-width:760px;width:96vw;max-height:90vh;display:flex;flex-direction:column;">
@@ -3708,7 +3753,20 @@ async function init() {
   // Listen for auth changes
   if (sb) {
     sb.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') { currentUser=null; currentProfile=null; document.getElementById('app').style.display='none'; document.getElementById('auth-screen').style.display = 'flex'; document.getElementById('auth-screen').style.alignItems = 'center'; document.getElementById('auth-screen').style.justifyContent = 'center'; }
+      if (event === 'TOKEN_REFRESHED' && session?.user) {
+        currentUser = session.user; // silent refresh — stay in app
+      } else if (event === 'SIGNED_OUT') {
+        // Try to recover session once before forcing logout
+        try {
+          const { data: rec } = await sb.auth.getSession();
+          if (rec?.session?.user) { currentUser = rec.session.user; return; }
+        } catch(e) {}
+        currentUser = null; currentProfile = null;
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('auth-screen').style.display = 'flex';
+        document.getElementById('auth-screen').style.alignItems = 'center';
+        document.getElementById('auth-screen').style.justifyContent = 'center';
+      }
     });
   }
 }
@@ -7655,18 +7713,35 @@ closeSidebar = function() {
 // ═══════════════════════════════════════════════════════════════
 
 function getAnthropicApiKey() {
-  return localStorage.getItem('bims_anthropic_key') || '';
+  try { return localStorage.getItem('bims_anthropic_key') || ''; }
+  catch(e) { try { return sessionStorage.getItem('bims_anthropic_key') || ''; } catch(e2) { return ''; } }
 }
 
 function getAnthropicHeaders() {
   const key = getAnthropicApiKey();
-  if (!key) throw new Error('Anthropic API key not configured. Go to Settings → AI Settings to add your key.');
+  if (!key) throw new Error('No Anthropic API key. Go to Settings → AI Settings, paste your key (sk-ant-...) and click Save.');
+  if (!key.startsWith('sk-ant-')) throw new Error('Invalid API key format — must start with sk-ant-. Check Settings → AI Settings.');
   return {
     'Content-Type': 'application/json',
     'x-api-key': key,
     'anthropic-version': '2023-06-01',
     'anthropic-dangerous-direct-browser-access': 'true'
   };
+}
+
+async function callAI(prompt, maxTokens = 1024) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: getAnthropicHeaders(),
+    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`AI error ${resp.status}: ${err?.error?.message || resp.statusText}`);
+  }
+  const data = await resp.json();
+  return data.content?.[0]?.text || '';
 }
 
 function saveAiSettings() {
@@ -8085,6 +8160,8 @@ function openBulkEditCategoryModal() {
   // Update counts
   document.getElementById('bulk-edit-count-label').textContent = ids.length;
   document.getElementById('bulk-edit-apply-count').textContent = ids.length;
+  const applyCount2 = document.getElementById('bulk-edit-apply-count2');
+  if (applyCount2) applyCount2.textContent = ids.length;
 
   // Build preview list
   const preview = document.getElementById('bulk-edit-preview');
