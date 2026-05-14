@@ -1579,10 +1579,10 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
           <input type="text" id="p-code" placeholder="e.g. CSGV40-009"
             style="flex:1;"
             oninput="this.dataset.manual='true'">
-          <button type="button" id="ai-code-btn" onclick="generateCodeWithAI()" title="Generate code using AI based on similar existing products"
+          <button type="button" id="ai-code-btn" onclick="generateCodeFromSequence()" title="Auto-generate next code in sequence from existing products"
             style="padding:9px 14px;border-radius:var(--radius-sm);border:1.5px solid #7c3aed;
                    background:#f5f3ff;color:#7c3aed;font-size:12px;font-weight:700;
-                   cursor:pointer;white-space:nowrap;flex-shrink:0;">🤖 AI</button>
+                   cursor:pointer;white-space:nowrap;flex-shrink:0;"># Next</button>
           <button type="button" onclick="buildCodeFromSelectors()" title="Manual code builder"
             style="padding:9px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--gold);
                    background:var(--gold-light,#fffbeb);color:var(--gold);font-size:12px;font-weight:700;
@@ -9435,93 +9435,71 @@ const SUB_ABBR = {
   'Swage Nipple':   'SNP',
 };
 
-async function generateCodeWithAI() {
-  const btn  = document.getElementById('ai-code-btn');
-  const name = (document.getElementById('p-name')?.value || '').trim();
-  const mat  = document.getElementById('p-material')?.value || '';
-  const cat  = document.getElementById('p-category')?.value || '';
+function generateCodeFromSequence() {
+  const btn = document.getElementById('ai-code-btn');
+  const mat = document.getElementById('p-material')?.value || '';
+  const cat = document.getElementById('p-category')?.value || '';
   const size = (document.getElementById('p-size')?.value || '').trim();
   const sub  = typeof getSubtypeValue === 'function' ? (getSubtypeValue() || '') : '';
 
-  if (!name && !mat && !cat) {
-    showToast('Fill in at least the product name, material, or category first', 'error');
+  if (!mat && !cat) {
+    showToast('Select Material and Category first', 'error');
     return;
   }
 
-  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+  if (btn) btn.disabled = true;
 
   try {
-    // Find similar products (same material OR category) that already have codes
-    const similar = allProducts
-      .filter(p => p.code && p.code.trim() &&
-        ((mat && (p.material||'').toLowerCase() === mat.toLowerCase()) ||
-         (cat && (p.category||'').toLowerCase() === cat.toLowerCase())))
-      .sort(() => Math.random() - 0.5) // shuffle so we get variety
-      .slice(0, 25);
-
-    // Also grab a random sample of ALL coded products so AI understands the global format
-    const global = allProducts
-      .filter(p => p.code && p.code.trim() && !similar.includes(p))
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 10);
-
-    const formatExamples = [...similar, ...global]
-      .map(p => `${p.code}  (${p.material||'?'} | ${p.category||'?'} | ${p.sub_type||'—'} | ${p.name})`)
-      .join('\n');
-
-    const prompt = `You are a product code generator for Barakah Group, an industrial piping and valve trading company.
-
-EXISTING PRODUCT CODES — learn the pattern strictly:
-${formatExamples || '(no existing codes — create a logical short code)'}
-
-NEW PRODUCT TO CODE:
-Name: ${name || '—'}
-Material: ${mat || '—'}
-Category: ${cat || '—'}
-Sub-type: ${sub || '—'}
-Size: ${size || '—'}
-
-Rules:
-1. Follow the EXACT same pattern/format as the existing codes
-2. Keep it short: 6–14 characters, uppercase alphanumeric + hyphens only
-3. Make it unique and specific to this product's material, type, and size
-4. Do NOT copy an existing code verbatim — generate a new one
-
-Reply with ONLY the product code. No explanation, no quotes, just the code.`;
-
-    const resp = await fetch(getGeminiUrl('gemini-2.0-flash-lite'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 30, temperature: 0.3 }
-      })
-    });
-
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
-      throw new Error(`AI ${resp.status}: ${errData?.error?.message || resp.statusText}`);
+    // Build prefix the same way assembleCode() does
+    const matCode = CB_MAT_CODES[mat] || mat.substring(0, 3).toUpperCase();
+    let typeCode = '';
+    if (CB_TYPE_CODES[cat]?.[sub]) {
+      typeCode = CB_TYPE_CODES[cat][sub];
+    } else if (sub) {
+      typeCode = sub.replace(/\s+/g, '').substring(0, 4).toUpperCase();
+    } else if (cat) {
+      typeCode = cat.split(/[\s&\/]+/).map(w => w[0] || '').join('').toUpperCase().substring(0, 3);
     }
 
-    const data = await resp.json();
-    const raw  = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
-    const code = raw.toUpperCase().replace(/[^A-Z0-9\-]/g, '').substring(0, 20);
+    if (!typeCode) {
+      showToast('Select a sub-type to generate a sequence code', 'error');
+      return;
+    }
 
-    if (!code) throw new Error('AI returned an empty code — try again');
+    // Normalise size: "2\"" → "2", "DN50" → "50", "40mm" → "40", "1/2\"" → ""
+    const sizeNum = size.match(/^(\d+)(?:[^\d\/]|$)/)?.[1] || '';
+
+    // Full prefix e.g. "CSGV40", type prefix e.g. "CSGV"
+    const typePrefix = matCode + typeCode;
+    const fullPrefix = typePrefix + sizeNum;
+
+    // Find all existing codes that start with this type prefix and end with -NNN (digits)
+    // e.g. CSGV40-009, CSGV80-003, CSGV-001
+    const prefixRe = new RegExp('^' + typePrefix + '[A-Z0-9]*-(\\d+)$', 'i');
+
+    let maxSeq = 0;
+    allProducts.forEach(p => {
+      if (!p.code) return;
+      const m = p.code.trim().match(prefixRe);
+      if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
+    });
+
+    const nextSeq = String(maxSeq + 1).padStart(3, '0');
+    const newCode = fullPrefix + '-' + nextSeq;
 
     const codeEl = document.getElementById('p-code');
     if (codeEl) {
-      codeEl.value = code;
+      codeEl.value = newCode;
       codeEl.dataset.manual = 'true';
       codeEl.style.borderColor = '#7c3aed';
       setTimeout(() => { if (codeEl) codeEl.style.borderColor = ''; }, 1500);
     }
-    showToast('✓ AI code: ' + code);
+    showToast('✓ ' + newCode + (maxSeq > 0 ? '  (seq after ' + String(maxSeq).padStart(3,'0') + ')' : '  (first in series)'));
 
   } catch(e) {
-    showToast('AI code failed: ' + e.message, 'error');
+    showToast('Code generation failed: ' + e.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🤖 AI'; }
+    if (btn) btn.disabled = false;
   }
 }
 
