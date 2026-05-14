@@ -501,12 +501,19 @@ input, select, textarea, button { font-family: inherit; }
         <div class="m-card-title">🏢 Stock by Company</div>
         <div id="dash-companies"></div>
       </div>
-      <div class="m-card">
-        <div class="m-section-header">
+      <div class="m-card" style="margin-bottom:10px;">
+        <div class="m-section-header" style="margin-bottom:8px;">
           <div class="m-card-title" style="margin:0;">🔄 Recent Movements</div>
           <span class="m-see-all" onclick="showTab('movements')">See all</span>
         </div>
         <div id="dash-movements"></div>
+      </div>
+      <div class="m-card" style="margin-bottom:10px;">
+        <div class="m-section-header" style="margin-bottom:8px;">
+          <div class="m-card-title" style="margin:0;">🤖 AI Insights</div>
+          <button class="m-btn m-btn-gold m-btn-sm" onclick="generateAiInsightsMobile()">Generate</button>
+        </div>
+        <div id="ai-insights-content" style="color:var(--text-muted);font-size:13px;">Tap Generate to analyze your inventory.</div>
       </div>
     </div>
 
@@ -538,6 +545,13 @@ input, select, textarea, button { font-family: inherit; }
     <div class="m-page" id="page-movements">
       <div class="m-section-header" style="margin-bottom:12px;">
         <div class="m-section-title">Stock Movements</div>
+        <div style="font-size:12px;color:var(--text-muted);" id="mov-count"></div>
+      </div>
+      <div class="m-filter-row" style="margin-bottom:10px;">
+        <span class="m-chip active" data-filter="movtype" data-val="" onclick="movFilter('type','');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">All</span>
+        <span class="m-chip" data-filter="movtype" data-val="in" onclick="movFilter('type','in');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">IN</span>
+        <span class="m-chip" data-filter="movtype" data-val="out" onclick="movFilter('type','out');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">OUT</span>
+        <span class="m-chip" data-filter="movtype" data-val="adjustment" onclick="movFilter('type','adjustment');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">ADJ</span>
       </div>
       <div id="movements-list"></div>
     </div>
@@ -546,6 +560,13 @@ input, select, textarea, button { font-family: inherit; }
     <div class="m-page" id="page-quotations">
       <div class="m-section-header" style="margin-bottom:12px;">
         <div class="m-section-title">Quotations</div>
+        <div style="font-size:12px;color:var(--text-muted);" id="quot-count"></div>
+      </div>
+      <div class="m-filter-row" style="margin-bottom:10px;">
+        <span class="m-chip active" onclick="quotFilter('');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">All</span>
+        <span class="m-chip" onclick="quotFilter('draft');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">Draft</span>
+        <span class="m-chip" onclick="quotFilter('sent');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">Sent</span>
+        <span class="m-chip" onclick="quotFilter('approved');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">Approved</span>
       </div>
       <div id="quotations-list"></div>
     </div>
@@ -580,13 +601,97 @@ input, select, textarea, button { font-family: inherit; }
 
     <!-- MORE -->
     <div class="m-page" id="page-more">
-      <div style="padding:4px 0 14px;">
-        <div style="font-size:20px;font-weight:800;color:var(--text);">More</div>
-        <div style="font-size:13px;color:var(--text-muted);">All sections & settings</div>
+      <!-- More Home Grid -->
+      <div id="more-home">
+        <div style="padding:4px 0 14px;">
+          <div style="font-size:20px;font-weight:800;color:var(--text);">More</div>
+          <div style="font-size:13px;color:var(--text-muted);">All sections & settings</div>
+        </div>
+        <div class="m-more-grid" id="more-grid"></div>
+        <div class="m-desktop-banner" style="margin:12px 0;border-radius:var(--radius);">
+          🖥️ Need full features? <a href="https://barakah-ims-rnqh.vercel.app" target="_blank">Open Desktop Version</a>
+        </div>
       </div>
-      <div class="m-more-grid" id="more-grid"></div>
-      <div class="m-desktop-banner" style="margin:12px 0;border-radius:var(--radius);">
-        🖥️ Need full features? <a href="https://barakah-ims-rnqh.vercel.app" target="_blank">Open Desktop Version</a>
+      <!-- Activity Log Section -->
+      <div id="more-section-activity" style="display:none;">
+        <div class="m-section-header" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="m-btn m-btn-outline m-btn-sm" onclick="showMoreHome()">← Back</button>
+            <div class="m-section-title">Activity Log</div>
+          </div>
+          <button class="m-btn m-btn-outline m-btn-sm" onclick="loadActivityLogMobile()">🔄</button>
+        </div>
+        <div id="activity-log-list"><div class="m-empty"><div class="m-empty-icon">📋</div><div class="m-empty-text">Loading...</div></div></div>
+      </div>
+      <!-- Settings Section -->
+      <div id="more-section-settings" style="display:none;">
+        <div class="m-section-header" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="m-btn m-btn-outline m-btn-sm" onclick="showMoreHome()">← Back</button>
+            <div class="m-section-title">Settings</div>
+          </div>
+        </div>
+        <!-- General Settings -->
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">⚙️ General</div>
+          <div class="m-form-group">
+            <label class="m-form-label">Low Stock Threshold</label>
+            <input type="number" class="m-input" id="s-low-threshold" placeholder="10" min="0">
+          </div>
+          <div class="m-form-group">
+            <label class="m-form-label">VAT Rate (%)</label>
+            <input type="number" class="m-input" id="s-vat-rate" placeholder="15" min="0" max="100" step="0.1">
+          </div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveSettingsMobile()">💾 Save General Settings</button>
+        </div>
+        <!-- AI Settings -->
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">🤖 AI Settings</div>
+          <div class="m-form-group">
+            <label class="m-form-label">Anthropic API Key</label>
+            <input type="password" class="m-input" id="s-ai-key" placeholder="sk-ant-...">
+          </div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveAiKey()">💾 Save AI Key</button>
+        </div>
+        <!-- Company Settings -->
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">🏢 Barakah Valves (BV)</div>
+          <div class="m-form-group"><label class="m-form-label">Company Name</label><input type="text" class="m-input" id="co-m-name-bv" placeholder="Company name"></div>
+          <div class="m-form-group"><label class="m-form-label">CR Number</label><input type="text" class="m-input" id="co-m-cr-bv" placeholder="CR number"></div>
+          <div class="m-form-group"><label class="m-form-label">VAT Number</label><input type="text" class="m-input" id="co-m-vat-bv" placeholder="VAT number"></div>
+          <div class="m-form-group"><label class="m-form-label">Phone</label><input type="text" class="m-input" id="co-m-phone-bv" placeholder="Phone"></div>
+          <div class="m-form-group"><label class="m-form-label">Address</label><textarea class="m-textarea" id="co-m-addr-bv" placeholder="Address" style="min-height:60px;"></textarea></div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveCompanySettingsMobile('bv')">💾 Save BV Settings</button>
+        </div>
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">🏢 Iron Spring (IS)</div>
+          <div class="m-form-group"><label class="m-form-label">Company Name</label><input type="text" class="m-input" id="co-m-name-is" placeholder="Company name"></div>
+          <div class="m-form-group"><label class="m-form-label">CR Number</label><input type="text" class="m-input" id="co-m-cr-is" placeholder="CR number"></div>
+          <div class="m-form-group"><label class="m-form-label">VAT Number</label><input type="text" class="m-input" id="co-m-vat-is" placeholder="VAT number"></div>
+          <div class="m-form-group"><label class="m-form-label">Phone</label><input type="text" class="m-input" id="co-m-phone-is" placeholder="Phone"></div>
+          <div class="m-form-group"><label class="m-form-label">Address</label><textarea class="m-textarea" id="co-m-addr-is" placeholder="Address" style="min-height:60px;"></textarea></div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveCompanySettingsMobile('is')">💾 Save IS Settings</button>
+        </div>
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">🏢 Stable Way (SW)</div>
+          <div class="m-form-group"><label class="m-form-label">Company Name</label><input type="text" class="m-input" id="co-m-name-sw" placeholder="Company name"></div>
+          <div class="m-form-group"><label class="m-form-label">CR Number</label><input type="text" class="m-input" id="co-m-cr-sw" placeholder="CR number"></div>
+          <div class="m-form-group"><label class="m-form-label">VAT Number</label><input type="text" class="m-input" id="co-m-vat-sw" placeholder="VAT number"></div>
+          <div class="m-form-group"><label class="m-form-label">Phone</label><input type="text" class="m-input" id="co-m-phone-sw" placeholder="Phone"></div>
+          <div class="m-form-group"><label class="m-form-label">Address</label><textarea class="m-textarea" id="co-m-addr-sw" placeholder="Address" style="min-height:60px;"></textarea></div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveCompanySettingsMobile('sw')">💾 Save SW Settings</button>
+        </div>
+      </div>
+      <!-- Users Section -->
+      <div id="more-section-users" style="display:none;">
+        <div class="m-section-header" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="m-btn m-btn-outline m-btn-sm" onclick="showMoreHome()">← Back</button>
+            <div class="m-section-title">Users</div>
+          </div>
+          <button class="m-btn m-btn-gold m-btn-sm" onclick="openSheet('add-user-sheet')">+ Add</button>
+        </div>
+        <div id="users-list"></div>
       </div>
     </div>
 
@@ -619,8 +724,8 @@ input, select, textarea, button { font-family: inherit; }
 
 </div><!-- end app -->
 
-<!-- FAB (add product) -->
-<button class="m-fab" id="fab-btn" onclick="openAddProductSheet()" title="Add Product" style="display:none;">+</button>
+<!-- FAB (context-aware) -->
+<button class="m-fab" id="fab-btn" onclick="handleFabClick()" title="Add" style="display:none;">+</button>
 
 <!-- SHEETS -->
 
@@ -666,6 +771,73 @@ input, select, textarea, button { font-family: inherit; }
     <button class="m-sheet-close" onclick="closeSheet('quot-detail-sheet')">✕</button>
   </div>
   <div class="m-sheet-body" id="quot-detail-body"></div>
+</div>
+
+<!-- Add Movement Sheet -->
+<div class="m-sheet-overlay" id="add-movement-sheet-overlay" onclick="closeSheet('add-movement-sheet')"></div>
+<div class="m-sheet" id="add-movement-sheet" style="max-height:96vh;">
+  <div class="m-sheet-handle"></div>
+  <div class="m-sheet-header">
+    <div class="m-sheet-title">New Stock Movement</div>
+    <button class="m-sheet-close" onclick="closeSheet('add-movement-sheet')">✕</button>
+  </div>
+  <div class="m-sheet-body" id="add-movement-body"></div>
+</div>
+
+<!-- Add Quotation Sheet -->
+<div class="m-sheet-overlay" id="add-quot-sheet-overlay" onclick="closeSheet('add-quot-sheet')"></div>
+<div class="m-sheet" id="add-quot-sheet" style="max-height:96vh;">
+  <div class="m-sheet-handle"></div>
+  <div class="m-sheet-header">
+    <div class="m-sheet-title" id="add-quot-sheet-title">New Quotation</div>
+    <button class="m-sheet-close" onclick="closeSheet('add-quot-sheet')">✕</button>
+  </div>
+  <div class="m-sheet-body" id="add-quot-body"></div>
+</div>
+
+<!-- Add User Sheet -->
+<div class="m-sheet-overlay" id="add-user-sheet-overlay" onclick="closeSheet('add-user-sheet')"></div>
+<div class="m-sheet" id="add-user-sheet" style="max-height:96vh;">
+  <div class="m-sheet-handle"></div>
+  <div class="m-sheet-header">
+    <div class="m-sheet-title">Add User</div>
+    <button class="m-sheet-close" onclick="closeSheet('add-user-sheet')">✕</button>
+  </div>
+  <div class="m-sheet-body">
+    <div class="m-form-group">
+      <label class="m-form-label">Full Name *</label>
+      <input type="text" class="m-input" id="nu-name" placeholder="Full name">
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Email *</label>
+      <input type="email" class="m-input" id="nu-email" placeholder="user@example.com">
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Password *</label>
+      <input type="password" class="m-input" id="nu-pass" placeholder="Min 8 characters">
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Role</label>
+      <select class="m-select" id="nu-role">
+        <option value="viewer">Viewer</option>
+        <option value="manager">Manager</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Company Access</label>
+      <select class="m-select" id="nu-company">
+        <option value="all">All Companies</option>
+        <option value="bv">Barakah Valves</option>
+        <option value="is">Iron Spring</option>
+        <option value="sw">Stable Way</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+      <button class="m-btn m-btn-outline" onclick="closeSheet('add-user-sheet')">Cancel</button>
+      <button class="m-btn m-btn-gold" onclick="createUserMobile()">Create User</button>
+    </div>
+  </div>
 </div>
 
 <!-- Catalogue Material Sheet -->
@@ -783,9 +955,19 @@ const LOGO_SW = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgIC
 function updateSubtitle(text) {
   const el = document.getElementById('page-subtitle');
   if (el) el.textContent = text;
-  // Show/hide FAB
+  // Show/hide FAB based on tab and role
   const fab = document.getElementById('fab-btn');
-  if (fab) fab.style.display = text === 'Inventory' ? 'flex' : 'none';
+  if (fab) {
+    const role = currentProfile?.role;
+    const showOn = ['Inventory','Movements','Quotations'];
+    fab.style.display = (showOn.includes(text) && role !== 'viewer') ? 'flex' : 'none';
+  }
+}
+
+function handleFabClick() {
+  if (_activeTab === 'inventory') openAddProductSheet();
+  else if (_activeTab === 'movements') openAddMovementSheet();
+  else if (_activeTab === 'quotations') openAddQuotSheet();
 }
 function normalizeCatName(c) { return c; }
 
@@ -992,6 +1174,19 @@ function showTab(tab) {
   document.querySelectorAll('.m-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   // Show page
   document.querySelectorAll('.m-page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
+  // Update FAB visibility
+  const fab = document.getElementById('fab-btn');
+  if (fab) {
+    const role = currentProfile?.role;
+    const showOn = ['inventory','movements','quotations'];
+    fab.style.display = (showOn.includes(tab) && role !== 'viewer') ? 'flex' : 'none';
+  }
+  // If switching to more tab, reset to home view
+  if (tab === 'more') {
+    const home = document.getElementById('more-home');
+    if (home) home.style.display = 'block';
+    document.querySelectorAll('[id^="more-section-"]').forEach(el => el.style.display = 'none');
+  }
   // Render content
   const renders = {
     dashboard: renderDashboard,
@@ -1359,100 +1554,8 @@ async function saveProduct() {
   } catch(e) { hideLoading(); showToast('Failed: '+e.message,'error'); }
 }
 
-// ── MOVEMENTS ──────────────────────────────────────────────────
-function renderMovements() {
-  const list = document.getElementById('movements-list');
-  if (!list) return;
-  const recent = allMovements.slice(0, 50);
-  if (!recent.length) {
-    list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">📋</div><div class="m-empty-text">No movements yet</div></div>';
-    return;
-  }
-  list.innerHTML = recent.map(m => {
-    const p = allProducts.find(x => x.id === m.product_id);
-    const isIn = m.type === 'in' || (m.qty_change||0) > 0;
-    return `<div class="m-list-item">
-      <div class="m-list-photo" style="background:${isIn?'var(--green-light)':'var(--red-light)'}">
-        <span style="font-size:20px">${isIn?'📥':'📤'}</span>
-      </div>
-      <div class="m-list-info">
-        <div class="m-list-name">${p?.name||'Unknown product'}</div>
-        <div class="m-list-sub">${m.company?.toUpperCase()||''} · ${new Date(m.created_at).toLocaleDateString('en-SA')} ${m.notes ? '· '+m.notes : ''}</div>
-      </div>
-      <div class="m-list-right">
-        <div style="font-size:17px;font-weight:800;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':''}${m.qty_change||0}</div>
-        <div class="m-badge ${isIn?'m-badge-green':'m-badge-red'}">${m.type||''}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ── QUOTATIONS ─────────────────────────────────────────────────
-function renderQuotations() {
-  const list = document.getElementById('quotations-list');
-  if (!list) return;
-  if (!allQuotations.length) {
-    list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">📄</div><div class="m-empty-text">No quotations yet</div></div>';
-    return;
-  }
-  const statusColors = { draft:'m-badge-warn', sent:'m-badge-blue', approved:'m-badge-green', rejected:'m-badge-red', cancelled:'m-badge-red' };
-  list.innerHTML = allQuotations.slice(0,50).map(q => {
-    const lines = q.quotation_lines || [];
-    const total = lines.reduce((a,l) => a + (l.qty||0)*(l.unit_price||0), 0);
-    return `<div class="m-list-item" onclick="openQuotSheet('${q.id}')">
-      <div class="m-list-photo" style="background:#eff6ff;font-size:20px;flex-shrink:0;">📄</div>
-      <div class="m-list-info">
-        <div class="m-list-name">${q.client||'—'}</div>
-        <div class="m-list-sub">${q.quot_no||''} · ${new Date(q.created_at).toLocaleDateString('en-SA')} · ${lines.length} items</div>
-      </div>
-      <div class="m-list-right">
-        <div style="font-weight:700;font-size:13px;">SAR ${total.toFixed(0)}</div>
-        <span class="m-badge ${statusColors[q.status]||'m-badge-blue'}" style="margin-top:3px;">${(q.status||'draft').toUpperCase()}</span>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function openQuotSheet(id) {
-  const q = allQuotations.find(x => x.id === id);
-  if (!q) return;
-  const lines = q.quotation_lines || [];
-  const sub = lines.reduce((a,l) => a + (l.qty||0)*(l.unit_price||0), 0);
-  const vat = sub * (parseFloat(settings.vatRate||15)/100);
-  const statusColors = { draft:'m-badge-warn', sent:'m-badge-blue', approved:'m-badge-green', rejected:'m-badge-red' };
-
-  const body = document.getElementById('quot-detail-body');
-  if (body) body.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div>
-        <div style="font-size:17px;font-weight:800;">${q.client}</div>
-        <div style="font-size:12px;color:var(--text-muted);">${q.quot_no||''} · ${new Date(q.created_at).toLocaleDateString('en-SA')}</div>
-      </div>
-      <span class="m-badge ${statusColors[q.status]||'m-badge-blue'}" style="font-size:12px;">${(q.status||'draft').toUpperCase()}</span>
-    </div>
-    <div class="m-card" style="margin-bottom:12px;">
-      ${lines.map(l => {
-        const p = allProducts.find(x => x.id === l.product_id);
-        return `<div class="m-detail-row">
-          <span class="m-detail-label" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;">${p?.name||l.custom_desc||'Item'} × ${l.qty}</span>
-          <span class="m-detail-val">SAR ${((l.qty||0)*(l.unit_price||0)).toFixed(2)}</span>
-        </div>`;
-      }).join('')}
-      <div class="m-detail-row"><span class="m-detail-label">Subtotal</span><span class="m-detail-val">SAR ${sub.toFixed(2)}</span></div>
-      <div class="m-detail-row"><span class="m-detail-label">VAT (${settings.vatRate||15}%)</span><span class="m-detail-val">SAR ${vat.toFixed(2)}</span></div>
-      <div class="m-detail-row" style="border-top:2px solid var(--border);">
-        <span style="font-weight:800;font-size:15px;">Total</span>
-        <span style="font-weight:800;font-size:15px;color:var(--gold);">SAR ${(sub+vat).toFixed(2)}</span>
-      </div>
-    </div>
-    ${currentProfile?.role !== 'viewer' && q.status==='draft' ? `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <button class="m-btn m-btn-outline m-btn-sm" onclick="updateQuotStatusMobile('${q.id}','sent')">📤 Mark Sent</button>
-      <button class="m-btn m-btn-gold m-btn-sm" onclick="updateQuotStatusMobile('${q.id}','approved')">✓ Approve</button>
-    </div>` : ''}
-  `;
-  openSheet('quot-detail-sheet');
-}
+// ── MOVEMENTS (placeholder removed, see enhanced version below) ──
+// ── QUOTATIONS (placeholder removed, see enhanced version below) ──
 
 async function updateQuotStatusMobile(id, status) {
   try {
@@ -1563,6 +1666,9 @@ function renderReports() {
   const bvQty = allProducts.reduce((a,p)=>a+(p.qty_bv||0),0);
   const isQty = allProducts.reduce((a,p)=>a+(p.qty_is||0),0);
   const swQty = allProducts.reduce((a,p)=>a+(p.qty_sw||0),0);
+  const bvVal = allProducts.reduce((a,p)=>a+(p.qty_bv||0)*(p.price||0),0);
+  const isVal = allProducts.reduce((a,p)=>a+(p.qty_is||0)*(p.price||0),0);
+  const swVal = allProducts.reduce((a,p)=>a+(p.qty_sw||0)*(p.price||0),0);
 
   // Top materials
   const matCounts = {};
@@ -1570,26 +1676,91 @@ function renderReports() {
   const topMats = Object.entries(matCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxMat = topMats[0]?.[1] || 1;
 
+  // Movement stats
+  const movIn  = allMovements.filter(m=>m.type==='in').reduce((a,m)=>a+(m.qty_change||0),0);
+  const movOut = allMovements.filter(m=>m.type==='out').reduce((a,m)=>a+Math.abs(m.qty_change||0),0);
+
+  // Top moved products
+  const productMoves = {};
+  allMovements.forEach(m => {
+    productMoves[m.product_id] = (productMoves[m.product_id]||0) + Math.abs(m.qty_change||0);
+  });
+  const topMoved = Object.entries(productMoves).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([id,cnt])=>{
+    const p = allProducts.find(x=>x.id===id);
+    return { name: p?.name||'Unknown', cnt };
+  });
+  const maxMoved = topMoved[0]?.cnt || 1;
+
+  // Quotation stats
+  const quotDraft    = allQuotations.filter(q=>q.status==='draft').length;
+  const quotSent     = allQuotations.filter(q=>q.status==='sent').length;
+  const quotApproved = allQuotations.filter(q=>q.status==='approved'||q.status==='accepted').length;
+  const quotTotal    = allQuotations.reduce((a,q)=>a+(q.total||0),0);
+
   const el = document.getElementById('reports-body');
   if (!el) return;
   el.innerHTML = `
     <div class="m-stats" style="grid-template-columns:1fr 1fr;">
       <div class="m-stat"><div class="m-stat-icon">📦</div><div class="m-stat-label">Products</div><div class="m-stat-value">${totalProds.toLocaleString()}</div></div>
       <div class="m-stat"><div class="m-stat-icon">📊</div><div class="m-stat-label">Total Units</div><div class="m-stat-value">${totalQty.toLocaleString()}</div></div>
-      <div class="m-stat"><div class="m-stat-icon">💰</div><div class="m-stat-label">Est. Value</div><div class="m-stat-value" style="font-size:16px;">SAR ${totalVal.toLocaleString(undefined,{maximumFractionDigits:0})}</div></div>
+      <div class="m-stat"><div class="m-stat-icon">💰</div><div class="m-stat-label">Est. Value</div><div class="m-stat-value" style="font-size:16px;">SAR ${(totalVal/1000).toFixed(0)}K</div></div>
       <div class="m-stat"><div class="m-stat-icon">⚠️</div><div class="m-stat-label">Low Stock</div><div class="m-stat-value" style="color:var(--red)">${lowCount}</div></div>
     </div>
     <div class="m-card" style="margin-bottom:12px;">
-      <div class="m-card-title">🏢 Stock by Company</div>
-      ${[['Barakah Valves',bvQty,totalQty],['Iron Spring',isQty,totalQty],['Stable Way',swQty,totalQty]].map(([n,v,max])=>`
+      <div class="m-card-title">🏢 Stock Value by Company</div>
+      ${[['Barakah Valves',bvQty,bvVal],['Iron Spring',isQty,isVal],['Stable Way',swQty,swVal]].map(([n,qty,val])=>`
         <div style="margin-bottom:12px;">
           <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;">
-            <span style="font-weight:600;">${n}</span><span style="font-weight:700;">${v.toLocaleString()}</span>
+            <span style="font-weight:600;">${n} (${qty.toLocaleString()} units)</span><span style="font-weight:700;">SAR ${val.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
           </div>
           <div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;">
-            <div style="height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:99px;width:${max?Math.round(v/max*100):0}%;transition:width .5s;"></div>
+            <div style="height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:99px;width:${totalVal?Math.round(val/totalVal*100):0}%;transition:width .5s;"></div>
           </div>
         </div>`).join('')}
+    </div>
+    <div class="m-card" style="margin-bottom:12px;">
+      <div class="m-card-title">🔄 Movement Summary</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center;margin-bottom:8px;">
+        <div style="background:var(--green-light);border-radius:10px;padding:12px;">
+          <div style="font-size:22px;font-weight:800;color:var(--green);">${movIn.toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--green);font-weight:600;">📥 STOCK IN</div>
+        </div>
+        <div style="background:var(--red-light);border-radius:10px;padding:12px;">
+          <div style="font-size:22px;font-weight:800;color:var(--red);">${movOut.toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--red);font-weight:600;">📤 STOCK OUT</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);text-align:center;">${allMovements.length} total movements recorded</div>
+    </div>
+    ${topMoved.length ? `<div class="m-card" style="margin-bottom:12px;">
+      <div class="m-card-title">🔥 Top Moved Products</div>
+      ${topMoved.map(({name,cnt})=>`
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+            <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">${name}</span><span style="color:var(--text-muted);">${cnt} units</span>
+          </div>
+          <div style="background:var(--surface2);border-radius:99px;height:6px;overflow:hidden;">
+            <div style="height:100%;background:var(--gold);border-radius:99px;width:${Math.round(cnt/maxMoved*100)}%;"></div>
+          </div>
+        </div>`).join('')}
+    </div>` : ''}
+    <div class="m-card" style="margin-bottom:12px;">
+      <div class="m-card-title">📄 Quotations</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin-bottom:8px;">
+        <div style="background:var(--warn-light);border-radius:8px;padding:10px;">
+          <div style="font-size:20px;font-weight:800;color:var(--warn);">${quotDraft}</div>
+          <div style="font-size:10px;color:var(--warn);font-weight:700;">DRAFT</div>
+        </div>
+        <div style="background:var(--steel-light);border-radius:8px;padding:10px;">
+          <div style="font-size:20px;font-weight:800;color:var(--steel);">${quotSent}</div>
+          <div style="font-size:10px;color:var(--steel);font-weight:700;">SENT</div>
+        </div>
+        <div style="background:var(--green-light);border-radius:8px;padding:10px;">
+          <div style="font-size:20px;font-weight:800;color:var(--green);">${quotApproved}</div>
+          <div style="font-size:10px;color:var(--green);font-weight:700;">APPROVED</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);text-align:center;">Total quotation value: SAR ${quotTotal.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
     </div>
     <div class="m-card">
       <div class="m-card-title">🗂️ Products by Material</div>
@@ -1613,11 +1784,10 @@ function renderMore() {
   const el = document.getElementById('more-grid');
   if (!el) return;
   const items = [
-    { icon:'📋', label:'Quotations', sub:'Create & manage', fn:'showTab("quotations")' },
-    { icon:'📂', label:'Catalogue', sub:'Browse products', fn:'showTab("catalogue")' },
-    { icon:'⚠️', label:'Low Stock', sub:'Items need attention', fn:'showTab("lowstock")' },
-    { icon:'📊', label:'Reports', sub:'Stock analysis', fn:'showTab("reports")' },
-    { icon:'📸', label:'Photo Library', sub:'Product images', fn:'showMoreSection("photos")' },
+    { icon:'📋', label:'Quotations', sub:'Create & manage', fn:'showTab("quotations");updateSubtitle("Quotations")' },
+    { icon:'📂', label:'Catalogue', sub:'Browse products', fn:'showTab("catalogue");updateSubtitle("Catalogue")' },
+    { icon:'⚠️', label:'Low Stock', sub:'Items need attention', fn:'showTab("lowstock");updateSubtitle("Low Stock")' },
+    { icon:'📊', label:'Reports', sub:'Stock analysis', fn:'showTab("reports");updateSubtitle("Reports")' },
     { icon:'📝', label:'Activity Log', sub:'Recent actions', fn:'showMoreSection("activity")' },
     ...(isMgr ? [{ icon:'⚙️', label:'Settings', sub:'System config', fn:'showMoreSection("settings")' }] : []),
     ...(isAdmin ? [{ icon:'👥', label:'Users', sub:'Manage users', fn:'showMoreSection("users")' }] : []),
@@ -1632,8 +1802,31 @@ function renderMore() {
 }
 
 function showMoreSection(section) {
-  const sections = { photos:'Photo Library', activity:'Activity Log', settings:'Settings', users:'User Management' };
-  showToast(sections[section] + ' — open on desktop for full access', 'warning');
+  const home = document.getElementById('more-home');
+  const sectionEl = document.getElementById('more-section-' + section);
+  if (!sectionEl) {
+    // Navigate to desktop for unsupported sections
+    showToast('Opening in full version...', 'warning');
+    setTimeout(() => window.open('https://barakah-ims-rnqh.vercel.app', '_blank'), 500);
+    return;
+  }
+  if (home) home.style.display = 'none';
+  // Hide all sections
+  document.querySelectorAll('[id^="more-section-"]').forEach(el => el.style.display = 'none');
+  sectionEl.style.display = 'block';
+  // Trigger data load for specific sections
+  if (section === 'activity') loadActivityLogMobile();
+  if (section === 'settings') loadCompanySettingsMobile();
+  if (section === 'users') loadUsersMobile();
+  // Scroll to top
+  const page = document.getElementById('page-more');
+  if (page) page.scrollTop = 0;
+}
+
+function showMoreHome() {
+  const home = document.getElementById('more-home');
+  if (home) home.style.display = 'block';
+  document.querySelectorAll('[id^="more-section-"]').forEach(el => el.style.display = 'none');
 }
 
 // ── SHEET HELPERS ──────────────────────────────────────────────
@@ -1688,6 +1881,680 @@ function invFilter(type, val) {
     c.classList.toggle('active', c.dataset.val === val);
   });
   renderInventory();
+}
+
+// ── MOVEMENT FILTER ────────────────────────────────────────────
+let _movFilterType = '';
+function movFilter(key, val) {
+  if (key === 'type') _movFilterType = val;
+  renderMovements();
+}
+
+function renderMovements() {
+  const list = document.getElementById('movements-list');
+  if (!list) return;
+  let items = allMovements;
+  if (_movFilterType) items = items.filter(m => m.type === _movFilterType);
+  const countEl = document.getElementById('mov-count');
+  if (countEl) countEl.textContent = items.length + ' movements';
+  if (!items.length) {
+    list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">📋</div><div class="m-empty-text">No movements</div></div>';
+    return;
+  }
+  list.innerHTML = items.slice(0, 100).map(m => {
+    const p = allProducts.find(x => x.id === m.product_id);
+    const isIn = m.type === 'in' || (m.qty_change||0) > 0;
+    return `<div class="m-list-item">
+      <div class="m-list-photo" style="background:${isIn?'var(--green-light)':'var(--red-light)'}">
+        <span style="font-size:20px">${isIn?'📥':'📤'}</span>
+      </div>
+      <div class="m-list-info">
+        <div class="m-list-name">${p?.name||'Unknown product'}</div>
+        <div class="m-list-sub">${m.company?.toUpperCase()||''} · ${new Date(m.created_at).toLocaleDateString('en-SA')} ${m.notes ? '· '+m.notes : ''}</div>
+      </div>
+      <div class="m-list-right">
+        <div style="font-size:17px;font-weight:800;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':''}${m.qty_change||0}</div>
+        <div class="m-badge ${isIn?'m-badge-green':'m-badge-red'}">${m.type||''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── QUOTATION FILTER ───────────────────────────────────────────
+let _quotFilterStatus = '';
+function quotFilter(status) {
+  _quotFilterStatus = status;
+  renderQuotations();
+}
+
+function renderQuotations() {
+  const list = document.getElementById('quotations-list');
+  if (!list) return;
+  let items = allQuotations;
+  if (_quotFilterStatus) items = items.filter(q => q.status === _quotFilterStatus);
+  const countEl = document.getElementById('quot-count');
+  if (countEl) countEl.textContent = items.length + ' quotations';
+  if (!items.length) {
+    list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">📄</div><div class="m-empty-text">No quotations yet</div></div>';
+    return;
+  }
+  const statusColors = { draft:'m-badge-warn', sent:'m-badge-blue', approved:'m-badge-green', accepted:'m-badge-green', rejected:'m-badge-red', cancelled:'m-badge-red' };
+  list.innerHTML = items.slice(0,100).map(q => {
+    const lines = q.quotation_lines || [];
+    const total = lines.reduce((a,l) => a + (l.qty||0)*(l.unit_price||0), 0);
+    return `<div class="m-list-item" onclick="openQuotSheet('${q.id}')">
+      <div class="m-list-photo" style="background:#eff6ff;font-size:20px;flex-shrink:0;">📄</div>
+      <div class="m-list-info">
+        <div class="m-list-name">${q.client||'—'}</div>
+        <div class="m-list-sub">${q.quot_no||''} · ${new Date(q.created_at).toLocaleDateString('en-SA')} · ${lines.length} items</div>
+      </div>
+      <div class="m-list-right">
+        <div style="font-weight:700;font-size:13px;">SAR ${total.toFixed(0)}</div>
+        <span class="m-badge ${statusColors[q.status]||'m-badge-blue'}" style="margin-top:3px;">${(q.status||'draft').toUpperCase()}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── ADD MOVEMENT SHEET ─────────────────────────────────────────
+function openAddMovementSheet() {
+  const body = document.getElementById('add-movement-body');
+  if (!body) return;
+  body.innerHTML = `
+    <div class="m-form-group" style="position:relative;">
+      <label class="m-form-label">Product *</label>
+      <input type="text" class="m-input" id="nm-product-search" placeholder="Search products..." autocomplete="off"
+        oninput="movProductSearch(this.value)" onfocus="movProductSearch(this.value)"
+        onblur="setTimeout(()=>{const d=document.getElementById('nm-product-drop');if(d)d.style.display='none'},200)">
+      <input type="hidden" id="nm-product-id" value="">
+      <div id="nm-product-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--gold);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);z-index:9999;max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Company</label>
+      <select class="m-select" id="nm-company">
+        <option value="bv">Barakah Valves (BV)</option>
+        <option value="is">Iron Spring (IS)</option>
+        <option value="sw">Stable Way (SW)</option>
+      </select>
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Type</label>
+      <select class="m-select" id="nm-type">
+        <option value="in">Stock In (+)</option>
+        <option value="out">Stock Out (−)</option>
+        <option value="adjustment">Adjustment (exact)</option>
+      </select>
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Quantity *</label>
+      <input type="number" class="m-input" id="nm-qty" placeholder="0" min="1" step="1" style="font-size:22px;text-align:center;">
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Reference / Notes</label>
+      <input type="text" class="m-input" id="nm-notes" placeholder="PO number, reason...">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+      <button class="m-btn m-btn-outline" onclick="closeSheet('add-movement-sheet')">Cancel</button>
+      <button class="m-btn m-btn-gold" onclick="saveNewMovement()">💾 Save</button>
+    </div>
+  `;
+  openSheet('add-movement-sheet');
+}
+
+function movProductSearch(q) {
+  const drop = document.getElementById('nm-product-drop');
+  if (!drop) return;
+  const val = q.toLowerCase();
+  if (!val) { drop.style.display = 'none'; return; }
+  const matches = allProducts.filter(p =>
+    (p.name||'').toLowerCase().includes(val) || (p.code||'').toLowerCase().includes(val)
+  ).slice(0, 20);
+  if (!matches.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = matches.map(p => `<div onclick="selectMovProduct('${p.id}','${(p.name||'').replace(/'/g,"\\'")}','${p.code||''}')"
+    style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;"
+    onmouseover="this.style.background='var(--gold-light)'" onmouseout="this.style.background=''">
+    <div style="font-weight:600;">${p.name}</div>
+    <div style="font-size:11px;color:var(--text-muted);">${p.code||''}</div>
+  </div>`).join('');
+  drop.style.display = 'block';
+}
+
+function selectMovProduct(id, name, code) {
+  document.getElementById('nm-product-id').value = id;
+  document.getElementById('nm-product-search').value = name + (code ? ' [' + code + ']' : '');
+  const drop = document.getElementById('nm-product-drop');
+  if (drop) drop.style.display = 'none';
+}
+
+async function saveNewMovement() {
+  const pid   = document.getElementById('nm-product-id')?.value;
+  const co    = document.getElementById('nm-company')?.value;
+  const type  = document.getElementById('nm-type')?.value;
+  const qty   = parseInt(document.getElementById('nm-qty')?.value) || 0;
+  const notes = document.getElementById('nm-notes')?.value || '';
+  if (!pid) { showToast('Please select a product', 'error'); return; }
+  if (qty <= 0) { showToast('Quantity must be greater than 0', 'error'); return; }
+  const p = allProducts.find(x => x.id === pid);
+  if (!p) return;
+  if (type === 'out' && (p['qty_'+co]||0) < qty) {
+    showToast(`Insufficient stock! Available: ${p['qty_'+co]||0}`, 'error'); return;
+  }
+  const currentQty = (p['qty_'+co]||0);
+  const newQty = type === 'in' ? currentQty + qty : type === 'out' ? Math.max(0, currentQty - qty) : qty;
+  const qtyChange = newQty - currentQty;
+  showLoading('SAVING...');
+  try {
+    await sb.from('products').update({ ['qty_'+co]: newQty }).eq('id', pid);
+    p['qty_'+co] = newQty;
+    const { data: mData } = await sb.from('stock_movements').insert({
+      product_id: pid, type, qty_change: qtyChange, company: co,
+      notes: notes || null, created_by: currentProfile?.id
+    }).select('*, profiles(full_name)').single();
+    if (mData) allMovements = [mData, ...allMovements];
+    hideLoading();
+    closeSheet('add-movement-sheet');
+    renderMovements();
+    checkLowStock();
+    showToast('Movement recorded!', 'success');
+  } catch(e) { hideLoading(); showToast('Failed: '+e.message, 'error'); }
+}
+
+// ── ADD QUOTATION SHEET ────────────────────────────────────────
+let _mQuotLines = []; // [{idx, productId, desc, qty, unit, price}]
+let _mQuotLineIdx = 0;
+let _editQuotMobileId = null;
+
+function openAddQuotSheet() {
+  _mQuotLines = [];
+  _mQuotLineIdx = 0;
+  _editQuotMobileId = null;
+  document.getElementById('add-quot-sheet-title').textContent = 'New Quotation';
+  renderQuotForm();
+  openSheet('add-quot-sheet');
+}
+
+function renderQuotForm() {
+  const body = document.getElementById('add-quot-body');
+  if (!body) return;
+  body.innerHTML = `
+    <div class="m-form-group">
+      <label class="m-form-label">Client Name *</label>
+      <input type="text" class="m-input" id="mq-client" placeholder="Customer / company name">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="m-form-group">
+        <label class="m-form-label">Company</label>
+        <select class="m-select" id="mq-company">
+          <option value="bv">Barakah Valves</option>
+          <option value="is">Iron Spring</option>
+          <option value="sw">Stable Way</option>
+        </select>
+      </div>
+      <div class="m-form-group">
+        <label class="m-form-label">Contact Ref</label>
+        <input type="text" class="m-input" id="mq-contact" placeholder="Ref#">
+      </div>
+    </div>
+    <div class="m-form-group">
+      <label class="m-form-label">Notes</label>
+      <textarea class="m-textarea" id="mq-notes" placeholder="Optional notes..." style="min-height:60px;"></textarea>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:700;">Line Items</div>
+      <button class="m-btn m-btn-outline m-btn-sm" onclick="addMQuotLine()">+ Add Item</button>
+    </div>
+    <div id="mq-lines-container"></div>
+    <div class="m-card" style="margin-top:10px;margin-bottom:10px;background:var(--gold-light);" id="mq-totals-card">
+      <div id="mq-totals" style="font-size:13px;color:var(--text-muted);">Add items to see totals</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button class="m-btn m-btn-outline" onclick="saveMQuotation('draft')">💾 Save Draft</button>
+      <button class="m-btn m-btn-gold" onclick="saveMQuotation('sent')">📤 Save & Send</button>
+    </div>
+  `;
+  // Add first line automatically
+  addMQuotLine();
+}
+
+function addMQuotLine() {
+  const idx = _mQuotLineIdx++;
+  _mQuotLines.push({ idx, productId: '', desc: '', qty: 1, unit: 'PCS', price: 0 });
+  const container = document.getElementById('mq-lines-container');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.id = 'mql-' + idx;
+  div.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;';
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text-muted);">ITEM ${idx+1}</div>
+      <button onclick="removeMQuotLine(${idx})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;">✕</button>
+    </div>
+    <div style="position:relative;margin-bottom:8px;">
+      <input type="text" id="mql-search-${idx}" placeholder="Search product..." class="m-input" autocomplete="off"
+        oninput="mqlProductSearch(${idx},this.value)" onfocus="mqlProductSearch(${idx},this.value)"
+        onblur="setTimeout(()=>{const d=document.getElementById('mql-drop-${idx}');if(d)d.style.display='none'},200)">
+      <input type="hidden" id="mql-pid-${idx}" value="">
+      <div id="mql-drop-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--gold);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);z-index:9999;max-height:180px;overflow-y:auto;margin-top:2px;"></div>
+    </div>
+    <input type="text" id="mql-custom-${idx}" placeholder="Custom description (if no product)" class="m-input" style="margin-bottom:8px;"
+      oninput="updateMQLTotals()">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+      <div>
+        <div class="m-form-label" style="margin-bottom:3px;">Qty</div>
+        <input type="number" id="mql-qty-${idx}" value="1" min="0.01" step="0.01" class="m-input" style="text-align:center;" oninput="updateMQLTotals()">
+      </div>
+      <div>
+        <div class="m-form-label" style="margin-bottom:3px;">Unit</div>
+        <select id="mql-unit-${idx}" class="m-select">
+          <option>PCS</option><option>MTR</option><option>KG</option><option>SET</option><option>BOX</option><option>LOT</option>
+        </select>
+      </div>
+      <div>
+        <div class="m-form-label" style="margin-bottom:3px;">Price SAR</div>
+        <input type="number" id="mql-price-${idx}" value="0" step="0.01" class="m-input" oninput="updateMQLTotals()">
+      </div>
+    </div>
+    <div style="text-align:right;font-size:12px;font-weight:700;color:var(--gold);margin-top:6px;" id="mql-total-${idx}">SAR 0.00</div>
+  `;
+  container.appendChild(div);
+  updateMQLTotals();
+}
+
+function removeMQuotLine(idx) {
+  _mQuotLines = _mQuotLines.filter(l => l.idx !== idx);
+  const el = document.getElementById('mql-'+idx);
+  if (el) el.remove();
+  updateMQLTotals();
+}
+
+function mqlProductSearch(idx, q) {
+  const drop = document.getElementById('mql-drop-'+idx);
+  if (!drop) return;
+  const val = q.toLowerCase();
+  if (!val) { drop.style.display = 'none'; return; }
+  const matches = allProducts.filter(p =>
+    (p.name||'').toLowerCase().includes(val) || (p.code||'').toLowerCase().includes(val)
+  ).slice(0, 15);
+  if (!matches.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = matches.map(p => `<div onclick="selectMQLProduct(${idx},'${p.id}','${(p.name||'').replace(/'/g,"\\'")}','${p.code||''}',${p.price||0},'${p.unit||'PCS'}')"
+    style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;"
+    onmouseover="this.style.background='var(--gold-light)'" onmouseout="this.style.background=''">
+    <div style="font-weight:600;">${p.name}</div>
+    <div style="font-size:11px;color:var(--text-muted);">${p.code||''} ${p.price ? '· SAR '+Number(p.price).toFixed(2) : ''}</div>
+  </div>`).join('');
+  drop.style.display = 'block';
+}
+
+function selectMQLProduct(idx, id, name, code, price, unit) {
+  document.getElementById('mql-pid-'+idx).value = id;
+  document.getElementById('mql-search-'+idx).value = name + (code ? ' ['+code+']' : '');
+  const priceEl = document.getElementById('mql-price-'+idx);
+  if (priceEl && price > 0) priceEl.value = price;
+  const unitEl = document.getElementById('mql-unit-'+idx);
+  if (unitEl && unit) unitEl.value = unit;
+  const drop = document.getElementById('mql-drop-'+idx);
+  if (drop) drop.style.display = 'none';
+  updateMQLTotals();
+}
+
+function updateMQLTotals() {
+  let sub = 0;
+  document.querySelectorAll('[id^="mql-qty-"]').forEach(el => {
+    const idx = el.id.replace('mql-qty-','');
+    const qty = parseFloat(el.value)||0;
+    const price = parseFloat(document.getElementById('mql-price-'+idx)?.value)||0;
+    const lineTotal = qty * price;
+    sub += lineTotal;
+    const totalEl = document.getElementById('mql-total-'+idx);
+    if (totalEl) totalEl.textContent = 'SAR ' + lineTotal.toFixed(2);
+  });
+  const vr = parseFloat(settings.vatRate||15)/100;
+  const vat = sub * vr;
+  const total = sub + vat;
+  const el = document.getElementById('mq-totals');
+  if (el) el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Subtotal</span><span>SAR ${sub.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>VAT (${Math.round(vr*100)}%)</span><span>SAR ${vat.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;color:var(--gold);border-top:1px solid var(--border);padding-top:6px;margin-top:6px;"><span>Total</span><span>SAR ${total.toFixed(2)}</span></div>
+  `;
+}
+
+async function saveMQuotation(status) {
+  const client = document.getElementById('mq-client')?.value?.trim();
+  if (!client) { showToast('Client name required', 'error'); return; }
+  const company = document.getElementById('mq-company')?.value || 'bv';
+  const notes   = document.getElementById('mq-notes')?.value || '';
+  const contact = document.getElementById('mq-contact')?.value || '';
+  // Collect lines
+  const lines = [];
+  document.querySelectorAll('[id^="mql-qty-"]').forEach(el => {
+    const idx = el.id.replace('mql-qty-','');
+    const qty = parseFloat(el.value)||0;
+    if (qty <= 0) return;
+    const pid = document.getElementById('mql-pid-'+idx)?.value || null;
+    const customDesc = document.getElementById('mql-custom-'+idx)?.value || '';
+    const unitPrice = parseFloat(document.getElementById('mql-price-'+idx)?.value)||0;
+    const unit = document.getElementById('mql-unit-'+idx)?.value || 'PCS';
+    const pObj = pid ? allProducts.find(x => x.id === pid) : null;
+    lines.push({
+      product_id: pid||null, custom_desc: customDesc,
+      qty, unit, unit_price: unitPrice, total: qty*unitPrice,
+      product_name: pObj?.name || customDesc || 'Item'
+    });
+  });
+  if (!lines.length) { showToast('Add at least one line item', 'error'); return; }
+  const sub = lines.reduce((a,l)=>a+l.total,0);
+  const vr = parseFloat(settings.vatRate||15)/100;
+  const quotNo = 'QT-' + company.toUpperCase() + '-' + Date.now().toString().slice(-6);
+  showLoading('SAVING...');
+  try {
+    const { data: qData, error: qErr } = await sb.from('quotations').insert({
+      quot_no: quotNo, company, client, status,
+      contact, notes,
+      subtotal: sub, vat: sub*vr, total: sub*(1+vr),
+      quot_date: new Date().toISOString().split('T')[0],
+      created_by: currentProfile?.id
+    }).select().single();
+    if (qErr) throw qErr;
+    if (qData) {
+      const lineInserts = lines.map((l,i)=>({
+        quotation_id: qData.id, product_id: l.product_id,
+        custom_desc: l.custom_desc, qty: l.qty, unit: l.unit,
+        unit_price: l.unit_price, total: l.total, sort_order: i
+      }));
+      const { data: lData } = await sb.from('quotation_lines').insert(lineInserts).select();
+      qData.quotation_lines = lData || [];
+      allQuotations = [qData, ...allQuotations];
+    }
+    hideLoading();
+    closeSheet('add-quot-sheet');
+    renderQuotations();
+    showToast('Quotation saved!', 'success');
+  } catch(e) { hideLoading(); showToast('Failed: '+e.message, 'error'); }
+}
+
+// Enhanced openQuotSheet with edit/status actions
+function openQuotSheet(id) {
+  const q = allQuotations.find(x => x.id === id);
+  if (!q) return;
+  const lines = q.quotation_lines || [];
+  const sub = lines.reduce((a,l) => a + (l.qty||0)*(l.unit_price||0), 0);
+  const vat = sub * (parseFloat(settings.vatRate||15)/100);
+  const statusColors = { draft:'m-badge-warn', sent:'m-badge-blue', approved:'m-badge-green', accepted:'m-badge-green', rejected:'m-badge-red', cancelled:'m-badge-red' };
+  const canEdit = currentProfile?.role !== 'viewer';
+
+  const body = document.getElementById('quot-detail-body');
+  if (body) body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <div style="font-size:17px;font-weight:800;">${q.client}</div>
+        <div style="font-size:12px;color:var(--text-muted);">${q.quot_no||''} · ${new Date(q.created_at).toLocaleDateString('en-SA')} · ${COMPANY_NAMES[q.company]||q.company||''}</div>
+      </div>
+      <span class="m-badge ${statusColors[q.status]||'m-badge-blue'}" style="font-size:12px;">${(q.status||'draft').toUpperCase()}</span>
+    </div>
+    <div class="m-card" style="margin-bottom:12px;">
+      ${lines.map(l => {
+        const p = allProducts.find(x => x.id === l.product_id);
+        return `<div class="m-detail-row">
+          <span class="m-detail-label" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;">${p?.name||l.custom_desc||'Item'} × ${l.qty} ${l.unit||'PCS'}</span>
+          <span class="m-detail-val">SAR ${((l.qty||0)*(l.unit_price||0)).toFixed(2)}</span>
+        </div>`;
+      }).join('')}
+      <div class="m-detail-row"><span class="m-detail-label">Subtotal</span><span class="m-detail-val">SAR ${sub.toFixed(2)}</span></div>
+      <div class="m-detail-row"><span class="m-detail-label">VAT (${settings.vatRate||15}%)</span><span class="m-detail-val">SAR ${vat.toFixed(2)}</span></div>
+      <div class="m-detail-row" style="border-top:2px solid var(--border);padding-top:8px;">
+        <span style="font-weight:800;font-size:15px;">Total</span>
+        <span style="font-weight:800;font-size:15px;color:var(--gold);">SAR ${(sub+vat).toFixed(2)}</span>
+      </div>
+    </div>
+    ${q.notes ? `<div class="m-card" style="margin-bottom:12px;font-size:13px;color:var(--text-muted);">📝 ${q.notes}</div>` : ''}
+    ${canEdit ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      ${q.status==='draft' ? `<button class="m-btn m-btn-outline m-btn-sm" onclick="updateQuotStatusMobile('${q.id}','sent')">📤 Mark Sent</button>` : ''}
+      ${(q.status==='draft'||q.status==='sent') ? `<button class="m-btn m-btn-gold m-btn-sm" onclick="updateQuotStatusMobile('${q.id}','approved')">✓ Approve</button>` : ''}
+      ${(q.status==='draft'||q.status==='sent') ? `<button class="m-btn m-btn-danger m-btn-sm" onclick="updateQuotStatusMobile('${q.id}','rejected')">✗ Reject</button>` : ''}
+      ${q.status!=='cancelled' ? `<button class="m-btn m-btn-danger m-btn-sm" onclick="updateQuotStatusMobile('${q.id}','cancelled')">Cancel</button>` : ''}
+    </div>` : ''}
+  `;
+  openSheet('quot-detail-sheet');
+}
+
+// ── ACTIVITY LOG ───────────────────────────────────────────────
+const ACTIVITY_ICONS = {
+  product_add:'📦', product_edit:'✏️', product_delete:'🗑️',
+  movement_in:'📥', movement_out:'📤', stock_update:'📊',
+  quotation_create:'📄', quotation_accept:'✅', quotation_reject:'❌',
+  login:'🔐', logout:'🚪', user_create:'👤', settings_update:'⚙️'
+};
+
+async function loadActivityLogMobile() {
+  const list = document.getElementById('activity-log-list');
+  if (list) list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">⏳</div><div class="m-empty-text">Loading...</div></div>';
+  try {
+    const { data, error } = await sb.from('activity_log')
+      .select('*, profiles(full_name)')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    if (!list) return;
+    if (!data || !data.length) {
+      list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">📋</div><div class="m-empty-text">No activity yet</div></div>';
+      return;
+    }
+    list.innerHTML = data.map(a => {
+      const icon = ACTIVITY_ICONS[a.type] || ACTIVITY_ICONS[a.action] || '•';
+      const time = new Date(a.created_at).toLocaleString('en-SA', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:true });
+      const user = a.profiles?.full_name || a.user_name || 'System';
+      const detail = a.details || a.description || '';
+      return `<div class="m-list-item">
+        <div class="m-list-photo" style="background:var(--surface2);font-size:20px;">${icon}</div>
+        <div class="m-list-info">
+          <div class="m-list-name">${detail || a.action || a.type || 'Action'}</div>
+          <div class="m-list-sub">${user} · ${time}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    const list = document.getElementById('activity-log-list');
+    if (list) list.innerHTML = `<div class="m-empty"><div class="m-empty-icon">⚠️</div><div class="m-empty-text">Failed to load: ${e.message}</div></div>`;
+  }
+}
+
+// ── SETTINGS ───────────────────────────────────────────────────
+async function loadCompanySettingsMobile() {
+  // Load VAT and low stock threshold
+  const vatEl = document.getElementById('s-vat-rate');
+  const threshEl = document.getElementById('s-low-threshold');
+  if (vatEl) vatEl.value = settings.vatRate || 15;
+  if (threshEl) threshEl.value = settings.lowStockThreshold || 10;
+  // Load AI key
+  const aiEl = document.getElementById('s-ai-key');
+  if (aiEl) aiEl.value = localStorage.getItem('bims_anthropic_key') || '';
+  // Load company settings from settings object
+  for (const co of ['bv','is','sw']) {
+    try {
+      const raw = settings['company_'+co];
+      if (!raw) continue;
+      const d = JSON.parse(raw);
+      if (d.name)  { const el = document.getElementById('co-m-name-'+co);  if(el) el.value = d.name; }
+      if (d.cr)    { const el = document.getElementById('co-m-cr-'+co);    if(el) el.value = d.cr; }
+      if (d.vat)   { const el = document.getElementById('co-m-vat-'+co);   if(el) el.value = d.vat; }
+      if (d.phone) { const el = document.getElementById('co-m-phone-'+co); if(el) el.value = d.phone; }
+      if (d.addr)  { const el = document.getElementById('co-m-addr-'+co);  if(el) el.value = d.addr; }
+    } catch(e) {}
+  }
+}
+
+async function saveSettingsMobile() {
+  try {
+    const vatRate = document.getElementById('s-vat-rate')?.value || '15';
+    const lowThreshold = document.getElementById('s-low-threshold')?.value || '10';
+    const pairs = [
+      ['vatRate', vatRate],
+      ['lowStockThreshold', lowThreshold],
+    ];
+    for (const [key, value] of pairs) {
+      await sb.from('settings').upsert({ key, value, updated_at: new Date().toISOString() });
+      settings[key] = value;
+    }
+    showToast('Settings saved!', 'success');
+    checkLowStock();
+  } catch(e) { showToast('Failed: '+e.message, 'error'); }
+}
+
+function saveAiKey() {
+  const key = document.getElementById('s-ai-key')?.value?.trim();
+  if (key) {
+    localStorage.setItem('bims_anthropic_key', key);
+    showToast('AI key saved!', 'success');
+  } else {
+    localStorage.removeItem('bims_anthropic_key');
+    showToast('AI key cleared', 'warning');
+  }
+}
+
+async function saveCompanySettingsMobile(co) {
+  try {
+    const name  = document.getElementById('co-m-name-'+co)?.value?.trim() || '';
+    const cr    = document.getElementById('co-m-cr-'+co)?.value?.trim()   || '';
+    const vat   = document.getElementById('co-m-vat-'+co)?.value?.trim()  || '';
+    const phone = document.getElementById('co-m-phone-'+co)?.value?.trim()|| '';
+    const addr  = document.getElementById('co-m-addr-'+co)?.value?.trim() || '';
+    let logoUrl = '';
+    try { const ex = settings['company_'+co]; if(ex) { const d=JSON.parse(ex); logoUrl=d.logoUrl||''; } } catch(e2) {}
+    const value = JSON.stringify({ name, cr, vat, phone, addr, logoUrl });
+    await sb.from('settings').upsert({ key: 'company_'+co, value, updated_at: new Date().toISOString() });
+    settings['company_'+co] = value;
+    const coNames = { bv:'Barakah Valves', is:'Iron Spring', sw:'Stable Way' };
+    showToast(coNames[co] + ' settings saved!', 'success');
+  } catch(e) { showToast('Failed: '+e.message, 'error'); }
+}
+
+// ── USER MANAGEMENT ────────────────────────────────────────────
+async function loadUsersMobile() {
+  const list = document.getElementById('users-list');
+  if (!list) return;
+  if (currentProfile?.role !== 'admin') {
+    list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">🔒</div><div class="m-empty-text">Admin access required</div></div>';
+    return;
+  }
+  list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">⏳</div><div class="m-empty-text">Loading...</div></div>';
+  try {
+    const { data, error } = await sb.from('profiles').select('*').order('created_at');
+    if (error) throw error;
+    if (!data || !data.length) {
+      list.innerHTML = '<div class="m-empty"><div class="m-empty-icon">👥</div><div class="m-empty-text">No users found</div></div>';
+      return;
+    }
+    const roleColors = { admin:'m-badge-gold', manager:'m-badge-blue', viewer:'m-badge-warn' };
+    list.innerHTML = data.map(u => `<div class="m-card" style="margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:42px;height:42px;border-radius:50%;background:var(--gold-light);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--gold);flex-shrink:0;">
+          ${(u.full_name||u.email||'?')[0].toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;">${u.full_name||'—'}</div>
+          <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.email||u.username||''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <span class="m-badge ${roleColors[u.role]||'m-badge-warn'}">${u.role||'viewer'}</span>
+          <div style="margin-top:4px;"><span class="m-badge ${u.status==='inactive'?'m-badge-red':'m-badge-green'}">${(u.status||'active').toUpperCase()}</span></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="m-btn m-btn-outline m-btn-sm" style="flex:1;"
+          onclick="toggleUserStatusMobile('${u.id}','${u.status||'active'}')">${u.status==='inactive'?'Enable':'Disable'}</button>
+      </div>
+    </div>`).join('');
+  } catch(e) {
+    if (list) list.innerHTML = `<div class="m-empty"><div class="m-empty-icon">⚠️</div><div class="m-empty-text">Failed: ${e.message}</div></div>`;
+  }
+}
+
+async function toggleUserStatusMobile(id, current) {
+  const next = current === 'inactive' ? 'active' : 'inactive';
+  try {
+    await sb.from('profiles').update({ status: next }).eq('id', id);
+    showToast('User ' + (next === 'active' ? 'enabled' : 'disabled'), 'success');
+    loadUsersMobile();
+  } catch(e) { showToast('Failed: '+e.message, 'error'); }
+}
+
+async function createUserMobile() {
+  const name    = document.getElementById('nu-name')?.value?.trim();
+  const email   = document.getElementById('nu-email')?.value?.trim();
+  const pass    = document.getElementById('nu-pass')?.value;
+  const role    = document.getElementById('nu-role')?.value || 'viewer';
+  const company = document.getElementById('nu-company')?.value || 'all';
+  if (!name || !email || !pass) { showToast('Fill all required fields', 'error'); return; }
+  if (pass.length < 8) { showToast('Password must be at least 8 characters', 'error'); return; }
+  showLoading('CREATING USER...');
+  try {
+    const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+    if (error) { hideLoading(); showToast(error.message, 'error'); return; }
+    if (data.user) {
+      await sb.from('profiles').upsert({
+        id: data.user.id, full_name: name, email, role,
+        company_access: company, status: 'active',
+        created_at: new Date().toISOString()
+      });
+    }
+    hideLoading();
+    closeSheet('add-user-sheet');
+    showToast('User created! Email: ' + email, 'success');
+    loadUsersMobile();
+  } catch(e) { hideLoading(); showToast('Failed: '+e.message, 'error'); }
+}
+
+// ── AI INSIGHTS ON DASHBOARD ───────────────────────────────────
+async function generateAiInsightsMobile() {
+  const key = localStorage.getItem('bims_anthropic_key');
+  const el = document.getElementById('ai-insights-content');
+  if (!key) {
+    if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Set your Anthropic API key in Settings → AI Settings to use this feature.</div>';
+    return;
+  }
+  if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">⏳ Generating insights...</div>';
+  const t = parseInt(settings.lowStockThreshold||10);
+  const lowItems = allProducts.filter(p=>(p.qty_bv||0)<t&&(p.qty_is||0)<t&&(p.qty_sw||0)<t);
+  const totalQty = allProducts.reduce((a,p)=>a+(p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0),0);
+  const totalVal = allProducts.reduce((a,p)=>a+((p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0))*(p.price||0),0);
+  const recentMov = allMovements.slice(0,10).map(m=>{
+    const p=allProducts.find(x=>x.id===m.product_id);
+    return `${m.type} ${Math.abs(m.qty_change||0)} ${p?.name||'unknown'} (${m.company})`;
+  }).join(', ');
+  const prompt = `You are an inventory management analyst for a trading company. Provide a concise 3-5 bullet point summary in English.
+
+Inventory data:
+- Total products: ${allProducts.length}
+- Total stock units: ${totalQty}
+- Estimated value: SAR ${totalVal.toFixed(0)}
+- Low stock items (${lowItems.length}): ${lowItems.slice(0,5).map(p=>p.name).join(', ')}${lowItems.length>5?'...':''}
+- Recent movements: ${recentMov}
+
+Give actionable insights about inventory health, critical low stock items, and any notable patterns.`;
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!resp.ok) { const err = await resp.json(); throw new Error(err.error?.message||resp.statusText); }
+    const json = await resp.json();
+    const text = json.content?.[0]?.text || 'No response';
+    if (el) el.innerHTML = `<div style="font-size:13px;line-height:1.7;white-space:pre-wrap;">${text}</div>`;
+  } catch(e) {
+    if (el) el.innerHTML = `<div style="color:var(--red);font-size:13px;">AI Error: ${e.message}</div>`;
+  }
 }
 
 // ── DOMContentLoaded ──────────────────────────────────────────
