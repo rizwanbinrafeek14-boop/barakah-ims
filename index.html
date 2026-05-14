@@ -10934,6 +10934,18 @@ function addPoLine() {
   renderPoLines();
 }
 
+async function _doPoUpsert(poData, editingId) {
+  if (editingId) {
+    const { error } = await sb.from('purchase_orders').update(poData).eq('id', editingId);
+    if (error) throw error;
+    return editingId;
+  } else {
+    const { data, error } = await sb.from('purchase_orders').insert(poData).select().single();
+    if (error) throw error;
+    return data.id;
+  }
+}
+
 async function savePo() {
   const supplier = document.getElementById('po-supplier')?.value.trim();
   const company  = document.getElementById('po-company')?.value;
@@ -10946,29 +10958,35 @@ async function savePo() {
       ? allPurchaseOrders.find(x=>x.id===_editingPoId)?.po_no
       : 'PO-'+company.toUpperCase()+'-'+Date.now().toString().slice(-6);
 
-    const poData = {
-      supplier, company,
-      po_no: poNo,
-      expected_date: document.getElementById('po-date')?.value||null,
-      reference: document.getElementById('po-ref')?.value.trim()||null,
-      notes: document.getElementById('po-notes')?.value.trim()||null,
-      updated_at: new Date().toISOString()
-    };
+    // Only include optional fields that have a value — avoids schema errors
+    // for columns the user hasn't yet added via SQL setup
+    const poData = { supplier, company, po_no: poNo, updated_at: new Date().toISOString() };
+    const expectedDate = document.getElementById('po-date')?.value;
+    if (expectedDate) poData.expected_date = expectedDate;
+    const ref = document.getElementById('po-ref')?.value.trim();
+    if (ref) poData.reference = ref;
+    const notes = document.getElementById('po-notes')?.value.trim();
+    if (notes) poData.notes = notes;
     if (!_editingPoId) {
       poData.status = 'pending';
       poData.created_by = currentProfile?.id;
     }
 
-    let poId = _editingPoId;
-    if (_editingPoId) {
-      const { error } = await sb.from('purchase_orders').update(poData).eq('id', _editingPoId);
-      if (error) throw error;
-      await sb.from('purchase_order_lines').delete().eq('po_id', _editingPoId);
-    } else {
-      const { data, error } = await sb.from('purchase_orders').insert(poData).select().single();
-      if (error) throw error;
-      poId = data.id;
+    let poId;
+    try {
+      poId = await _doPoUpsert(poData, _editingPoId);
+    } catch(e1) {
+      // If a column is missing from the DB schema, strip that field and retry
+      const colMatch = e1.message?.match(/column[^']*'([^']+)'/);
+      if (colMatch) {
+        delete poData[colMatch[1]];
+        poId = await _doPoUpsert(poData, _editingPoId);
+      } else {
+        throw e1;
+      }
     }
+
+    if (_editingPoId) await sb.from('purchase_order_lines').delete().eq('po_id', _editingPoId);
 
     const lines = _poLines.filter(l=>l.product_id).map(l=>{
       const p = allProducts.find(x=>x.id===l.product_id);
