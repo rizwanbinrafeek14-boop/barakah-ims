@@ -912,29 +912,32 @@ async function doLogout() {
 // ── LAUNCH ─────────────────────────────────────────────────────
 async function launchApp(user) {
   try {
-    // Get profile
-    const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
-    currentProfile = profile || { id: user.id, full_name: user.email, role: 'viewer' };
+    // Load profile (fast — single row)
+    const profileResult = await Promise.race([
+      sb.from('profiles').select('*').eq('id', user.id).single(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Profile load timed out')), 8000))
+    ]);
+    currentProfile = profileResult.data || { id: user.id, full_name: user.email, role: 'viewer' };
 
-    // Load data
-    await Promise.all([loadSettings(), loadAllData()]);
+    await loadSettings().catch(() => {});
 
-    // Show app
+    // Show app immediately — don't wait for data
     document.getElementById('auth-screen').style.display = 'none';
     const app = document.getElementById('app');
     app.classList.add('visible');
 
-    // Set user display
     const av = document.getElementById('user-avatar-text');
     if (av) av.textContent = (currentProfile.full_name || 'U')[0].toUpperCase();
 
-    // Show date
     const dateEl = document.getElementById('header-date');
     if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-SA', { month:'short', day:'numeric', year:'numeric' });
 
-    // Render dashboard
     showTab('dashboard');
     hideLoading();
+
+    // Load product data in background after app is visible
+    loadAllData().catch(e => showToast('Data load failed: ' + e.message, 'error'));
+
   } catch(e) {
     hideLoading();
     document.getElementById('auth-screen').style.display = 'flex';
