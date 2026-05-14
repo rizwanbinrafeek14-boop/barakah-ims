@@ -1573,13 +1573,17 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
       <div class="field"><label>Product Name *</label><input type="text" id="p-name" placeholder="e.g. Gate Valve 2 inch"></div>
       <div class="field">
         <label>Product Code
-          <span style="font-size:10px;color:var(--text-muted);font-weight:400;text-transform:none;margin-left:6px;">— built from selectors below or type manually</span>
+          <span style="font-size:10px;color:var(--text-muted);font-weight:400;text-transform:none;margin-left:6px;">— AI-generated or type manually</span>
         </label>
         <div style="display:flex;gap:6px;align-items:center;">
           <input type="text" id="p-code" placeholder="e.g. CSGV40-009"
             style="flex:1;"
             oninput="this.dataset.manual='true'">
-          <button type="button" onclick="buildCodeFromSelectors()" title="Generate code"
+          <button type="button" id="ai-code-btn" onclick="generateCodeWithAI()" title="Generate code using AI based on similar existing products"
+            style="padding:9px 14px;border-radius:var(--radius-sm);border:1.5px solid #7c3aed;
+                   background:#f5f3ff;color:#7c3aed;font-size:12px;font-weight:700;
+                   cursor:pointer;white-space:nowrap;flex-shrink:0;">🤖 AI</button>
+          <button type="button" onclick="buildCodeFromSelectors()" title="Manual code builder"
             style="padding:9px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--gold);
                    background:var(--gold-light,#fffbeb);color:var(--gold);font-size:12px;font-weight:700;
                    cursor:pointer;white-space:nowrap;flex-shrink:0;">⚡ Build</button>
@@ -9445,6 +9449,97 @@ const SUB_ABBR = {
   'Pipe Nipple':    'PNP',
   'Swage Nipple':   'SNP',
 };
+
+async function generateCodeWithAI() {
+  const btn  = document.getElementById('ai-code-btn');
+  const name = (document.getElementById('p-name')?.value || '').trim();
+  const mat  = document.getElementById('p-material')?.value || '';
+  const cat  = document.getElementById('p-category')?.value || '';
+  const size = (document.getElementById('p-size')?.value || '').trim();
+  const sub  = typeof getSubtypeValue === 'function' ? (getSubtypeValue() || '') : '';
+
+  if (!name && !mat && !cat) {
+    showToast('Fill in at least the product name, material, or category first', 'error');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+
+  try {
+    // Find similar products (same material OR category) that already have codes
+    const similar = allProducts
+      .filter(p => p.code && p.code.trim() &&
+        ((mat && (p.material||'').toLowerCase() === mat.toLowerCase()) ||
+         (cat && (p.category||'').toLowerCase() === cat.toLowerCase())))
+      .sort(() => Math.random() - 0.5) // shuffle so we get variety
+      .slice(0, 25);
+
+    // Also grab a random sample of ALL coded products so AI understands the global format
+    const global = allProducts
+      .filter(p => p.code && p.code.trim() && !similar.includes(p))
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 10);
+
+    const formatExamples = [...similar, ...global]
+      .map(p => `${p.code}  (${p.material||'?'} | ${p.category||'?'} | ${p.sub_type||'—'} | ${p.name})`)
+      .join('\n');
+
+    const prompt = `You are a product code generator for Barakah Group, an industrial piping and valve trading company.
+
+EXISTING PRODUCT CODES — learn the pattern strictly:
+${formatExamples || '(no existing codes — create a logical short code)'}
+
+NEW PRODUCT TO CODE:
+Name: ${name || '—'}
+Material: ${mat || '—'}
+Category: ${cat || '—'}
+Sub-type: ${sub || '—'}
+Size: ${size || '—'}
+
+Rules:
+1. Follow the EXACT same pattern/format as the existing codes
+2. Keep it short: 6–14 characters, uppercase alphanumeric + hyphens only
+3. Make it unique and specific to this product's material, type, and size
+4. Do NOT copy an existing code verbatim — generate a new one
+
+Reply with ONLY the product code. No explanation, no quotes, just the code.`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: getAnthropicHeaders(),
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 30,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(`AI ${resp.status}: ${errData?.error?.message || resp.statusText}`);
+    }
+
+    const data = await resp.json();
+    const raw  = (data.content?.[0]?.text || '').trim();
+    const code = raw.toUpperCase().replace(/[^A-Z0-9\-]/g, '').substring(0, 20);
+
+    if (!code) throw new Error('AI returned an empty code — try again');
+
+    const codeEl = document.getElementById('p-code');
+    if (codeEl) {
+      codeEl.value = code;
+      codeEl.dataset.manual = 'true';
+      codeEl.style.borderColor = '#7c3aed';
+      setTimeout(() => { if (codeEl) codeEl.style.borderColor = ''; }, 1500);
+    }
+    showToast('✓ AI code: ' + code);
+
+  } catch(e) {
+    showToast('AI code failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 AI'; }
+  }
+}
 
 function generateProductCode() {
   const name    = (document.getElementById('p-name')?.value || '').trim();
