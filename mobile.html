@@ -671,10 +671,10 @@ input, select, textarea, button { font-family: inherit; }
         </div>
         <!-- AI Settings -->
         <div class="m-card" style="margin-bottom:12px;">
-          <div class="m-card-title">🤖 AI Settings</div>
+          <div class="m-card-title">🤖 AI Settings (Google Gemini — Free)</div>
           <div class="m-form-group">
-            <label class="m-form-label">Anthropic API Key</label>
-            <input type="password" class="m-input" id="s-ai-key" placeholder="sk-ant-...">
+            <label class="m-form-label">Gemini API Key</label>
+            <input type="password" class="m-input" id="s-ai-key" placeholder="AIzaSy...">
           </div>
           <button class="m-btn m-btn-gold m-btn-full" onclick="saveAiKey()">💾 Save AI Key</button>
         </div>
@@ -2429,7 +2429,7 @@ async function loadCompanySettingsMobile() {
   if (threshEl) threshEl.value = settings.lowStockThreshold || 10;
   // Load AI key
   const aiEl = document.getElementById('s-ai-key');
-  if (aiEl) aiEl.value = (_readLocal ? _readLocal('bims_anthropic_key') : localStorage.getItem('bims_anthropic_key')) || '';
+  if (aiEl) aiEl.value = (_readLocal ? _readLocal('bims_gemini_key') : localStorage.getItem('bims_gemini_key')) || '';
   // Load company settings from settings object
   for (const co of ['bv','is','sw']) {
     try {
@@ -2474,11 +2474,11 @@ function _readLocal(k) {
 function saveAiKey() {
   const key = (document.getElementById('s-ai-key')?.value || '').trim();
   if (key) {
-    _storeLocal('bims_anthropic_key', key);
-    showToast('AI key saved!', 'success');
+    _storeLocal('bims_gemini_key', key);
+    showToast('Gemini key saved!', 'success');
   } else {
-    try { localStorage.removeItem('bims_anthropic_key'); } catch(e) {}
-    try { sessionStorage.removeItem('bims_anthropic_key'); } catch(e) {}
+    try { localStorage.removeItem('bims_gemini_key'); } catch(e) {}
+    try { sessionStorage.removeItem('bims_gemini_key'); } catch(e) {}
     showToast('AI key cleared', 'warning');
   }
 }
@@ -2578,10 +2578,10 @@ async function createUserMobile() {
 
 // ── AI INSIGHTS ON DASHBOARD ───────────────────────────────────
 async function generateAiInsightsMobile() {
-  const key = _readLocal('bims_anthropic_key');
+  const key = _readLocal('bims_gemini_key');
   const el = document.getElementById('ai-insights-content');
   if (!key) {
-    if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Go to More → Settings → AI Settings, paste your Anthropic API key and tap Save.</div>';
+    if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Go to More → Settings → AI Settings, paste your Gemini API key and tap Save.</div>';
     return;
   }
   if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">⏳ Generating insights...</div>';
@@ -2604,23 +2604,20 @@ Inventory data:
 
 Give actionable insights about inventory health, critical low stock items, and any notable patterns.`;
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    if (!resp.ok) { const err = await resp.json(); throw new Error(err.error?.message||resp.statusText); }
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 400, temperature: 0.3 }
+        })
+      }
+    );
+    if (!resp.ok) { const err = await resp.json().catch(()=>({})); throw new Error(err.error?.message||resp.statusText); }
     const json = await resp.json();
-    const text = json.content?.[0]?.text || 'No response';
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
     if (el) el.innerHTML = `<div style="font-size:13px;line-height:1.7;white-space:pre-wrap;">${text}</div>`;
   } catch(e) {
     if (el) el.innerHTML = `<div style="color:var(--red);font-size:13px;">AI Error: ${e.message}</div>`;
