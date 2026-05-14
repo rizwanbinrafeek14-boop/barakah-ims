@@ -851,7 +851,7 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
         style='width:100%;padding:12px 14px;background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:14px;font-family:inherit;outline:none;'>
     </div>
     <div id="login-error" style="font-size:12.5px;color:#fca5a5;min-height:20px;margin-bottom:10px;"></div>
-    <button onclick="handleLogin()" style="width:100%;padding:13px;background:linear-gradient(135deg,#d97706,#f59e0b);border:none;border-radius:8px;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;">Sign In</button>
+    <button id="login-btn" onclick="handleLogin()" style="width:100%;padding:13px;background:linear-gradient(135deg,#d97706,#f59e0b);border:none;border-radius:8px;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;">Sign In</button>
   </div>
 </div>
 
@@ -2222,23 +2222,38 @@ async function handleLogin() {
   if (errEl) errEl.textContent = '';
   if (!email || !pass) { if (errEl) errEl.textContent = 'Please enter email and password.'; return; }
   const btn = document.querySelector('#auth-screen button');
+  const resetBtn = () => { if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; } };
   if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
   try {
-    // Ensure sb is initialised (may not be ready on first render)
+    // Ensure sb is initialised with safe storage (Edge Tracking Prevention fallback)
     if (!sb) {
       const _sc = window.supabase?.createClient || window.supabase?.default?.createClient;
       if (!_sc) throw new Error('Supabase SDK not loaded. Check your internet connection.');
-      sb = _sc(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+      let _safeStorage = window.localStorage;
+      try { localStorage.setItem('__bims_test__','1'); localStorage.removeItem('__bims_test__'); }
+      catch(_) {
+        const _mem = {};
+        _safeStorage = {
+          getItem:    k => { try { return sessionStorage.getItem(k); } catch(e) { return _mem[k]??null; } },
+          setItem:    (k,v) => { try { sessionStorage.setItem(k,v); } catch(e) { _mem[k]=v; } },
+          removeItem: k => { try { sessionStorage.removeItem(k); } catch(e) { delete _mem[k]; } }
+        };
+      }
+      sb = _sc(SUPABASE_URL, SUPABASE_KEY, { auth: { storage: _safeStorage, persistSession: true, autoRefreshToken: true } });
     }
-    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-    if (error) throw error;
-    // Explicitly launch app — onAuthStateChange only listens for SIGNED_OUT
-    currentUser = data.user;
+    // 12-second timeout so it never hangs silently
+    const result = await Promise.race([
+      sb.auth.signInWithPassword({ email, password: pass }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Sign-in timed out — check your internet and try again.')), 12000))
+    ]);
+    if (result.error) throw result.error;
+    if (!result.data?.user) throw new Error('No user returned. Please try again.');
+    currentUser = result.data.user;
+    if (btn) btn.textContent = 'Loading...';
     await loadProfile();
   } catch(e) {
-    if (errEl) errEl.textContent = String(e.message || 'Login failed.');
-    const btn2 = document.querySelector('#auth-screen button');
-    if (btn2) { btn2.disabled = false; btn2.textContent = 'Sign In'; }
+    if (errEl) errEl.textContent = '⚠️ ' + (e.message || 'Login failed.');
+    resetBtn();
   }
 }
 
@@ -2356,7 +2371,11 @@ async function doLogin() {
 
 async function loadProfile() {
   try {
-    const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+    const profileResult = await Promise.race([
+      sb.from('profiles').select('*').eq('id', currentUser.id).single(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Profile load timed out — check connection.')), 10000))
+    ]);
+    const { data, error } = profileResult;
 
     if (error || !data) {
       // Auto-create profile on first login
