@@ -10935,15 +10935,26 @@ function addPoLine() {
 }
 
 async function _doPoUpsert(poData, editingId) {
-  if (editingId) {
-    const { error } = await sb.from('purchase_orders').update(poData).eq('id', editingId);
-    if (error) throw error;
-    return editingId;
-  } else {
-    const { data, error } = await sb.from('purchase_orders').insert(poData).select().single();
-    if (error) throw error;
-    return data.id;
+  const payload = {...poData};
+  const required = new Set(['supplier','company','po_no','status','created_by']);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    let err, row;
+    if (editingId) {
+      ({ error: err } = await sb.from('purchase_orders').update(payload).eq('id', editingId));
+      if (!err) return editingId;
+    } else {
+      ({ data: row, error: err } = await sb.from('purchase_orders').insert(payload).select().single());
+      if (!err) return row.id;
+    }
+    const col = err.message?.match(/['"]([\w]+)['"]\s*column|column[^'"]*['"]([^'"]+)['"]/);
+    const colName = col?.[1] || col?.[2];
+    if (colName && !required.has(colName) && colName in payload) {
+      delete payload[colName];
+    } else {
+      throw err;
+    }
   }
+  throw new Error('Could not save PO after stripping missing columns');
 }
 
 async function savePo() {
