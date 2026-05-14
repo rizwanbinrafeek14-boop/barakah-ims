@@ -538,6 +538,13 @@ input, select, textarea, button { font-family: inherit; }
     <div class="m-page" id="page-movements">
       <div class="m-section-header" style="margin-bottom:12px;">
         <div class="m-section-title">Stock Movements</div>
+        <div style="font-size:12px;color:var(--text-muted);" id="mov-count"></div>
+      </div>
+      <div class="m-filter-row" style="margin-bottom:10px;">
+        <span class="m-chip active" data-filter="movtype" data-val="" onclick="movFilter('type','');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">All</span>
+        <span class="m-chip" data-filter="movtype" data-val="in" onclick="movFilter('type','in');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">IN</span>
+        <span class="m-chip" data-filter="movtype" data-val="out" onclick="movFilter('type','out');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">OUT</span>
+        <span class="m-chip" data-filter="movtype" data-val="adjustment" onclick="movFilter('type','adjustment');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">ADJ</span>
       </div>
       <div id="movements-list"></div>
     </div>
@@ -546,6 +553,13 @@ input, select, textarea, button { font-family: inherit; }
     <div class="m-page" id="page-quotations">
       <div class="m-section-header" style="margin-bottom:12px;">
         <div class="m-section-title">Quotations</div>
+        <div style="font-size:12px;color:var(--text-muted);" id="quot-count"></div>
+      </div>
+      <div class="m-filter-row" style="margin-bottom:10px;">
+        <span class="m-chip active" onclick="quotFilter('');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">All</span>
+        <span class="m-chip" onclick="quotFilter('draft');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">Draft</span>
+        <span class="m-chip" onclick="quotFilter('sent');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">Sent</span>
+        <span class="m-chip" onclick="quotFilter('approved');this.closest('.m-filter-row').querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active')">Approved</span>
       </div>
       <div id="quotations-list"></div>
     </div>
@@ -580,13 +594,97 @@ input, select, textarea, button { font-family: inherit; }
 
     <!-- MORE -->
     <div class="m-page" id="page-more">
-      <div style="padding:4px 0 14px;">
-        <div style="font-size:20px;font-weight:800;color:var(--text);">More</div>
-        <div style="font-size:13px;color:var(--text-muted);">All sections & settings</div>
+      <!-- More Home Grid -->
+      <div id="more-home">
+        <div style="padding:4px 0 14px;">
+          <div style="font-size:20px;font-weight:800;color:var(--text);">More</div>
+          <div style="font-size:13px;color:var(--text-muted);">All sections & settings</div>
+        </div>
+        <div class="m-more-grid" id="more-grid"></div>
+        <div class="m-desktop-banner" style="margin:12px 0;border-radius:var(--radius);">
+          🖥️ Need full features? <a href="https://barakah-ims-rnqh.vercel.app" target="_blank">Open Desktop Version</a>
+        </div>
       </div>
-      <div class="m-more-grid" id="more-grid"></div>
-      <div class="m-desktop-banner" style="margin:12px 0;border-radius:var(--radius);">
-        🖥️ Need full features? <a href="https://barakah-ims-rnqh.vercel.app" target="_blank">Open Desktop Version</a>
+      <!-- Activity Log Section -->
+      <div id="more-section-activity" style="display:none;">
+        <div class="m-section-header" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="m-btn m-btn-outline m-btn-sm" onclick="showMoreHome()">← Back</button>
+            <div class="m-section-title">Activity Log</div>
+          </div>
+          <button class="m-btn m-btn-outline m-btn-sm" onclick="loadActivityLogMobile()">🔄</button>
+        </div>
+        <div id="activity-log-list"><div class="m-empty"><div class="m-empty-icon">📋</div><div class="m-empty-text">Loading...</div></div></div>
+      </div>
+      <!-- Settings Section -->
+      <div id="more-section-settings" style="display:none;">
+        <div class="m-section-header" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="m-btn m-btn-outline m-btn-sm" onclick="showMoreHome()">← Back</button>
+            <div class="m-section-title">Settings</div>
+          </div>
+        </div>
+        <!-- General Settings -->
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">⚙️ General</div>
+          <div class="m-form-group">
+            <label class="m-form-label">Low Stock Threshold</label>
+            <input type="number" class="m-input" id="s-low-threshold" placeholder="10" min="0">
+          </div>
+          <div class="m-form-group">
+            <label class="m-form-label">VAT Rate (%)</label>
+            <input type="number" class="m-input" id="s-vat-rate" placeholder="15" min="0" max="100" step="0.1">
+          </div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveSettingsMobile()">💾 Save General Settings</button>
+        </div>
+        <!-- AI Settings -->
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">🤖 AI Settings</div>
+          <div class="m-form-group">
+            <label class="m-form-label">Anthropic API Key</label>
+            <input type="password" class="m-input" id="s-ai-key" placeholder="sk-ant-...">
+          </div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveAiKey()">💾 Save AI Key</button>
+        </div>
+        <!-- Company Settings -->
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">🏢 Barakah Valves (BV)</div>
+          <div class="m-form-group"><label class="m-form-label">Company Name</label><input type="text" class="m-input" id="co-m-name-bv" placeholder="Company name"></div>
+          <div class="m-form-group"><label class="m-form-label">CR Number</label><input type="text" class="m-input" id="co-m-cr-bv" placeholder="CR number"></div>
+          <div class="m-form-group"><label class="m-form-label">VAT Number</label><input type="text" class="m-input" id="co-m-vat-bv" placeholder="VAT number"></div>
+          <div class="m-form-group"><label class="m-form-label">Phone</label><input type="text" class="m-input" id="co-m-phone-bv" placeholder="Phone"></div>
+          <div class="m-form-group"><label class="m-form-label">Address</label><textarea class="m-textarea" id="co-m-addr-bv" placeholder="Address" style="min-height:60px;"></textarea></div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveCompanySettingsMobile('bv')">💾 Save BV Settings</button>
+        </div>
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">🏢 Iron Spring (IS)</div>
+          <div class="m-form-group"><label class="m-form-label">Company Name</label><input type="text" class="m-input" id="co-m-name-is" placeholder="Company name"></div>
+          <div class="m-form-group"><label class="m-form-label">CR Number</label><input type="text" class="m-input" id="co-m-cr-is" placeholder="CR number"></div>
+          <div class="m-form-group"><label class="m-form-label">VAT Number</label><input type="text" class="m-input" id="co-m-vat-is" placeholder="VAT number"></div>
+          <div class="m-form-group"><label class="m-form-label">Phone</label><input type="text" class="m-input" id="co-m-phone-is" placeholder="Phone"></div>
+          <div class="m-form-group"><label class="m-form-label">Address</label><textarea class="m-textarea" id="co-m-addr-is" placeholder="Address" style="min-height:60px;"></textarea></div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveCompanySettingsMobile('is')">💾 Save IS Settings</button>
+        </div>
+        <div class="m-card" style="margin-bottom:12px;">
+          <div class="m-card-title">🏢 Stable Way (SW)</div>
+          <div class="m-form-group"><label class="m-form-label">Company Name</label><input type="text" class="m-input" id="co-m-name-sw" placeholder="Company name"></div>
+          <div class="m-form-group"><label class="m-form-label">CR Number</label><input type="text" class="m-input" id="co-m-cr-sw" placeholder="CR number"></div>
+          <div class="m-form-group"><label class="m-form-label">VAT Number</label><input type="text" class="m-input" id="co-m-vat-sw" placeholder="VAT number"></div>
+          <div class="m-form-group"><label class="m-form-label">Phone</label><input type="text" class="m-input" id="co-m-phone-sw" placeholder="Phone"></div>
+          <div class="m-form-group"><label class="m-form-label">Address</label><textarea class="m-textarea" id="co-m-addr-sw" placeholder="Address" style="min-height:60px;"></textarea></div>
+          <button class="m-btn m-btn-gold m-btn-full" onclick="saveCompanySettingsMobile('sw')">💾 Save SW Settings</button>
+        </div>
+      </div>
+      <!-- Users Section -->
+      <div id="more-section-users" style="display:none;">
+        <div class="m-section-header" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="m-btn m-btn-outline m-btn-sm" onclick="showMoreHome()">← Back</button>
+            <div class="m-section-title">Users</div>
+          </div>
+          <button class="m-btn m-btn-gold m-btn-sm" onclick="openSheet('add-user-sheet')">+ Add</button>
+        </div>
+        <div id="users-list"></div>
       </div>
     </div>
 
