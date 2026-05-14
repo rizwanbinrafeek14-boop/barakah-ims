@@ -2075,7 +2075,7 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
     <div class="modal-title" id="po-modal-title">New Purchase Order</div>
     <input type="hidden" id="po-edit-id">
     <div class="grid-2">
-      <div class="field"><label>Supplier *</label><input type="text" id="po-supplier" class="input" placeholder="Supplier name"></div>
+      <div class="field"><label>Supplier *</label><input type="text" id="po-supplier" class="input" placeholder="Supplier name" list="po-supplier-datalist" autocomplete="off"><datalist id="po-supplier-datalist"></datalist></div>
       <div class="field"><label>Company *</label>
         <select id="po-company" class="input">
           <option value="bv">Barakah Valves</option>
@@ -5419,322 +5419,221 @@ let _editingPOId = null;
 // Hook into showPage
 
 
-function printPO(po) {
-  if (!po) return;
+function _buildPoHtml(po, docType) {
+  // docType: 'po' | 'delivery'
   const co = po.company || 'bv';
   const info = COMPANY_INFO[co] || COMPANY_INFO.bv;
   const stored = getCompanyData(co);
   const lines = po.purchase_order_lines || po.lines || [];
-  const vatRate = settings.vatRate || '15';
-  const cr = stored.cr || info.cr;
-  const vat = stored.vat || info.vat;
-  const phone = stored.phone || info.phone;
-  const addr = stored.addr || info.address;
-  const name = stored.name || info.nameEn;
+  const cr      = stored.cr    || info.cr;
+  const vat     = stored.vat   || info.vat;
+  const phone   = stored.phone || info.phone;
+  const addr    = stored.addr  || info.address;
+  const email   = stored.email || info.email || '';
+  const coName  = stored.name  || info.nameEn;
   const logoUrl = stored.logoUrl || '';
 
-  const w = window.open('','_blank','width=960,height=800');
-  w.document.write(`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title></title>
-\x3cscript>
-// ── GROUPED VIEW CONSTANTS & STATE ───────────────────────────
-const GROUPED_CATEGORIES = [
-  'Valves','Pipes & Tubes','Fittings','Forged Steel Fittings',
-  'Flanges','Rods / Bars / Beams','Electrical','Safety Equipment','Instruments','Hardware & Tools','Other'
-];
+  const subtotal = lines.reduce((a,l) => a + (l.qty_ordered||0)*(l.unit_price||0), 0);
+  const dateStr  = new Date(po.created_at).toLocaleDateString('en-SA',{day:'numeric',month:'long',year:'numeric'});
 
-const CAT_ICONS = {
-  'Valves':'🔧','Pipes & Tubes':'🔩','Fittings':'⚙️',
-  'Forged Steel Fittings':'🔨','Flanges':'🟤','Rods / Bars / Beams':'📏',
-  'Electrical':'⚡','Safety Equipment':'🦺','Instruments':'📊','Other':'📦',
-};
+  const isPO = docType === 'po';
+  const accentColor  = info.accentColor;
+  const accentColor2 = info.accentColor2;
 
-const ALL_MATERIALS = ['CS','SS','GI','BMI','Brass','Bronze','Copper','PVC','CPVC','PPR','HDPE','Other'];
+  const headerHTML = `
+    <div class="lh-header">
+      <div class="lh-left">
+        ${logoUrl ? `<img src="${logoUrl}" class="lh-logo">` : `<div class="lh-logo-ph">${coName}</div>`}
+        <div>
+          <div class="co-en">${coName}</div>
+          <div class="co-tag">${info.taglineEn}</div>
+          <div class="co-cr">C.R. ${cr}</div>
+        </div>
+      </div>
+      <div class="lh-right">
+        <div class="co-ar">${info.nameAr}</div>
+        <div class="co-tag" style="direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif">${info.taglineAr}</div>
+        <div class="co-vat">VAT Reg No: ${vat}</div>
+      </div>
+    </div>`;
 
-const MAT_COLORS = {
-  CS:    {bg:'#f0f4ff',color:'#1e3a8a',border:'#bfdbfe'},
-  SS:    {bg:'#f0fdf4',color:'#166534',border:'#bbf7d0'},
-  GI:    {bg:'#fef9c3',color:'#854d0e',border:'#fde047'},
-  BMI:   {bg:'#27272a',color:'#e4e4e7',border:'#52525b'},
-  Brass: {bg:'#fef3c7',color:'#92400e',border:'#fcd34d'},
-  Bronze:{bg:'#fff7ed',color:'#9a3412',border:'#fdba74'},
-  Copper:{bg:'#fdf2f0',color:'#b45309',border:'#fca5a5'},
-  PVC:   {bg:'#eff6ff',color:'#1d4ed8',border:'#93c5fd'},
-  CPVC:  {bg:'#f5f3ff',color:'#6d28d9',border:'#c4b5fd'},
-  PPR:   {bg:'#ecfdf5',color:'#065f46',border:'#6ee7b7'},
-  HDPE:  {bg:'#fdf4ff',color:'#7e22ce',border:'#e879f9'},
-  Other: {bg:'#f8fafc',color:'#475569',border:'#cbd5e1'},
-};
+  const footerHTML = `
+    <div class="lh-footer">
+      <div>Tel: ${phone}${email ? ' · '+email : ''} · ${addr}</div>
+      <div class="footer-ar">${info.addressAr}</div>
+    </div>`;
 
-let groupedViewActive  = false;
-let groupedCurrentMat  = 'all';
-
-// ── TOGGLE GROUPED VIEW ───────────────────────────────────────
-function toggleGroupedView() {
-  groupedViewActive = !groupedViewActive;
-  const btn              = document.getElementById('grouped-toggle');
-  const invContainer     = document.getElementById('inventory-container');
-  const groupedContainer = document.getElementById('grouped-view-container');
-  const viewToggle       = document.getElementById('view-toggle');
-
-  // Hide/show filter bar (first card in inventory page)
-  const filterBars = document.querySelectorAll('#page-inventory .card');
-  const filterBar  = filterBars[0];
-
-  if (groupedViewActive) {
-    if (invContainer)     invContainer.style.display     = 'none';
-    if (groupedContainer) groupedContainer.style.display = '';
-    if (btn) {
-      btn.style.background = 'linear-gradient(135deg,var(--gold),var(--gold2))';
-      btn.style.color      = '#0f1f3d';
-      btn.style.border     = 'none';
-      btn.textContent      = '⊟ Grouped ✓';
-    }
-    if (viewToggle) viewToggle.disabled = true;
-    if (filterBar)  filterBar.style.display = 'none';
-    // Reset state
-    groupedCurrentMat   = 'all';
-    groupedCurrentCatL2 = 'all';
-    renderGroupedView();
+  let bodyHTML;
+  if (isPO) {
+    bodyHTML = `
+      <div class="doc-band">
+        <h1>PURCHASE ORDER / أمر شراء</h1>
+        <div style="font-size:13px;opacity:.85">${po.po_no} · ${dateStr}</div>
+      </div>
+      <div class="info-grid">
+        <div class="ib">
+          <div class="label">Supplier / المورد</div>
+          <div class="val">${po.supplier}</div>
+          ${po.reference ? `<div class="sub">Ref: ${po.reference}</div>` : ''}
+        </div>
+        <div class="ib" style="text-align:right">
+          <div class="label">Company / الشركة</div>
+          <div class="val">${coName}</div>
+          ${po.expected_date ? `<div class="sub">Expected: ${new Date(po.expected_date).toLocaleDateString()}</div>` : ''}
+          <div class="sub">PO Date: ${dateStr}</div>
+        </div>
+      </div>
+      <div class="items">
+        <h3>Items / البنود</h3>
+        <table>
+          <thead><tr>
+            <th style="width:28px">#</th>
+            <th>Description / الوصف</th>
+            <th style="width:55px;text-align:center">Qty</th>
+            <th style="width:55px;text-align:center">Unit</th>
+            <th style="width:100px;text-align:right">Unit Price (SAR)</th>
+            <th style="width:100px;text-align:right">Total (SAR)</th>
+          </tr></thead>
+          <tbody>
+            ${lines.map((l,i) => {
+              const p = allProducts.find(x=>x.id===l.product_id);
+              const n = p?.name || l.product_name || 'Item';
+              const tot = (l.qty_ordered||0) * (l.unit_price||0);
+              return `<tr>
+                <td style="color:#94a3b8">${i+1}</td>
+                <td>${n}${p?.code?` <span style="font-size:10px;color:#94a3b8">(${p.code})</span>`:''}</td>
+                <td style="text-align:center">${l.qty_ordered||0}</td>
+                <td style="text-align:center">${l.unit||p?.unit||'PCS'}</td>
+                <td style="text-align:right">${Number(l.unit_price||0).toFixed(2)}</td>
+                <td style="text-align:right">${tot.toFixed(2)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+          <tfoot>
+            <tr><td colspan="5" style="color:#64748b;text-align:right">Subtotal / المجموع</td><td style="text-align:right">SAR ${subtotal.toFixed(2)}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+      ${po.notes ? `<div style="padding:0 28px 12px"><div style="background:#fffbf0;border-left:3px solid ${accentColor2};padding:9px 13px;border-radius:0 5px 5px 0;font-size:12px"><b>Notes:</b> ${po.notes}</div></div>` : ''}
+      <div class="sig-section">
+        <div class="sig-box">Authorized Signature / التوقيع المعتمد<br><br><br></div>
+        <div class="sig-box" style="text-align:right">Supplier Acknowledgment / إقرار المورد<br><br><br></div>
+      </div>`;
   } else {
-    if (invContainer)     invContainer.style.display = '';
-    if (groupedContainer) groupedContainer.style.display = 'none';
-    if (btn) {
-      btn.style.background = '';
-      btn.style.color      = '';
-      btn.style.border     = '';
-      btn.textContent      = '⊟ Grouped';
-    }
-    if (viewToggle) viewToggle.disabled = false;
-    if (filterBar)  filterBar.style.display = '';
-    renderInventory();
+    bodyHTML = `
+      <div class="doc-band">
+        <h1>DELIVERY NOTE / مذكرة تسليم</h1>
+        <div style="font-size:13px;opacity:.85">${po.po_no} · ${dateStr}</div>
+      </div>
+      <div class="info-grid">
+        <div class="ib">
+          <div class="label">Supplier / المورد</div>
+          <div class="val">${po.supplier}</div>
+          ${po.reference ? `<div class="sub">Ref: ${po.reference}</div>` : ''}
+        </div>
+        <div class="ib" style="text-align:right">
+          <div class="label">Deliver To / التسليم إلى</div>
+          <div class="val">${coName}</div>
+          ${po.expected_date ? `<div class="sub">Expected: ${new Date(po.expected_date).toLocaleDateString()}</div>` : ''}
+        </div>
+      </div>
+      <div class="items">
+        <h3>Items / البنود</h3>
+        <table>
+          <thead><tr>
+            <th style="width:28px">#</th>
+            <th>Description / الوصف</th>
+            <th style="width:70px;text-align:center">Ordered</th>
+            <th style="width:70px;text-align:center">Received</th>
+            <th style="width:55px;text-align:center">Unit</th>
+            <th>Remarks</th>
+          </tr></thead>
+          <tbody>
+            ${lines.map((l,i) => {
+              const p = allProducts.find(x=>x.id===l.product_id);
+              const n = p?.name || l.product_name || 'Item';
+              return `<tr>
+                <td style="color:#94a3b8">${i+1}</td>
+                <td>${n}${p?.code?` <span style="font-size:10px;color:#94a3b8">(${p.code})</span>`:''}</td>
+                <td style="text-align:center">${l.qty_ordered||0}</td>
+                <td style="text-align:center"></td>
+                <td style="text-align:center">${l.unit||p?.unit||'PCS'}</td>
+                <td></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${po.notes ? `<div style="padding:0 28px 12px"><div style="background:#fffbf0;border-left:3px solid ${accentColor2};padding:9px 13px;border-radius:0 5px 5px 0;font-size:12px"><b>Notes:</b> ${po.notes}</div></div>` : ''}
+      <div class="sig-section">
+        <div class="sig-box">Delivered by / سلّمه<br><br><br></div>
+        <div class="sig-box" style="text-align:right">Received by / استلمه<br><br><br></div>
+      </div>`;
   }
-}
 
-// Inject grouped-tab CSS once
-function ensureGroupedTabStyles() {
-  if (document.getElementById('grouped-tab-style')) return;
-  const style = document.createElement('style');
-  style.id    = 'grouped-tab-style';
-  style.textContent = [
-    '.grouped-cat-tab{padding:8px 14px;border-radius:8px;cursor:pointer;',
-    'font-family:var(--font);font-size:13px;font-weight:500;',
-    'border:1.5px solid var(--border);background:var(--surface);',
-    'color:var(--text);transition:all .18s;white-space:nowrap;}',
-    '.grouped-cat-tab:hover{border-color:var(--gold);color:var(--gold);}',
-    '.grouped-mat-tab{padding:5px 12px;border-radius:20px;cursor:pointer;',
-    'font-family:var(--font);font-size:12px;font-weight:600;',
-    'border:1.5px solid;transition:all .18s;white-space:nowrap;}',
-    '.grouped-mat-tab:hover{opacity:.85;transform:scale(1.04);}',
-    '.subgroup-rows table{width:100%;border-collapse:collapse;}',
-    '.subgroup-rows tr{cursor:pointer;}',
-    '.subgroup-rows tr:hover{background:var(--surface2)!important;}'
-  ].join('');
-  document.head.appendChild(style);
-}
-
-document.title="";window.onbeforeprint=function(){document.title="";}<\/script>
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title></title>
+<script>document.title="";window.onbeforeprint=function(){document.title="";};<\/script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-  @page {
-    size: A4;
-    margin: 0;
-    /* Remove browser header/footer (URL, date, page number) */
-    margin-top: 0;
-    margin-bottom: 0;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html {
-    width: 210mm;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  body {
-    font-family: 'Inter', Arial, sans-serif;
-    color: #1a1a2e;
-    background: #fff;
-    font-size: 13px;
-    width: 210mm;
-    height: 297mm;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .page {
-    width: 210mm;
-    height: 297mm;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    overflow: hidden;
-  }
-  .content-area { flex: 1; display: flex; flex-direction: column; }
-  /* ── LETTERHEAD HEADER ── */
-  .lh-header {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 20px 28px 14px;
-    border-bottom: 4px solid ${info.accentColor};
-    flex-shrink: 0;
-  }
-  .lh-left { display: flex; align-items: flex-start; gap: 14px; }
-  .lh-logo { width: 80px; height: 60px; object-fit: contain; }
-  .lh-logo-ph {
-    width: 80px; height: 60px; display: flex; align-items: center;
-    justify-content: center; background: #f1f5f9; border-radius: 6px;
-    font-size: 9px; font-weight: 700; color: ${info.accentColor};
-    text-align: center; padding: 4px; line-height: 1.2;
-  }
-  .co-en { font-size: 16px; font-weight: 800; color: ${info.accentColor}; }
-  .co-tag { font-size: 10px; color: #64748b; margin-top: 2px; }
-  .co-cr { font-size: 11px; font-weight: 600; color: ${info.accentColor2}; margin-top: 3px; }
-  .lh-right { text-align: right; direction: rtl; }
-  .co-ar { font-size: 16px; font-weight: 800; color: ${info.accentColor}; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
-  .co-vat { font-size: 11px; font-weight: 600; color: ${info.accentColor2}; margin-top: 3px; }
-  /* ── PO BAND ── */
-  .po-band {
-    background: ${info.accentColor}; color: #fff;
-    padding: 9px 28px; display: flex; justify-content: space-between; align-items: center;
-    flex-shrink: 0;
-  }
-  .po-band h1 { font-size: 16px; font-weight: 700; letter-spacing: 1.5px; }
-  /* ── INFO GRID ── */
-  .info-grid {
-    display: grid; grid-template-columns: 1fr 1fr;
-    padding: 14px 28px; border-bottom: 1px solid #e2e8f0;
-    gap: 20px; flex-shrink: 0;
-  }
-  .ib .label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 2px; }
-  .ib .val { font-size: 13px; font-weight: 600; color: #1a1a2e; }
-  .ib .sub { font-size: 11px; color: #64748b; margin-top: 1px; }
-  /* ── ITEMS ── */
-  .items { padding: 14px 28px; flex: 1; }
-  .items h3 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 8px; }
-  table { width: 100%; border-collapse: collapse; }
-  thead th { background: ${info.accentColor}; color: #fff; padding: 8px 11px; text-align: left; font-size: 11px; font-weight: 700; }
-  thead th:last-child { text-align: right; }
-  tbody tr:nth-child(even) { background: #f8fafc; }
-  tbody td { padding: 8px 11px; font-size: 12px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-  tbody td:last-child { text-align: right; font-weight: 600; }
-  tfoot td { padding: 7px 11px; font-size: 12px; text-align: right; }
-  .grand { font-size: 15px !important; font-weight: 800 !important; color: ${info.accentColor} !important; border-top: 2px solid ${info.accentColor} !important; }
-  /* ── NOTES ── */
-  .notes-box { background: #fffbf0; border-left: 3px solid ${info.accentColor2}; padding: 9px 13px; border-radius: 0 5px 5px 0; font-size: 12px; margin: 0 28px 12px; }
-  /* ── SIGNATURE ── */
-  .sig-section {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
-    padding: 16px 28px; margin-top: 8px; flex-shrink: 0;
-  }
-  .sig-box { border-top: 1px solid #94a3b8; padding-top: 6px; font-size: 11px; color: #64748b; }
-  /* ── FOOTER — pinned to absolute bottom ── */
-  .lh-footer {
-    background: ${info.accentColor};
-    color: rgba(255,255,255,0.92);
-    padding: 9px 28px;
-    font-size: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-    margin-top: auto;
-  }
-  .footer-ar { direction: rtl; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
-  /* ── WATERMARK ── */
-  .watermark {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) rotate(-30deg);
-    font-size: 70px; font-weight: 900; color: rgba(0,0,0,0.025);
-    pointer-events: none; z-index: 0; white-space: nowrap;
-  }
-  /* ── PRINT BUTTON ── */
-  .print-btn {
-    display: block; margin: 16px auto; padding: 9px 24px;
-    background: ${info.accentColor}; color: #fff; border: none;
-    border-radius: 6px; font-size: 13px; cursor: pointer;
-    font-family: 'Inter', sans-serif;
-  }
-  @media print {
-    .print-btn { display: none !important; }
-    @page {
-      size: A4;
-      margin: 0mm;
-    }
-    /* Force browser to NOT print URL/date headers */
-    html, body {
-      width: 210mm;
-      height: 297mm;
-    }
-    .page {
-      width: 210mm;
-      height: 297mm;
-      page-break-after: avoid;
-    }
-  }
+  @page { size:A4; margin:0; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:210mm;font-family:'Inter',Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{width:210mm;min-height:297mm;height:297mm;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .lh-header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 28px 14px;border-bottom:4px solid ${accentColor};flex-shrink:0}
+  .lh-left{display:flex;align-items:flex-start;gap:14px}
+  .lh-logo{width:80px;height:60px;object-fit:contain}
+  .lh-logo-ph{width:80px;height:60px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;border-radius:6px;font-size:9px;font-weight:700;color:${accentColor};text-align:center;padding:4px;line-height:1.2}
+  .co-en{font-size:16px;font-weight:800;color:${accentColor}}
+  .co-tag{font-size:10px;color:#64748b;margin-top:2px}
+  .co-cr{font-size:11px;font-weight:600;color:${accentColor2};margin-top:3px}
+  .lh-right{text-align:right;direction:rtl}
+  .co-ar{font-size:16px;font-weight:800;color:${accentColor};font-family:'Segoe UI',Tahoma,Arial,sans-serif}
+  .co-vat{font-size:11px;font-weight:600;color:${accentColor2};margin-top:3px}
+  .doc-band{background:${accentColor};color:#fff;padding:9px 28px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+  .doc-band h1{font-size:16px;font-weight:700;letter-spacing:1.5px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;padding:14px 28px;border-bottom:1px solid #e2e8f0;gap:20px;flex-shrink:0}
+  .ib .label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:2px}
+  .ib .val{font-size:13px;font-weight:600;color:#1a1a2e}
+  .ib .sub{font-size:11px;color:#64748b;margin-top:1px}
+  .items{padding:14px 28px;flex:1}
+  .items h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:8px}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:${accentColor};color:#fff;padding:8px 10px;text-align:left;font-size:11px;font-weight:700}
+  tbody tr:nth-child(even){background:#f8fafc}
+  tbody td{padding:8px 10px;font-size:12px;border-bottom:1px solid #e2e8f0;vertical-align:middle}
+  tfoot td{padding:7px 10px;font-size:12px;text-align:right;border-top:2px solid ${accentColor};color:${accentColor};font-weight:700}
+  .sig-section{display:grid;grid-template-columns:1fr 1fr;gap:40px;padding:16px 28px;margin-top:8px;flex-shrink:0}
+  .sig-box{border-top:1px solid #94a3b8;padding-top:6px;font-size:11px;color:#64748b}
+  .lh-footer{background:${accentColor};color:rgba(255,255,255,.92);padding:9px 28px;font-size:10px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;margin-top:auto}
+  .footer-ar{direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif}
+  .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:70px;font-weight:900;color:rgba(0,0,0,.025);pointer-events:none;z-index:0;white-space:nowrap}
+  .print-btn{display:block;margin:16px auto;padding:9px 24px;background:${accentColor};color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif}
+  @media print{.print-btn{display:none!important}@page{size:A4;margin:0mm}html,body{width:210mm;height:297mm}.page{height:297mm;page-break-after:avoid}}
 </style></head>
 <body>
 <div class="page">
   <div class="watermark">${info.nameEn}</div>
-  <div class="lh-header">
-    <div class="lh-left">
-      ${logoUrl ? `<img src="${logoUrl}" class="lh-logo">` : `<div class="lh-logo-ph">${info.nameEn}</div>`}
-      <div>
-        <div class="co-en">${name}</div>
-        <div class="co-tag">${info.taglineEn}</div>
-        <div class="co-cr">C.R. ${cr}</div>
-      </div>
-    </div>
-    <div class="lh-right">
-      <div class="co-ar">${info.nameAr}</div>
-      <div class="co-tag" style="direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif">${info.taglineAr}</div>
-      <div class="co-vat">VAT Reg No: ${vat}</div>
-    </div>
-  </div>
-  <div class="po-band">
-    <h1>PURCHASE ORDER / أمر شراء</h1>
-    <div style="font-size:13px;opacity:.85">${po.po_no} · ${new Date(po.po_date||po.created_at).toLocaleDateString('en-SA',{day:'numeric',month:'long',year:'numeric'})}</div>
-  </div>
-  <div class="info-grid">
-    <div class="ib">
-      <div class="label">Supplier / المورد</div>
-      <div class="val">${po.supplier}</div>
-      ${po.contact ? `<div class="sub">${po.contact}</div>` : ''}
-    </div>
-    <div class="ib" style="text-align:right">
-      <div class="label">Deliver To / التسليم إلى</div>
-      <div class="val">${po.delivery_addr || addr}</div>
-      ${po.delivery_date ? `<div class="sub">Expected: ${new Date(po.delivery_date).toLocaleDateString()}</div>` : ''}
-    </div>
-  </div>
-  <div class="items">
-    <h3>Items / البنود</h3>
-    <table>
-      <thead><tr><th>#</th><th>Description / الوصف</th><th>Qty / الكمية</th><th>Unit Price (SAR)</th><th>Total (SAR)</th></tr></thead>
-      <tbody>
-        ${lines.map((l,i) => `<tr>
-          <td style="color:#94a3b8">${i+1}</td>
-          <td>${l.product_id ? (allProducts.find(x=>x.id===l.product_id)?.name||l.product_name||'Item') : (l.custom_desc||l.product_name||'Item')}</td>
-          <td>${l.qty} ${l.unit||'PCS'}</td>
-          <td style="text-align:right">${Number(l.unit_price).toFixed(2)}</td>
-          <td>${Number(l.total).toFixed(2)}</td>
-        </tr>`).join('')}
-      </tbody>
-      <tfoot>
-        <tr><td colspan="4" style="color:#64748b">Subtotal</td><td>SAR ${Number(po.subtotal||0).toFixed(2)}</td></tr>
-        <tr><td colspan="4" style="color:#64748b">VAT ${vatRate}%</td><td>SAR ${Number(po.vat||0).toFixed(2)}</td></tr>
-        <tr class="grand"><td colspan="4" style="text-align:right;font-size:14px;font-weight:700">TOTAL / الإجمالي</td><td style="font-size:16px">SAR ${Number(po.total||0).toFixed(2)}</td></tr>
-      </tfoot>
-    </table>
-  </div>
-  ${po.notes ? `<div style="padding:0 32px 16px"><div style="background:#fffbf0;border-left:3px solid ${info.accentColor2};padding:10px 14px;border-radius:0 6px 6px 0;font-size:12px"><b>Notes:</b> ${po.notes}</div></div>` : ''}
-  <div class="sig-section">
-    <div class="sig-box">Authorized Signature / التوقيع المعتمد<br><br><br></div>
-    <div class="sig-box" style="text-align:right">Received By / استلم بواسطة<br><br><br></div>
-  </div>
-  <div class="lh-footer">
-    <div>Tel: ${phone}${info.email ? ' · '+info.email : ''} · ${addr}</div>
-    <div class="footer-ar">${info.addressAr}</div>
-  </div>
+  ${headerHTML}
+  ${bodyHTML}
+  ${footerHTML}
 </div>
 <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
-</body></html>`);
+</body></html>`;
+}
+
+function printPO(po) {
+  if (!po) return;
+  const w = window.open('','_blank','width=960,height=800');
+  w.document.write(_buildPoHtml(po, 'po'));
+  w.document.close();
+  w.focus();
+}
+
+function printPoDeliveryNote(po) {
+  if (!po) return;
+  const w = window.open('','_blank','width=960,height=800');
+  w.document.write(_buildPoHtml(po, 'delivery'));
   w.document.close();
   w.focus();
 }
@@ -10869,6 +10768,8 @@ function renderPurchaseOrders() {
       <td><span class="badge ${statusColors[po.status]||'badge-warn'}">${(po.status||'').toUpperCase()}</span></td>
       <td onclick="event.stopPropagation()" style="white-space:nowrap">
         ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-sm btn-success" onclick="openReceivePo('${po.id}')">📦 Receive</button>`:''}
+        <button class="btn btn-sm btn-outline" style="border-color:rgba(37,99,235,.4);color:#2563eb" onclick="printPO(allPurchaseOrders.find(x=>x.id==='${po.id}'))">📄 PO</button>
+        <button class="btn btn-sm btn-outline" style="border-color:rgba(22,163,74,.4);color:#16a34a" onclick="printPoDeliveryNote(allPurchaseOrders.find(x=>x.id==='${po.id}'))">🚚 D.Note</button>
         <button class="btn btn-sm btn-outline" onclick="editPo('${po.id}')">✏️</button>
         <button class="btn btn-sm btn-danger admin-only" onclick="deletePo('${po.id}','${po.po_no}')">🗑️</button>
       </td>
@@ -10890,6 +10791,12 @@ function openPoModal(editId) {
   document.getElementById('po-date').value = po?.expected_date||'';
   document.getElementById('po-ref').value = po?.reference||'';
   document.getElementById('po-notes').value = po?.notes||'';
+  // Populate supplier autocomplete
+  const dl = document.getElementById('po-supplier-datalist');
+  if (dl) {
+    const names = new Set([...allPurchaseOrders.map(p=>p.supplier), ...(allDbSuppliers||[]).map(s=>s.name)]);
+    dl.innerHTML = [...names].filter(Boolean).sort().map(n=>`<option value="${n}">`).join('');
+  }
   if (po?.purchase_order_lines?.length) _poLines = po.purchase_order_lines.map(l=>({...l}));
   renderPoLines();
   openModal('modal-po');
