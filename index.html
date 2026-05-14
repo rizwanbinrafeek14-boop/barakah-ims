@@ -967,6 +967,10 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
       </div>
 
       <div class="nav-item" onclick="showPage('movements')" id="nav-movements"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="nav-label">Stock Movements</span></div>
+      <div class="nav-item manager-only" onclick="openTransferModal()" id="nav-transfer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3L4 7l4 4M16 21l4-4-4-4"/><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+        <span class="nav-label">Stock Transfer</span>
+      </div>
       <div class="nav-item" onclick="showPage('quotations')" id="nav-quotations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span class="nav-label">Quotations</span></div>
 
       <div class="nav-item" onclick="showPage('low-stock')" id="nav-low-stock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -974,6 +978,15 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
       </div>
       <div class="nav-item" onclick="showPage('movement-analysis')" id="nav-movement-analysis">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span class="nav-label">Movement Analysis</span></div>
+      <div class="nav-section">Procurement</div>
+      <div class="nav-item manager-only" onclick="showPage('purchase-orders')" id="nav-purchase-orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span class="nav-label">Purchase Orders</span>
+      </div>
+      <div class="nav-item manager-only" onclick="showPage('customers')" id="nav-customers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">Customers</span>
+      </div>
       <div class="nav-section">Documents</div>
       <div class="nav-item" onclick="showPage('documents')" id="nav-documents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span class="nav-label">Documents</span></div>
       <div class="nav-section">Reports</div>
@@ -1369,6 +1382,75 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
       <div id="activity-sql-notice" style="display:none" class="alert alert-warn" style="margin-top:12px">
         ⚠️ Activity log table not set up yet.
         <button class="btn btn-sm btn-outline" onclick="showActivitySqlSetup()" style="margin-left:8px">Show SQL</button>
+      </div>
+    </div>
+
+    <!-- PURCHASE ORDERS PAGE -->
+    <div class="page" id="page-purchase-orders">
+      <div class="page-header">
+        <div class="page-header-title"><h1>Purchase Orders</h1><p>Track supplier orders and stock receipts</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" onclick="showPoSqlSetup()" style="font-size:12px;color:var(--text-muted)">⚙️ Setup</button>
+          <button class="btn btn-gold manager-only" onclick="openPoModal()">+ New PO</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="filter-bar">
+          <input class="search-input" type="text" placeholder="🔍 Search by PO number or supplier..." id="po-search" oninput="renderPurchaseOrders()">
+          <select class="filter-select" id="po-filter-status" onchange="renderPurchaseOrders()">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="partial">Partial</option>
+            <option value="received">Received</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <select class="filter-select" id="po-filter-company" onchange="renderPurchaseOrders()">
+            <option value="">All Companies</option>
+            <option value="bv">Barakah Valves</option>
+            <option value="is">Iron Spring</option>
+            <option value="sw">Stable Way</option>
+          </select>
+        </div>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table><thead><tr>
+            <th>PO Number</th><th>Date</th><th>Supplier</th><th>Company</th><th>Items</th><th>Total (SAR)</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="po-tbody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Loading... <span style="font-size:12px">(Run SQL setup first if empty)</span></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+      <div id="po-sql-notice" style="display:none;margin-top:12px" class="alert alert-warn">
+        ⚠️ Purchase Orders table not set up yet.
+        <button class="btn btn-sm btn-outline" onclick="showPoSqlSetup()" style="margin-left:8px">Show SQL</button>
+      </div>
+    </div>
+
+    <!-- CUSTOMERS PAGE -->
+    <div class="page" id="page-customers">
+      <div class="page-header">
+        <div class="page-header-title"><h1>Customers</h1><p>Client database — linked to quotations</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" onclick="showCustomerSqlSetup()" style="font-size:12px;color:var(--text-muted)">⚙️ Setup</button>
+          <button class="btn btn-gold" onclick="openCustomerModal()">+ Add Customer</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="filter-bar">
+          <input class="search-input" type="text" placeholder="🔍 Search by name, company, phone..." id="cust-search" oninput="renderCustomers()">
+        </div>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table><thead><tr>
+            <th>Name</th><th>Company</th><th>Phone</th><th>Email</th><th>VAT Number</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="customers-tbody">
+            <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Loading customers...</td></tr>
+          </tbody></table>
+        </div>
       </div>
     </div>
 
@@ -1801,6 +1883,12 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
       <div class="field"><label>Date *</label><input type="date" id="quot-date"></div>
     </div>
     <div class="field"><label>Client *</label><input type="text" id="quot-client" placeholder="Client company name"></div>
+    <div class="field">
+      <label>Link Customer (optional)</label>
+      <select id="quot-customer-id" class="input">
+        <option value="">No customer linked</option>
+      </select>
+    </div>
     <div class="grid-2">
       <div class="field"><label>Contact Person</label><input type="text" id="quot-contact" placeholder="Contact name"></div>
       <div class="field"><label>Client Reference</label><input type="text" id="quot-client-ref" placeholder="Client PO / inquiry ref"></div>
@@ -1897,6 +1985,130 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
     <div id="company-picker-options" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px"></div>
     <div class="modal-footer" style="justify-content:center">
       <button class="btn btn-outline" onclick="closeModal('modal-company-picker')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- STOCK TRANSFER MODAL -->
+<div class="modal-overlay" id="modal-transfer">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-title">🔄 Stock Transfer</div>
+    <div class="field">
+      <label>Product *</label>
+      <select id="tr-product" class="input" onchange="updateTransferStock()">
+        <option value="">Select product...</option>
+      </select>
+    </div>
+    <div id="tr-stock-info" style="display:none;background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:var(--text-muted)"></div>
+    <div class="grid-2">
+      <div class="field">
+        <label>From Company *</label>
+        <select id="tr-from" class="input" onchange="updateTransferStock()">
+          <option value="bv">Barakah Valves</option>
+          <option value="is">Iron Spring</option>
+          <option value="sw">Stable Way</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>To Company *</label>
+        <select id="tr-to" class="input">
+          <option value="is">Iron Spring</option>
+          <option value="bv">Barakah Valves</option>
+          <option value="sw">Stable Way</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label>Quantity *</label>
+        <input type="number" id="tr-qty" min="1" class="input" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Reference</label>
+        <input type="text" id="tr-ref" class="input" placeholder="TRF-2026-001">
+      </div>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="tr-notes" class="input" rows="2" placeholder="Reason for transfer..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-transfer')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveTransfer()">Transfer Stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE / EDIT PURCHASE ORDER -->
+<div class="modal-overlay" id="modal-po">
+  <div class="modal" style="max-width:700px;width:96vw">
+    <div class="modal-title" id="po-modal-title">New Purchase Order</div>
+    <input type="hidden" id="po-edit-id">
+    <div class="grid-2">
+      <div class="field"><label>Supplier *</label><input type="text" id="po-supplier" class="input" placeholder="Supplier name"></div>
+      <div class="field"><label>Company *</label>
+        <select id="po-company" class="input">
+          <option value="bv">Barakah Valves</option>
+          <option value="is">Iron Spring</option>
+          <option value="sw">Stable Way</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Expected Date</label><input type="date" id="po-date" class="input"></div>
+      <div class="field"><label>Reference</label><input type="text" id="po-ref" class="input" placeholder="Supplier ref / invoice no."></div>
+    </div>
+    <!-- Line items -->
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px">
+      <div style="background:var(--surface2);padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center">
+        <span>Items</span>
+        <button class="btn btn-sm btn-outline" type="button" onclick="addPoLine()">+ Add Item</button>
+      </div>
+      <div id="po-lines" style="padding:10px"></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="po-notes" class="input" rows="2" placeholder="Delivery instructions, payment terms..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-po')">Cancel</button>
+      <button class="btn btn-gold" onclick="savePo()">Save PO</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECEIVE PO ITEMS -->
+<div class="modal-overlay" id="modal-receive-po">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-title">📦 Receive Stock — <span id="receive-po-no"></span></div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Enter quantities actually received. Stock will be updated automatically.</p>
+    <div id="receive-po-lines"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-receive-po')">Cancel</button>
+      <button class="btn btn-gold" onclick="savePoReceipt()">Confirm Receipt</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD / EDIT CUSTOMER -->
+<div class="modal-overlay" id="modal-customer">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-title" id="customer-modal-title">Add Customer</div>
+    <input type="hidden" id="cust-edit-id">
+    <div class="grid-2">
+      <div class="field"><label>Contact Name *</label><input type="text" id="cust-name" class="input" placeholder="Full name"></div>
+      <div class="field"><label>Company Name</label><input type="text" id="cust-company" class="input" placeholder="Company name"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Phone</label><input type="tel" id="cust-phone" class="input" placeholder="+966 5X XXX XXXX"></div>
+      <div class="field"><label>Email</label><input type="email" id="cust-email" class="input" placeholder="email@example.com"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>VAT Number</label><input type="text" id="cust-vat" class="input" placeholder="3XXXXXXXXXXXXXXX3"></div>
+      <div class="field"><label>CR Number</label><input type="text" id="cust-cr" class="input" placeholder="10XXXXXXXX"></div>
+    </div>
+    <div class="field"><label>Address</label><textarea id="cust-address" class="input" rows="2" placeholder="City, Street..."></textarea></div>
+    <div class="field"><label>Notes</label><input type="text" id="cust-notes" class="input" placeholder="Any additional notes"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-customer')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveCustomer()">Save Customer</button>
     </div>
   </div>
 </div>
@@ -2330,6 +2542,8 @@ let maPeriod = 30;
 let allProducts = [];
 let allMovements = [];
 let allQuotations = [];
+let allPurchaseOrders = [];
+let allCustomers = [];
 let settings = {};
 
 // ─── THEME ───────────────────────────────────────────────────
@@ -2537,6 +2751,8 @@ async function launchApp() {
     loadActivityLog().catch(()=>{}),
     Promise.resolve().then(()=>{ updateCatNavBadges(); if(typeof loadCatMatrix==='function') loadCatMatrix(); }),
     logActivity('login','Logged in').catch(()=>{}),
+    loadPurchaseOrders().catch(()=>{}),
+    loadCustomers().catch(()=>{}),
   ]).then(() => {
     populateMonthFilter();
     // Re-render the active page now that data is loaded
@@ -2644,7 +2860,8 @@ const PAGE_TITLES = {
   quotations:'Quotations', 'low-stock':'Low Stock Alerts',
   'movement-analysis':'Movement Analysis', documents:'Product Documents',
   reports:'Monthly Reports', 'ai-insights':'AI Insights',
-  'activity-log':'Activity Log', users:'User Management', settings:'Settings'
+  'activity-log':'Activity Log', users:'User Management', settings:'Settings',
+  'purchase-orders':'Purchase Orders', customers:'Customers'
 };
 
 function showPage(id) {
@@ -2689,6 +2906,8 @@ function showPage(id) {
     }, 30);
   }
   if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
+  if (id === 'purchase-orders') { loadPurchaseOrders(); }
+  if (id === 'customers') { loadCustomers(); }
 
   // Update bottom nav
   if (typeof updateBottomNav === 'function') updateBottomNav(id);
@@ -3338,6 +3557,7 @@ async function saveQuotation(status) {
     notes:document.getElementById('quot-notes').value,
     subtotal:sub, vat:sub*vr, total:sub*(1+vr),
     quot_date:document.getElementById('quot-date').value,
+    customer_id:document.getElementById('quot-customer-id')?.value||null,
     created_by:currentProfile.id
   }).select().single();
 
@@ -3366,7 +3586,9 @@ function renderQuotations() {
   document.getElementById('quotations-tbody').innerHTML=list.map(q=>`
     <tr><td class="mono" style="font-size:12px;color:var(--gold)">${q.quot_no}</td><td style="font-size:13px">${new Date(q.quot_date||q.created_at).toLocaleDateString()}</td><td><div style="font-weight:500">${q.client}</div><div style="font-size:11px;color:var(--text-muted)">${q.client_ref||''}</div></td><td><span class="badge badge-blue" style="font-size:10px">${COMPANY_NAMES[q.company]||q.company}</span></td><td>${(q.quotation_lines||[]).length} items</td><td class="mono" style="font-weight:600">SAR ${Number(q.total||0).toFixed(2)}</td><td><span class="badge ${statusColors[q.status]||'badge-blue'}">${(q.status||'').toUpperCase()}</span></td>
     <td onclick="event.stopPropagation()" style="white-space:nowrap">
-      <button class="btn btn-sm btn-outline" onclick="printQuotation(allQuotations.find(x=>x.id==='${q.id}'))">Print</button>
+      <button class="btn btn-sm btn-outline" style="border-color:rgba(22,163,74,.4);color:#16a34a" onclick="printDeliveryNote(allQuotations.find(x=>x.id==='${q.id}'))">🚚 D.Note</button>
+      <button class="btn btn-sm btn-outline" style="border-color:rgba(37,99,235,.4);color:#2563eb" onclick="printQuotation(allQuotations.find(x=>x.id==='${q.id}'))">📄 Quote</button>
+      <button class="btn btn-sm" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600" onclick="shareOnWhatsApp(allQuotations.find(x=>x.id==='${q.id}'))">📱 WA</button>
       <button class="btn btn-sm btn-success" onclick="updateQuotStatus('${q.id}','accepted')">✓</button>
       <button class="btn btn-sm btn-danger" onclick="updateQuotStatus('${q.id}','rejected')">✗</button>
       <button class="btn btn-sm btn-outline admin-only" onclick="openEditQuotation('${q.id}')" style="border-color:rgba(201,168,76,0.4);color:var(--gold)" ${currentProfile?.role!=='admin'?'style="display:none"':''}>✏️</button>
@@ -4163,6 +4385,8 @@ async function openEditQuotation(id) {
   document.getElementById('quot-contact').value     = q.contact || '';
   document.getElementById('quot-client-ref').value  = q.client_ref || '';
   document.getElementById('quot-notes').value       = q.notes || '';
+  const custSelEdit = document.getElementById('quot-customer-id');
+  if (custSelEdit && q.customer_id) custSelEdit.value = q.customer_id;
 
   // Set delivery option
   const deliverySel = document.getElementById('quot-delivery');
@@ -10445,6 +10669,621 @@ function toggleSidebarCollapse() {
 }
 
 window.addEventListener('DOMContentLoaded', init);
+
+// ═══════════════════════════════════════════════════════════════
+// STOCK TRANSFER (inter-company)
+// ═══════════════════════════════════════════════════════════════
+function openTransferModal() {
+  const sel = document.getElementById('tr-product');
+  if (sel) sel.innerHTML = '<option value="">Select product...</option>' + allProducts.map(p=>`<option value="${p.id}">${p.name}${p.code?' ('+p.code+')':''}</option>`).join('');
+  ['tr-qty','tr-ref','tr-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const info = document.getElementById('tr-stock-info');
+  if (info) info.style.display = 'none';
+  openModal('modal-transfer');
+}
+
+function updateTransferStock() {
+  const pid = document.getElementById('tr-product')?.value;
+  const from = document.getElementById('tr-from')?.value;
+  const info = document.getElementById('tr-stock-info');
+  if (!pid || !info) return;
+  const p = allProducts.find(x=>x.id===pid);
+  if (!p) { info.style.display='none'; return; }
+  const coLabels = {bv:'BV',is:'IS',sw:'SW'};
+  info.style.display = '';
+  info.innerHTML = `<b>${p.name}</b> — Stock: BV: <b>${p.qty_bv||0}</b>  IS: <b>${p.qty_is||0}</b>  SW: <b>${p.qty_sw||0}</b>${from?' | Available from '+coLabels[from]+': <b>'+(p['qty_'+from]||0)+'</b>':''}`;
+}
+
+async function saveTransfer() {
+  const pid  = document.getElementById('tr-product')?.value;
+  const from = document.getElementById('tr-from')?.value;
+  const to   = document.getElementById('tr-to')?.value;
+  const qty  = parseInt(document.getElementById('tr-qty')?.value||'0');
+  const ref  = document.getElementById('tr-ref')?.value.trim()||null;
+  const notes= document.getElementById('tr-notes')?.value.trim()||null;
+
+  if (!pid) { showToast('Select a product','error'); return; }
+  if (from === to) { showToast('From and To companies must be different','error'); return; }
+  if (!qty || qty < 1) { showToast('Enter a valid quantity','error'); return; }
+
+  const p = allProducts.find(x=>x.id===pid);
+  if (!p) { showToast('Product not found','error'); return; }
+
+  const available = p['qty_'+from]||0;
+  if (qty > available) { showToast(`Only ${available} units available in ${from.toUpperCase()}`, 'error'); return; }
+
+  showLoading('TRANSFERRING...');
+  try {
+    const newFrom = available - qty;
+    const newTo   = (p['qty_'+to]||0) + qty;
+    const update  = { ['qty_'+from]: newFrom, ['qty_'+to]: newTo, updated_at: new Date().toISOString() };
+
+    const { error } = await sb.from('products').update(update).eq('id', pid);
+    if (error) throw error;
+
+    // Update local copy
+    Object.assign(p, update);
+
+    const coNames = {bv:'Barakah Valves',is:'Iron Spring',sw:'Stable Way'};
+    const movBase = { product_id:pid, qty, reference:ref, notes, created_by: currentProfile?.id };
+    await Promise.allSettled([
+      sb.from('stock_movements').insert({...movBase, type:'transfer', company:from, qty_change: -qty }),
+      sb.from('stock_movements').insert({...movBase, type:'transfer', company:to,   qty_change:  qty }),
+    ]);
+
+    logActivity('stock_transfer', `Transferred ${qty} × ${p.name} from ${coNames[from]} → ${coNames[to]}`, { product_id: pid, company: from, ref_id: ref });
+
+    hideLoading();
+    closeModal('modal-transfer');
+    showToast(`✓ ${qty} units transferred: ${coNames[from]} → ${coNames[to]}`);
+
+    if (currentPage === 'inventory') renderInventory();
+    if (currentPage === 'movements') {
+      allMovements = (await sb.from('stock_movements').select('*, profiles(full_name)').order('created_at',{ascending:false}).limit(500)).data || [];
+      renderMovements();
+    }
+    if (currentPage === 'dashboard') renderDashboard();
+
+  } catch(e) {
+    hideLoading();
+    showToast('Transfer failed: '+e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PURCHASE ORDERS
+// ═══════════════════════════════════════════════════════════════
+let _editingPoId = null;
+let _receivingPoId = null;
+
+async function loadPurchaseOrders() {
+  try {
+    const { data, error } = await sb.from('purchase_orders')
+      .select('*, purchase_order_lines(*)')
+      .order('created_at', { ascending: false });
+    if (error) {
+      if (error.message?.includes('relation') || error.code === '42P01') {
+        const notice = document.getElementById('po-sql-notice');
+        if (notice) notice.style.display = '';
+        const tbody = document.getElementById('po-tbody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text-muted)">Run SQL setup to enable Purchase Orders</td></tr>';
+      }
+      return;
+    }
+    allPurchaseOrders = data || [];
+    renderPurchaseOrders();
+  } catch(e) { console.warn('PO load:', e.message); }
+}
+
+function renderPurchaseOrders() {
+  const tbody = document.getElementById('po-tbody');
+  if (!tbody) return;
+  const search = (document.getElementById('po-search')?.value||'').toLowerCase();
+  const fs = document.getElementById('po-filter-status')?.value||'';
+  const fc = document.getElementById('po-filter-company')?.value||'';
+
+  const list = allPurchaseOrders.filter(po => {
+    const ms = !search || (po.po_no||'').toLowerCase().includes(search) || (po.supplier||'').toLowerCase().includes(search);
+    return ms && (!fs||po.status===fs) && (!fc||po.company===fc);
+  });
+
+  const statusColors = {pending:'badge-warn',partial:'badge-blue',received:'badge-green',cancelled:'badge-red'};
+  const coNames = {bv:'BV',is:'IS',sw:'SW'};
+
+  tbody.innerHTML = list.map(po => {
+    const lines = po.purchase_order_lines||[];
+    const total = lines.reduce((a,l)=>a+(l.qty_ordered||0)*(l.unit_price||0),0);
+    return `<tr>
+      <td class="mono" style="color:var(--gold);font-size:12px">${po.po_no}</td>
+      <td style="font-size:12px">${new Date(po.created_at).toLocaleDateString()}</td>
+      <td style="font-size:13px">${po.supplier}</td>
+      <td><span class="badge badge-blue" style="font-size:10px">${coNames[po.company]||po.company}</span></td>
+      <td style="font-size:13px">${lines.length} items</td>
+      <td class="mono" style="font-weight:600">SAR ${total.toFixed(2)}</td>
+      <td><span class="badge ${statusColors[po.status]||'badge-warn'}">${(po.status||'').toUpperCase()}</span></td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        ${po.status!=='received'&&po.status!=='cancelled'?`<button class="btn btn-sm btn-success" onclick="openReceivePo('${po.id}')">📦 Receive</button>`:''}
+        <button class="btn btn-sm btn-outline" onclick="editPo('${po.id}')">✏️</button>
+        <button class="btn btn-sm btn-danger admin-only" onclick="deletePo('${po.id}','${po.po_no}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text-muted)">No purchase orders yet</td></tr>';
+}
+
+let _poLines = [];
+
+function openPoModal(editId) {
+  editId = editId || null;
+  _editingPoId = editId;
+  _poLines = editId ? [] : [{ product_id:'', product_name:'', qty_ordered:1, unit_price:0 }];
+  const po = editId ? allPurchaseOrders.find(x=>x.id===editId) : null;
+  document.getElementById('po-modal-title').textContent = editId ? 'Edit Purchase Order' : 'New Purchase Order';
+  document.getElementById('po-edit-id').value = editId||'';
+  document.getElementById('po-supplier').value = po?.supplier||'';
+  document.getElementById('po-company').value = po?.company||'bv';
+  document.getElementById('po-date').value = po?.expected_date||'';
+  document.getElementById('po-ref').value = po?.reference||'';
+  document.getElementById('po-notes').value = po?.notes||'';
+  if (po?.purchase_order_lines?.length) _poLines = po.purchase_order_lines.map(l=>({...l}));
+  renderPoLines();
+  openModal('modal-po');
+}
+
+function editPo(id) { openPoModal(id); }
+
+function renderPoLines() {
+  const container = document.getElementById('po-lines');
+  if (!container) return;
+  container.innerHTML = _poLines.map((line, i) => `
+    <div style="display:grid;grid-template-columns:1fr 80px 90px 30px;gap:8px;align-items:center;margin-bottom:8px">
+      <select class="input" style="font-size:12px" onchange="_poLines[${i}].product_id=this.value;_poLines[${i}].product_name=this.options[this.selectedIndex].text">
+        <option value="">Select product...</option>
+        ${allProducts.map(p=>`<option value="${p.id}" ${line.product_id===p.id?'selected':''}>${p.name}${p.code?' ('+p.code+')':''}</option>`).join('')}
+      </select>
+      <input type="number" min="1" value="${line.qty_ordered||1}" class="input" style="font-size:12px" placeholder="Qty" onchange="_poLines[${i}].qty_ordered=parseInt(this.value)||1">
+      <input type="number" min="0" step="0.01" value="${line.unit_price||0}" class="input" style="font-size:12px" placeholder="Price" onchange="_poLines[${i}].unit_price=parseFloat(this.value)||0">
+      <button type="button" onclick="_poLines.splice(${i},1);renderPoLines()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px">×</button>
+    </div>`).join('');
+}
+
+function addPoLine() {
+  _poLines.push({ product_id:'', product_name:'', qty_ordered:1, unit_price:0 });
+  renderPoLines();
+}
+
+async function savePo() {
+  const supplier = document.getElementById('po-supplier')?.value.trim();
+  const company  = document.getElementById('po-company')?.value;
+  if (!supplier) { showToast('Enter supplier name','error'); return; }
+  if (!_poLines.length || !_poLines.some(l=>l.product_id)) { showToast('Add at least one product','error'); return; }
+
+  showLoading('SAVING PO...');
+  try {
+    const poNo = _editingPoId
+      ? allPurchaseOrders.find(x=>x.id===_editingPoId)?.po_no
+      : 'PO-'+company.toUpperCase()+'-'+Date.now().toString().slice(-6);
+
+    const poData = {
+      supplier, company,
+      po_no: poNo,
+      expected_date: document.getElementById('po-date')?.value||null,
+      reference: document.getElementById('po-ref')?.value.trim()||null,
+      notes: document.getElementById('po-notes')?.value.trim()||null,
+      updated_at: new Date().toISOString()
+    };
+    if (!_editingPoId) {
+      poData.status = 'pending';
+      poData.created_by = currentProfile?.id;
+    }
+
+    let poId = _editingPoId;
+    if (_editingPoId) {
+      const { error } = await sb.from('purchase_orders').update(poData).eq('id', _editingPoId);
+      if (error) throw error;
+      await sb.from('purchase_order_lines').delete().eq('po_id', _editingPoId);
+    } else {
+      const { data, error } = await sb.from('purchase_orders').insert(poData).select().single();
+      if (error) throw error;
+      poId = data.id;
+    }
+
+    const lines = _poLines.filter(l=>l.product_id).map(l=>{
+      const p = allProducts.find(x=>x.id===l.product_id);
+      return { po_id:poId, product_id:l.product_id, product_name:p?.name||l.product_name||'', qty_ordered:l.qty_ordered, qty_received:0, unit_price:l.unit_price };
+    });
+    if (lines.length) await sb.from('purchase_order_lines').insert(lines);
+
+    logActivity('po_create', `PO ${poNo} — ${supplier} (${lines.length} items)`, { company, ref_id: poNo });
+    await loadPurchaseOrders();
+    hideLoading();
+    closeModal('modal-po');
+    showToast('✓ Purchase order saved!');
+  } catch(e) {
+    hideLoading();
+    showToast('Save failed: '+e.message,'error');
+  }
+}
+
+function openReceivePo(poId) {
+  _receivingPoId = poId;
+  const po = allPurchaseOrders.find(x=>x.id===poId);
+  if (!po) return;
+  document.getElementById('receive-po-no').textContent = po.po_no;
+  const lines = po.purchase_order_lines||[];
+  document.getElementById('receive-po-lines').innerHTML = lines.map((l,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div><div style="font-weight:500;font-size:13px">${l.product_name||'Unknown product'}</div><div style="font-size:11px;color:var(--text-muted)">Ordered: ${l.qty_ordered} | Already received: ${l.qty_received||0}</div></div>
+      <div style="text-align:center;font-size:12px;color:var(--text-muted)">Remaining:<br><b>${(l.qty_ordered||0)-(l.qty_received||0)}</b></div>
+      <input type="number" id="recv-qty-${i}" min="0" max="${(l.qty_ordered||0)-(l.qty_received||0)}" value="${(l.qty_ordered||0)-(l.qty_received||0)}" class="input" style="font-size:13px" data-line-id="${l.id}" data-product-id="${l.product_id}">
+    </div>`).join('');
+  openModal('modal-receive-po');
+}
+
+async function savePoReceipt() {
+  const po = allPurchaseOrders.find(x=>x.id===_receivingPoId);
+  if (!po) return;
+  const lines = po.purchase_order_lines||[];
+  const company = po.company;
+
+  showLoading('RECEIVING STOCK...');
+  try {
+    let anyReceived = false;
+    for (let i=0; i<lines.length; i++) {
+      const l = lines[i];
+      const qtyEl = document.getElementById('recv-qty-'+i);
+      const qtyRecv = parseInt(qtyEl?.value||'0');
+      if (!qtyRecv || qtyRecv < 1) continue;
+      anyReceived = true;
+
+      // Update line received qty
+      const newReceived = (l.qty_received||0) + qtyRecv;
+      await sb.from('purchase_order_lines').update({ qty_received: newReceived }).eq('id', l.id);
+      l.qty_received = newReceived;
+
+      // Update product stock
+      const prod = allProducts.find(x=>x.id===l.product_id);
+      if (prod) {
+        const newQty = (prod['qty_'+company]||0) + qtyRecv;
+        await sb.from('products').update({ ['qty_'+company]: newQty, updated_at: new Date().toISOString() }).eq('id', l.product_id);
+        prod['qty_'+company] = newQty;
+      }
+
+      // Log movement
+      await sb.from('stock_movements').insert({ product_id:l.product_id, type:'in', qty:qtyRecv, qty_change:qtyRecv, company, reference:po.po_no, notes:'PO Receipt', created_by:currentProfile?.id }).catch(()=>{});
+    }
+
+    if (!anyReceived) { hideLoading(); showToast('Enter at least one received quantity','error'); return; }
+
+    // Update PO status
+    const allReceived = lines.every(l=>(l.qty_received||0)>=(l.qty_ordered||0));
+    const newStatus = allReceived ? 'received' : 'partial';
+    await sb.from('purchase_orders').update({ status:newStatus, updated_at:new Date().toISOString() }).eq('id', po.id);
+    po.status = newStatus;
+
+    logActivity('po_receive', `Received items for PO ${po.po_no}`, { company, ref_id: po.po_no });
+    renderPurchaseOrders();
+    if (currentPage==='inventory') renderInventory();
+    if (currentPage==='dashboard') renderDashboard();
+
+    hideLoading();
+    closeModal('modal-receive-po');
+    showToast('✓ Stock received and updated!');
+  } catch(e) {
+    hideLoading();
+    showToast('Receipt failed: '+e.message,'error');
+  }
+}
+
+async function deletePo(id, poNo) {
+  if (!confirm(`Delete PO ${poNo}? This cannot be undone.`)) return;
+  showLoading('DELETING...');
+  try {
+    await sb.from('purchase_order_lines').delete().eq('po_id', id);
+    await sb.from('purchase_orders').delete().eq('id', id);
+    allPurchaseOrders = allPurchaseOrders.filter(x=>x.id!==id);
+    renderPurchaseOrders();
+    hideLoading();
+    showToast('PO deleted');
+  } catch(e) { hideLoading(); showToast('Delete failed: '+e.message,'error'); }
+}
+
+function showPoSqlSetup() {
+  const sql = `-- Run in Supabase SQL Editor:
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_no TEXT NOT NULL,
+  supplier TEXT NOT NULL,
+  company TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  expected_date DATE,
+  reference TEXT,
+  notes TEXT,
+  created_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS purchase_order_lines (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  po_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id),
+  product_name TEXT,
+  qty_ordered INTEGER NOT NULL DEFAULT 1,
+  qty_received INTEGER DEFAULT 0,
+  unit_price DECIMAL(10,2) DEFAULT 0
+);
+ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_order_lines ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all" ON purchase_order_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
+  const win = window.open('','_blank','width=700,height=500');
+  win.document.write('<pre style="font-family:monospace;padding:20px;background:#1e1e2e;color:#cdd6f4;white-space:pre-wrap">'+sql+'</pre><button onclick="navigator.clipboard.writeText(document.querySelector(\'pre\').textContent);alert(\'Copied!\')" style="margin:10px;padding:8px 16px">Copy SQL</button>');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMERS
+// ═══════════════════════════════════════════════════════════════
+let _editingCustomerId = null;
+
+async function loadCustomers() {
+  try {
+    const { data, error } = await sb.from('customers').select('*').order('name');
+    if (error) {
+      if (error.message?.includes('relation') || error.code === '42P01') {
+        const tbody = document.getElementById('customers-tbody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-muted)">Run SQL setup to enable Customers</td></tr>';
+      }
+      return;
+    }
+    allCustomers = data || [];
+    renderCustomers();
+    populateCustomerSelect();
+  } catch(e) { console.warn('Customers load:', e.message); }
+}
+
+function renderCustomers() {
+  const tbody = document.getElementById('customers-tbody');
+  if (!tbody) return;
+  const search = (document.getElementById('cust-search')?.value||'').toLowerCase();
+  const list = allCustomers.filter(c => !search || (c.name||'').toLowerCase().includes(search) || (c.company||'').toLowerCase().includes(search) || (c.phone||'').toLowerCase().includes(search));
+
+  tbody.innerHTML = list.map(c=>`<tr>
+    <td style="font-weight:500">${c.name}</td>
+    <td style="font-size:13px">${c.company||'—'}</td>
+    <td class="mono" style="font-size:12px">${c.phone||'—'}</td>
+    <td style="font-size:12px">${c.email||'—'}</td>
+    <td class="mono" style="font-size:11px;color:var(--text-muted)">${c.vat_number||'—'}</td>
+    <td onclick="event.stopPropagation()" style="white-space:nowrap">
+      <button class="btn btn-sm btn-outline" onclick="openCustomerModal('${c.id}')">✏️ Edit</button>
+      <button class="btn btn-sm btn-danger admin-only" onclick="deleteCustomer('${c.id}','${c.name.replace(/'/g,&quot;\\&quot;)}')">🗑️</button>
+    </td>
+  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-muted)">No customers yet. Add your first customer.</td></tr>';
+}
+
+function populateCustomerSelect() {
+  const sel = document.getElementById('quot-customer-id');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">No customer linked</option>' + allCustomers.map(c=>`<option value="${c.id}">${c.name}${c.company?' — '+c.company:''}</option>`).join('');
+}
+
+function openCustomerModal(editId) {
+  editId = editId || null;
+  _editingCustomerId = editId;
+  const c = editId ? allCustomers.find(x=>x.id===editId) : null;
+  document.getElementById('customer-modal-title').textContent = editId ? 'Edit Customer' : 'Add Customer';
+  document.getElementById('cust-edit-id').value = editId||'';
+  document.getElementById('cust-name').value = c?.name||'';
+  document.getElementById('cust-company').value = c?.company||'';
+  document.getElementById('cust-phone').value = c?.phone||'';
+  document.getElementById('cust-email').value = c?.email||'';
+  document.getElementById('cust-vat').value = c?.vat_number||'';
+  document.getElementById('cust-cr').value = c?.cr_number||'';
+  document.getElementById('cust-address').value = c?.address||'';
+  document.getElementById('cust-notes').value = c?.notes||'';
+  openModal('modal-customer');
+}
+
+async function saveCustomer() {
+  const name = document.getElementById('cust-name')?.value.trim();
+  if (!name) { showToast('Enter customer name','error'); return; }
+  showLoading('SAVING...');
+  try {
+    const data = {
+      name,
+      company: document.getElementById('cust-company')?.value.trim()||null,
+      phone:   document.getElementById('cust-phone')?.value.trim()||null,
+      email:   document.getElementById('cust-email')?.value.trim()||null,
+      vat_number: document.getElementById('cust-vat')?.value.trim()||null,
+      cr_number:  document.getElementById('cust-cr')?.value.trim()||null,
+      address: document.getElementById('cust-address')?.value.trim()||null,
+      notes:   document.getElementById('cust-notes')?.value.trim()||null,
+      updated_at: new Date().toISOString()
+    };
+    if (_editingCustomerId) {
+      await sb.from('customers').update(data).eq('id', _editingCustomerId);
+      const idx = allCustomers.findIndex(x=>x.id===_editingCustomerId);
+      if (idx>=0) Object.assign(allCustomers[idx], data);
+    } else {
+      data.created_by = currentProfile?.id;
+      const { data: created } = await sb.from('customers').insert(data).select().single();
+      if (created) allCustomers.push(created);
+    }
+    renderCustomers();
+    populateCustomerSelect();
+    hideLoading();
+    closeModal('modal-customer');
+    showToast('Customer saved!');
+  } catch(e) { hideLoading(); showToast('Save failed: '+e.message,'error'); }
+}
+
+async function deleteCustomer(id, name) {
+  if (!confirm('Delete customer "'+name+'"?')) return;
+  showLoading('DELETING...');
+  try {
+    await sb.from('customers').delete().eq('id', id);
+    allCustomers = allCustomers.filter(x=>x.id!==id);
+    renderCustomers();
+    hideLoading();
+    showToast('Customer deleted');
+  } catch(e) { hideLoading(); showToast('Delete failed: '+e.message,'error'); }
+}
+
+function showCustomerSqlSetup() {
+  const sql = `-- Run in Supabase SQL Editor:
+CREATE TABLE IF NOT EXISTS customers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  company TEXT,
+  phone TEXT,
+  email TEXT,
+  vat_number TEXT,
+  cr_number TEXT,
+  address TEXT,
+  notes TEXT,
+  created_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON customers FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
+  const win = window.open('','_blank','width=700,height=400');
+  win.document.write('<pre style="font-family:monospace;padding:20px;background:#1e1e2e;color:#cdd6f4;white-space:pre-wrap">'+sql+'</pre><button onclick="navigator.clipboard.writeText(document.querySelector(\'pre\').textContent);alert(\'Copied!\')" style="margin:10px;padding:8px 16px">Copy SQL</button>');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WHATSAPP SHARE
+// ═══════════════════════════════════════════════════════════════
+function shareOnWhatsApp(q) {
+  if (!q) return;
+  const lines = q.quotation_lines || [];
+  const vat = parseFloat(settings.vatRate||15)/100;
+  const subtotal = lines.reduce((a,l)=>a+(l.qty||0)*(l.unit_price||0),0);
+  const vatAmt = subtotal*vat;
+  const total = subtotal+vatAmt;
+  const coNames = {bv:'Barakah Valves Trading Co.',is:'Iron Spring Trading Co.',sw:'Stable Way Trading Co.'};
+  const coName = coNames[q.company]||q.company||'Barakah Group';
+
+  let msg = '*'+coName+'*\n';
+  msg += '*Quotation: '+q.quot_no+'*\n';
+  msg += 'Date: '+new Date(q.quot_date||q.created_at).toLocaleDateString('en-SA')+'\n';
+  msg += 'Client: '+q.client+'\n';
+  if (q.client_ref) msg += 'Ref: '+q.client_ref+'\n';
+  msg += '\n*Items:*\n';
+  lines.forEach((l,i)=>{
+    const prod = allProducts.find(x=>x.id===l.product_id);
+    const name = l.custom_desc || prod?.name || 'Item';
+    msg += (i+1)+'. '+name+' — Qty: '+(l.qty||0)+' '+(l.unit||'PCS')+' @ SAR '+Number(l.unit_price||0).toFixed(2)+' = SAR '+Number((l.qty||0)*(l.unit_price||0)).toFixed(2)+'\n';
+  });
+  msg += '\nSubtotal: SAR '+subtotal.toFixed(2)+'\n';
+  msg += 'VAT ('+(settings.vatRate||15)+'%): SAR '+vatAmt.toFixed(2)+'\n';
+  msg += '*Total: SAR '+total.toFixed(2)+'*\n';
+  if (q.notes) msg += '\nTerms: '+q.notes+'\n';
+  msg += '\nDelivery: '+(q.delivery||'As per discussion');
+
+  const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DELIVERY NOTE PRINT
+// ═══════════════════════════════════════════════════════════════
+function printDeliveryNote(q) {
+  if (!q) return;
+  _quotToPrint = q;
+
+  const companies = ['bv','is','sw'];
+  const coNames = { bv:'Barakah Valves', is:'Iron Spring', sw:'Stable Way' };
+  const borderColors = { bv:'rgba(74,127,165,0.4)', is:'rgba(181,55,42,0.4)', sw:'rgba(138,122,80,0.4)' };
+
+  document.getElementById('company-picker-options').innerHTML = companies.map(co => {
+    const d = getCompanyData(co);
+    return '<div onclick="doPrintDeliveryNoteWithCompany(\''+co+'\')" style="display:flex;align-items:center;gap:14px;padding:14px 18px;border:1px solid '+borderColors[co]+';border-radius:12px;cursor:pointer;margin-bottom:10px" onmouseover="this.style.borderColor=\'var(--gold)\'" onmouseout="this.style.borderColor=\''+borderColors[co]+'\'">'
+      +'<div style="width:54px;height:42px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">'
+      +(d.logoUrl ? '<img src="'+d.logoUrl+'" style="width:100%;height:100%;object-fit:contain;padding:3px">' : '<span style="font-size:18px">🏢</span>')
+      +'</div>'
+      +'<div style="text-align:left"><div style="font-weight:600;font-size:14px">'+(d.name||coNames[co])+'</div>'
+      +(d.cr ? '<div style="font-size:11px;color:var(--text-muted)">CR: '+d.cr+'</div>' : '')
+      +'</div><div style="margin-left:auto;font-size:18px">→</div></div>';
+  }).join('');
+  openModal('modal-company-picker');
+}
+
+function doPrintDeliveryNoteWithCompany(co) {
+  closeModal('modal-company-picker');
+  const q = _quotToPrint;
+  _quotToPrint = null;
+  if (!q) return;
+  executeDeliveryNote(q, co);
+}
+
+function executeDeliveryNote(q, co) {
+  const d = getCompanyData(co);
+  const coNames = {bv:'Barakah Valves Trading Co.',is:'Iron Spring Trading Co.',sw:'Stable Way Trading Co.'};
+  const lines = q.quotation_lines || [];
+
+  const win = window.open('', '_blank', 'width=850,height=1100');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
+  +'<title>Delivery Note — '+q.quot_no+'</title>'
+  +'<style>'
+  +'* { margin:0;padding:0;box-sizing:border-box; }'
+  +'body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 30px; }'
+  +'.header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; border-bottom:2px solid #d97706; padding-bottom:16px; }'
+  +'.logo { height:60px; object-fit:contain; }'
+  +'.doc-title { text-align:right; }'
+  +'.doc-title h1 { font-size:24px; font-weight:800; color:#d97706; letter-spacing:1px; }'
+  +'.doc-title .ref { font-size:13px; color:#555; margin-top:4px; }'
+  +'.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }'
+  +'.info-box { background:#f8f8f8; border:1px solid #e0e0e0; border-radius:6px; padding:12px 14px; }'
+  +'.info-box label { font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:#888; display:block; margin-bottom:4px; }'
+  +'.info-box div { font-size:13px; font-weight:600; }'
+  +'table { width:100%; border-collapse:collapse; margin-bottom:20px; }'
+  +'thead th { background:#d97706; color:#fff; padding:8px 10px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; }'
+  +'tbody tr:nth-child(even) { background:#fafafa; }'
+  +'tbody td { padding:8px 10px; border-bottom:1px solid #eee; font-size:12px; }'
+  +'.footer { margin-top:32px; border-top:1px solid #ddd; padding-top:16px; font-size:11px; color:#888; display:flex; justify-content:space-between; }'
+  +'.sig-box { border:1px solid #ccc; border-radius:6px; padding:40px 60px 12px; text-align:center; font-size:11px; color:#888; }'
+  +'@media print { body { padding: 15px; } }'
+  +'</style>'
+  +'</head><body>'
+  +'<div class="header">'
+  +'<div style="display:flex;align-items:center;gap:14px">'
+  +(d.logoUrl?'<img src="'+d.logoUrl+'" class="logo">':'')
+  +'<div>'
+  +'<div style="font-weight:800;font-size:16px">'+(d.name||coNames[co])+'</div>'
+  +(d.cr?'<div style="font-size:11px;color:#555">CR: '+d.cr+'</div>':'')
+  +(d.vat?'<div style="font-size:11px;color:#555">VAT: '+d.vat+'</div>':'')
+  +(d.phone?'<div style="font-size:11px;color:#555">Tel: '+d.phone+'</div>':'')
+  +'</div></div>'
+  +'<div class="doc-title">'
+  +'<h1>DELIVERY NOTE</h1>'
+  +'<div class="ref">Ref: '+q.quot_no+'</div>'
+  +'<div class="ref">Date: '+new Date(q.quot_date||q.created_at).toLocaleDateString('en-SA',{day:'numeric',month:'long',year:'numeric'})+'</div>'
+  +'</div></div>'
+  +'<div class="info-grid">'
+  +'<div class="info-box"><label>Deliver To</label><div>'+q.client+'</div>'+(q.contact?'<div style="font-size:12px;color:#555;margin-top:2px">'+q.contact+'</div>':'')+'</div>'
+  +'<div class="info-box"><label>Delivery Details</label><div>'+(q.delivery||'As per discussion')+'</div>'+(q.client_ref?'<div style="font-size:12px;color:#555;margin-top:2px">Client Ref: '+q.client_ref+'</div>':'')+'</div>'
+  +'</div>'
+  +'<table>'
+  +'<thead><tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th>Remarks</th></tr></thead>'
+  +'<tbody>'
+  +lines.map((l,i)=>{
+    const prod = allProducts.find(x=>x.id===l.product_id);
+    const name = l.custom_desc||prod?.name||'';
+    return '<tr><td>'+(i+1)+'</td><td>'+name+'</td><td style="font-weight:600">'+(l.qty||0)+'</td><td>'+(l.unit||'PCS')+'</td><td></td></tr>';
+  }).join('')
+  +'</tbody></table>'
+  +'<div style="display:flex;justify-content:space-between;margin-top:40px">'
+  +'<div class="sig-box">Delivered by<br><small>Signature &amp; Date</small></div>'
+  +'<div class="sig-box">Received by<br><small>Signature, Stamp &amp; Date</small></div>'
+  +'</div>'
+  +(q.notes?'<div style="margin-top:20px;font-size:11px;color:#666"><b>Notes:</b> '+q.notes+'</div>':'')
+  +'<div class="footer">'
+  +'<span>'+(d.name||coNames[co])+'</span>'
+  +'<span>Delivery Note · '+q.quot_no+'</span>'
+  +'</div>'
+  +'<script>window.onload=function(){window.print();}<\/script>'
+  +'</body></html>');
+  win.document.close();
+}
 
 </script>
 
