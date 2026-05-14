@@ -1005,11 +1005,13 @@ function normalizeCatName(c) { return c; }
 
 // ── STATE ─────────────────────────────────────────────────────
 let sb = null;
+let currentUser = null;
 let currentProfile = null;
 let settings = {};
 let allProducts = [];
 let allMovements = [];
 let allQuotations = [];
+let _appLaunched = false;
 let _activeTab = 'dashboard';
 let _invSearch = '';
 let _invFilterMat = '';
@@ -1147,7 +1149,9 @@ async function doLogout() {
 
 // ── LAUNCH ─────────────────────────────────────────────────────
 async function launchApp(user) {
+  if (_appLaunched) return; // prevent double-launch on token refresh
   try {
+    currentUser = user;
     // Load profile (fast — single row)
     const profileResult = await Promise.race([
       sb.from('profiles').select('*').eq('id', user.id).single(),
@@ -1157,7 +1161,9 @@ async function launchApp(user) {
 
     await loadSettings().catch(() => {});
 
-    // Show app immediately — don't wait for data
+    // Mark as launched before showing UI
+    _appLaunched = true;
+
     document.getElementById('auth-screen').style.display = 'none';
     const app = document.getElementById('app');
     app.classList.add('visible');
@@ -1171,10 +1177,11 @@ async function launchApp(user) {
     showTab('dashboard');
     hideLoading();
 
-    // Load product data in background after app is visible
+    // Load all data in background
     loadAllData().catch(e => showToast('Data load failed: ' + e.message, 'error'));
 
   } catch(e) {
+    _appLaunched = false;
     hideLoading();
     document.getElementById('auth-screen').style.display = 'flex';
     showToast('Launch failed: ' + e.message, 'error');
@@ -2423,7 +2430,7 @@ async function loadCompanySettingsMobile() {
   if (threshEl) threshEl.value = settings.lowStockThreshold || 10;
   // Load AI key
   const aiEl = document.getElementById('s-ai-key');
-  if (aiEl) aiEl.value = localStorage.getItem('bims_anthropic_key') || '';
+  if (aiEl) aiEl.value = (_readLocal ? _readLocal('bims_anthropic_key') : localStorage.getItem('bims_anthropic_key')) || '';
   // Load company settings from settings object
   for (const co of ['bv','is','sw']) {
     try {
@@ -2456,13 +2463,23 @@ async function saveSettingsMobile() {
   } catch(e) { showToast('Failed: '+e.message, 'error'); }
 }
 
+function _storeLocal(k, v) {
+  try { localStorage.setItem(k, v); } catch(e) {}
+  try { sessionStorage.setItem(k, v); } catch(e) {}
+}
+function _readLocal(k) {
+  try { const v = localStorage.getItem(k); if (v) return v; } catch(e) {}
+  try { return sessionStorage.getItem(k) || ''; } catch(e) { return ''; }
+}
+
 function saveAiKey() {
-  const key = document.getElementById('s-ai-key')?.value?.trim();
+  const key = (document.getElementById('s-ai-key')?.value || '').trim();
   if (key) {
-    localStorage.setItem('bims_anthropic_key', key);
+    _storeLocal('bims_anthropic_key', key);
     showToast('AI key saved!', 'success');
   } else {
-    localStorage.removeItem('bims_anthropic_key');
+    try { localStorage.removeItem('bims_anthropic_key'); } catch(e) {}
+    try { sessionStorage.removeItem('bims_anthropic_key'); } catch(e) {}
     showToast('AI key cleared', 'warning');
   }
 }
@@ -2562,10 +2579,10 @@ async function createUserMobile() {
 
 // ── AI INSIGHTS ON DASHBOARD ───────────────────────────────────
 async function generateAiInsightsMobile() {
-  const key = localStorage.getItem('bims_anthropic_key');
+  const key = _readLocal('bims_anthropic_key');
   const el = document.getElementById('ai-insights-content');
   if (!key) {
-    if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Set your Anthropic API key in Settings → AI Settings to use this feature.</div>';
+    if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Go to More → Settings → AI Settings, paste your Anthropic API key and tap Save.</div>';
     return;
   }
   if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">⏳ Generating insights...</div>';
@@ -2597,7 +2614,7 @@ Give actionable insights about inventory health, critical low stock items, and a
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 400,
         messages: [{ role: 'user', content: prompt }]
       })
