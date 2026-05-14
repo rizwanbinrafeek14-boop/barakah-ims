@@ -2267,8 +2267,11 @@ async function handleLogin() {
       if (!_sc) throw new Error('Supabase SDK not loaded. Check your internet connection.');
       sb = _sc(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
     }
-    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     if (error) throw error;
+    // Explicitly launch app — onAuthStateChange only listens for SIGNED_OUT
+    currentUser = data.user;
+    await loadProfile();
   } catch(e) {
     if (errEl) errEl.textContent = String(e.message || 'Login failed.');
     const btn2 = document.querySelector('#auth-screen button');
