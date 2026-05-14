@@ -987,6 +987,10 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span class="nav-label">Customers</span>
       </div>
+      <div class="nav-item admin-only" style="display:none" onclick="showPage('suppliers')" id="nav-suppliers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <span class="nav-label">Suppliers</span>
+      </div>
       <div class="nav-section">Documents</div>
       <div class="nav-item" onclick="showPage('documents')" id="nav-documents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span class="nav-label">Documents</span></div>
       <div class="nav-section">Reports</div>
@@ -1425,6 +1429,32 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
       <div id="po-sql-notice" style="display:none;margin-top:12px" class="alert alert-warn">
         ⚠️ Purchase Orders table not set up yet.
         <button class="btn btn-sm btn-outline" onclick="showPoSqlSetup()" style="margin-left:8px">Show SQL</button>
+      </div>
+    </div>
+
+    <!-- SUPPLIERS PAGE (Admin only) -->
+    <div class="page" id="page-suppliers">
+      <div class="page-header">
+        <div class="page-header-title"><h1>Suppliers</h1><p>Supplier directory — products each supplier carries</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" onclick="showSupplierSqlSetup()" style="font-size:12px;color:var(--text-muted)">⚙️ Setup</button>
+          <button class="btn btn-gold" onclick="openSupplierModal()">+ Add Supplier</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="filter-bar">
+          <input class="search-input" type="text" placeholder="🔍 Search suppliers..." id="supplier-search" oninput="renderSuppliers()">
+        </div>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table><thead><tr>
+            <th>Supplier Name</th><th>Total POs</th><th>Last Order</th><th>Products Supplied</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="suppliers-tbody">
+            <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">Loading suppliers...</td></tr>
+          </tbody></table>
+        </div>
       </div>
     </div>
 
@@ -2083,6 +2113,41 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-receive-po')">Cancel</button>
       <button class="btn btn-gold" onclick="savePoReceipt()">Confirm Receipt</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUPPLIER PRODUCTS VIEWER -->
+<div class="modal-overlay" id="modal-supplier-products">
+  <div class="modal" style="max-width:560px;width:96vw">
+    <div class="modal-title">Products from <span id="supplier-modal-name" style="color:var(--gold)"></span></div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Products this supplier has supplied based on purchase order history.</p>
+    <div id="supplier-products-list" style="max-height:380px;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-supplier-products')">Close</button>
+      <button class="btn btn-gold" id="supplier-new-po-btn" onclick="closeModal('modal-supplier-products');openPoModalWithSupplier()">+ New PO</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD / EDIT SUPPLIER -->
+<div class="modal-overlay" id="modal-supplier">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-title" id="supplier-modal-title">Add Supplier</div>
+    <input type="hidden" id="supp-edit-id">
+    <div class="grid-2">
+      <div class="field"><label>Supplier Name *</label><input type="text" id="supp-name" class="input" placeholder="Company / supplier name"></div>
+      <div class="field"><label>Contact Person</label><input type="text" id="supp-contact" class="input" placeholder="Full name"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Phone</label><input type="tel" id="supp-phone" class="input" placeholder="+966 5X XXX XXXX"></div>
+      <div class="field"><label>Email</label><input type="email" id="supp-email" class="input" placeholder="email@example.com"></div>
+    </div>
+    <div class="field"><label>Products / Categories They Sell</label><textarea id="supp-products-text" class="input" rows="3" placeholder="e.g. Gate valves, ball valves, pipe fittings..."></textarea></div>
+    <div class="field"><label>Notes</label><input type="text" id="supp-notes" class="input" placeholder="Payment terms, lead time, etc."></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-supplier')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveSupplier()">Save Supplier</button>
     </div>
   </div>
 </div>
@@ -2861,7 +2926,7 @@ const PAGE_TITLES = {
   'movement-analysis':'Movement Analysis', documents:'Product Documents',
   reports:'Monthly Reports', 'ai-insights':'AI Insights',
   'activity-log':'Activity Log', users:'User Management', settings:'Settings',
-  'purchase-orders':'Purchase Orders', customers:'Customers'
+  'purchase-orders':'Purchase Orders', customers:'Customers', suppliers:'Suppliers'
 };
 
 function showPage(id) {
@@ -2875,7 +2940,7 @@ function showPage(id) {
   if (isMobileScreen && sidebar && sidebar.classList.contains('open')) {
     closeSidebar();
   }
-  if ((id === 'users' || id === 'settings') && currentProfile?.role !== 'admin') { showPage('dashboard'); return; }
+  if ((id === 'users' || id === 'settings' || id === 'suppliers') && currentProfile?.role !== 'admin') { showPage('dashboard'); return; }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const page = document.getElementById('page-' + id);
@@ -2908,6 +2973,7 @@ function showPage(id) {
   if (id === 'activity-log') { setTimeout(() => { if (typeof loadActivityLog === 'function') loadActivityLog(); }, 30); }
   if (id === 'purchase-orders') { loadPurchaseOrders(); }
   if (id === 'customers') { loadCustomers(); }
+  if (id === 'suppliers') { loadAndRenderSuppliers(); }
 
   // Update bottom nav
   if (typeof updateBottomNav === 'function') updateBottomNav(id);
@@ -10831,17 +10897,34 @@ function openPoModal(editId) {
 
 function editPo(id) { openPoModal(id); }
 
+function poLineProductChange(i, sel) {
+  _poLines[i].product_id = sel.value;
+  _poLines[i].product_name = sel.options[sel.selectedIndex].text;
+  if (sel.value) {
+    const p = allProducts.find(x => x.id === sel.value);
+    if (p && p.price) {
+      _poLines[i].unit_price = p.price;
+      const priceEl = document.getElementById('po-price-' + i);
+      if (priceEl) priceEl.value = p.price;
+    }
+  }
+}
+
 function renderPoLines() {
   const container = document.getElementById('po-lines');
   if (!container) return;
+  if (!allProducts.length) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px">Loading products... Please wait or reload.</p>';
+    return;
+  }
   container.innerHTML = _poLines.map((line, i) => `
     <div style="display:grid;grid-template-columns:1fr 80px 90px 30px;gap:8px;align-items:center;margin-bottom:8px">
-      <select class="input" style="font-size:12px" onchange="_poLines[${i}].product_id=this.value;_poLines[${i}].product_name=this.options[this.selectedIndex].text">
+      <select class="input" style="font-size:12px" onchange="poLineProductChange(${i}, this)">
         <option value="">Select product...</option>
         ${allProducts.map(p=>`<option value="${p.id}" ${line.product_id===p.id?'selected':''}>${p.name}${p.code?' ('+p.code+')':''}</option>`).join('')}
       </select>
-      <input type="number" min="1" value="${line.qty_ordered||1}" class="input" style="font-size:12px" placeholder="Qty" onchange="_poLines[${i}].qty_ordered=parseInt(this.value)||1">
-      <input type="number" min="0" step="0.01" value="${line.unit_price||0}" class="input" style="font-size:12px" placeholder="Price" onchange="_poLines[${i}].unit_price=parseFloat(this.value)||0">
+      <input type="number" min="1" value="${line.qty_ordered||1}" class="input" style="font-size:12px" placeholder="Qty" oninput="_poLines[${i}].qty_ordered=parseInt(this.value)||1">
+      <input type="number" id="po-price-${i}" min="0" step="0.01" value="${line.unit_price||0}" class="input" style="font-size:12px" placeholder="Price" oninput="_poLines[${i}].unit_price=parseFloat(this.value)||0">
       <button type="button" onclick="_poLines.splice(${i},1);renderPoLines()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px">×</button>
     </div>`).join('');
 }
@@ -11016,6 +11099,217 @@ ALTER TABLE purchase_order_lines ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "allow_all" ON purchase_order_lines FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
   const win = window.open('','_blank','width=700,height=500');
+  win.document.write('<pre style="font-family:monospace;padding:20px;background:#1e1e2e;color:#cdd6f4;white-space:pre-wrap">'+sql+'</pre><button onclick="navigator.clipboard.writeText(document.querySelector(\'pre\').textContent);alert(\'Copied!\')" style="margin:10px;padding:8px 16px">Copy SQL</button>');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPPLIERS
+// ═══════════════════════════════════════════════════════════════
+let _supplierList = [];
+let _editingSupplierId = null;
+let _viewingSupplierName = null;
+let allDbSuppliers = [];
+
+async function loadAndRenderSuppliers() {
+  // Load registered suppliers from DB (if table exists), then render combined with PO history
+  try {
+    const { data, error } = await sb.from('suppliers').select('*').order('name');
+    if (!error) allDbSuppliers = data || [];
+  } catch(e) { allDbSuppliers = []; }
+  renderSuppliers();
+}
+
+function renderSuppliers() {
+  const tbody = document.getElementById('suppliers-tbody');
+  if (!tbody) return;
+  const search = (document.getElementById('supplier-search')?.value||'').toLowerCase();
+
+  // Build supplier map from PO history
+  const poMap = {};
+  allPurchaseOrders.forEach(po => {
+    const name = (po.supplier||'').trim();
+    if (!name) return;
+    if (!poMap[name]) poMap[name] = { poCount:0, lastDate:null, products:{} };
+    poMap[name].poCount++;
+    if (!poMap[name].lastDate || po.created_at > poMap[name].lastDate) poMap[name].lastDate = po.created_at;
+    (po.purchase_order_lines||[]).forEach(l => {
+      if (l.product_id && !poMap[name].products[l.product_id]) {
+        poMap[name].products[l.product_id] = l.product_name || allProducts.find(x=>x.id===l.product_id)?.name || 'Unknown';
+      }
+    });
+  });
+
+  // Merge DB suppliers with PO-derived ones
+  const seen = new Set();
+  _supplierList = [];
+
+  // DB suppliers first
+  allDbSuppliers.forEach(s => {
+    const name = s.name;
+    seen.add(name);
+    const po = poMap[name] || { poCount:0, lastDate:null, products:{} };
+    _supplierList.push({ id:s.id, name, contact:s.contact_name, phone:s.phone, email:s.email, notes:s.notes, productsText:s.products_text, poCount:po.poCount, lastDate:po.lastDate, poProducts:po.products, fromDb:true });
+  });
+
+  // PO-derived suppliers not in DB
+  Object.entries(poMap).forEach(([name, po]) => {
+    if (!seen.has(name)) {
+      _supplierList.push({ id:null, name, contact:null, phone:null, email:null, notes:null, productsText:null, poCount:po.poCount, lastDate:po.lastDate, poProducts:po.products, fromDb:false });
+    }
+  });
+
+  _supplierList.sort((a,b) => a.name.localeCompare(b.name));
+
+  const filtered = _supplierList.filter(s => !search || s.name.toLowerCase().includes(search));
+
+  tbody.innerHTML = filtered.length ? filtered.map((s, idx) => {
+    const prodCount = Object.keys(s.poProducts).length;
+    const lastStr = s.lastDate ? new Date(s.lastDate).toLocaleDateString() : '—';
+    return `<tr>
+      <td>
+        <div style="font-weight:500">${s.name}</div>
+        ${s.phone ? `<div style="font-size:11px;color:var(--text-muted)">${s.phone}</div>` : ''}
+      </td>
+      <td class="mono">${s.poCount||0}</td>
+      <td style="font-size:12px">${lastStr}</td>
+      <td style="font-size:13px">${prodCount} product${prodCount!==1?'s':''}</td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap;display:flex;gap:6px;align-items:center">
+        <button class="btn btn-sm btn-outline" onclick="viewSupplierProducts(${_supplierList.indexOf(s)})">View Products</button>
+        ${s.fromDb
+          ? `<button class="btn btn-sm btn-outline" onclick="openSupplierModal('${s.id}')">✏️</button>
+             <button class="btn btn-sm btn-danger" onclick="deleteSupplier('${s.id}','${s.name.replace(/'/g,"\\'")}')">🗑️</button>`
+          : `<button class="btn btn-sm btn-outline" onclick="openSupplierModalWithName('${s.name.replace(/'/g,"\\'")}')">+ Register</button>`
+        }
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">No suppliers found. Create purchase orders or add a supplier manually.</td></tr>';
+}
+
+function viewSupplierProducts(idx) {
+  const s = _supplierList[idx];
+  if (!s) return;
+  _viewingSupplierName = s.name;
+  document.getElementById('supplier-modal-name').textContent = s.name;
+  const poProds = Object.entries(s.poProducts);
+
+  let html = '';
+
+  // Products from PO history
+  if (poProds.length) {
+    html += `<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">From Purchase Orders</div>`;
+    html += poProds.map(([pid, pname]) => {
+      const p = allProducts.find(x=>x.id===pid);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-weight:500;font-size:13px">${p?.name||pname}</div>
+          ${p?.code?`<div style="font-size:11px;color:var(--text-muted)">Code: ${p.code}</div>`:''}
+          ${p?.size?`<div style="font-size:11px;color:var(--text-muted)">Size: ${p.size}</div>`:''}
+        </div>
+        ${p?.price?`<div class="mono" style="color:var(--gold);font-size:13px">SAR ${p.price}</div>`:''}
+      </div>`;
+    }).join('');
+  }
+
+  // Manually noted products/categories
+  if (s.productsText) {
+    html += `<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-top:14px;margin-bottom:8px">Registered Product Categories</div>
+      <div style="font-size:13px;line-height:1.6;padding:10px;background:var(--surface2);border-radius:6px">${s.productsText}</div>`;
+  }
+
+  if (!poProds.length && !s.productsText) {
+    html = '<p style="text-align:center;padding:28px;color:var(--text-muted)">No products recorded yet for this supplier.</p>';
+  }
+
+  document.getElementById('supplier-products-list').innerHTML = html;
+  openModal('modal-supplier-products');
+}
+
+function openPoModalWithSupplier() {
+  openPoModal();
+  if (_viewingSupplierName) {
+    setTimeout(() => { const el = document.getElementById('po-supplier'); if (el) el.value = _viewingSupplierName; }, 50);
+  }
+}
+
+function openSupplierModal(editId) {
+  editId = editId || null;
+  _editingSupplierId = editId;
+  const s = editId ? allDbSuppliers.find(x=>x.id===editId) : null;
+  document.getElementById('supplier-modal-title').textContent = editId ? 'Edit Supplier' : 'Add Supplier';
+  document.getElementById('supp-edit-id').value = editId||'';
+  document.getElementById('supp-name').value = s?.name||'';
+  document.getElementById('supp-contact').value = s?.contact_name||'';
+  document.getElementById('supp-phone').value = s?.phone||'';
+  document.getElementById('supp-email').value = s?.email||'';
+  document.getElementById('supp-products-text').value = s?.products_text||'';
+  document.getElementById('supp-notes').value = s?.notes||'';
+  openModal('modal-supplier');
+}
+
+function openSupplierModalWithName(name) {
+  openSupplierModal();
+  setTimeout(() => { const el = document.getElementById('supp-name'); if (el) el.value = name; }, 50);
+}
+
+async function saveSupplier() {
+  const name = document.getElementById('supp-name')?.value.trim();
+  if (!name) { showToast('Enter supplier name','error'); return; }
+  showLoading('SAVING...');
+  try {
+    const data = {
+      name,
+      contact_name: document.getElementById('supp-contact')?.value.trim()||null,
+      phone:        document.getElementById('supp-phone')?.value.trim()||null,
+      email:        document.getElementById('supp-email')?.value.trim()||null,
+      products_text:document.getElementById('supp-products-text')?.value.trim()||null,
+      notes:        document.getElementById('supp-notes')?.value.trim()||null,
+      updated_at:   new Date().toISOString()
+    };
+    if (_editingSupplierId) {
+      await sb.from('suppliers').update(data).eq('id', _editingSupplierId);
+      const idx = allDbSuppliers.findIndex(x=>x.id===_editingSupplierId);
+      if (idx>=0) Object.assign(allDbSuppliers[idx], data);
+    } else {
+      data.created_by = currentProfile?.id;
+      const { data: created } = await sb.from('suppliers').insert(data).select().single();
+      if (created) allDbSuppliers.push(created);
+    }
+    renderSuppliers();
+    hideLoading();
+    closeModal('modal-supplier');
+    showToast('Supplier saved!');
+  } catch(e) { hideLoading(); showToast('Save failed: '+e.message,'error'); }
+}
+
+async function deleteSupplier(id, name) {
+  if (!confirm('Delete supplier "'+name+'"?')) return;
+  showLoading('DELETING...');
+  try {
+    await sb.from('suppliers').delete().eq('id', id);
+    allDbSuppliers = allDbSuppliers.filter(x=>x.id!==id);
+    renderSuppliers();
+    hideLoading();
+    showToast('Supplier deleted');
+  } catch(e) { hideLoading(); showToast('Delete failed: '+e.message,'error'); }
+}
+
+function showSupplierSqlSetup() {
+  const sql = `-- Run in Supabase SQL Editor:
+CREATE TABLE IF NOT EXISTS suppliers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  contact_name TEXT,
+  phone TEXT,
+  email TEXT,
+  products_text TEXT,
+  notes TEXT,
+  created_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_all" ON suppliers FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
+  const win = window.open('','_blank','width=700,height=420');
   win.document.write('<pre style="font-family:monospace;padding:20px;background:#1e1e2e;color:#cdd6f4;white-space:pre-wrap">'+sql+'</pre><button onclick="navigator.clipboard.writeText(document.querySelector(\'pre\').textContent);alert(\'Copied!\')" style="margin:10px;padding:8px 16px">Copy SQL</button>');
 }
 
