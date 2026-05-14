@@ -1306,6 +1306,9 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
         <div class="page-header-title"><h1>AI Insights</h1><p>Smart inventory recommendations</p></div>
         <button class="btn btn-gold" onclick="generateAiInsights()">↻ Refresh</button>
       </div>
+      <div id="ai-content"></div>
+    </div>
+
     <!-- ACTIVITY LOG PAGE -->
     <div class="page" id="page-activity-log">
       <div class="page-header">
@@ -1315,9 +1318,6 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
         </div>
         <button class="btn btn-outline" onclick="loadActivityLog()" style="font-size:12px">🔄 Refresh</button>
       </div>
-    <!-- PURCHASE ORDERS PAGE -->
-    
-
 
       <!-- Filters -->
       <div class="card" style="margin-bottom:14px">
@@ -1370,8 +1370,6 @@ body.sidebar-hidden .main    { margin-left: 0 !important; }
         ⚠️ Activity log table not set up yet.
         <button class="btn btn-sm btn-outline" onclick="showActivitySqlSetup()" style="margin-left:8px">Show SQL</button>
       </div>
-    </div>
-      <div id="ai-content"></div>
     </div>
 
     <!-- USERS (Admin only) -->
@@ -2526,14 +2524,33 @@ async function launchApp() {
   hideLoading();
   showPage('dashboard');
 
-  // Load all data in background — don't block the UI
+  // Load all data in background — re-render current page when done
+  const _syncBadge = document.createElement('div');
+  _syncBadge.id = 'sync-badge';
+  _syncBadge.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:9999;background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:7px 14px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.25);letter-spacing:.5px;opacity:.92';
+  _syncBadge.textContent = '⟳ Syncing data...';
+  document.body.appendChild(_syncBadge);
+
   Promise.all([
     preloadData().catch(e => console.warn('preloadData error:', e)),
     loadPhotoLibrary().then(()=>{ renderLibraryGrid(); ensurePhotoLibraryTable(); }).catch(()=>{}),
     loadActivityLog().catch(()=>{}),
     Promise.resolve().then(()=>{ updateCatNavBadges(); if(typeof loadCatMatrix==='function') loadCatMatrix(); }),
     logActivity('login','Logged in').catch(()=>{}),
-  ]).then(() => { populateMonthFilter(); }).catch(()=>{});
+  ]).then(() => {
+    populateMonthFilter();
+    // Re-render the active page now that data is loaded
+    const activePage = document.querySelector('.page.active');
+    if (activePage) {
+      const pid = activePage.id.replace('page-', '');
+      if (pid === 'dashboard') renderDashboard();
+      else if (pid === 'inventory') renderInventory();
+      else if (pid === 'low-stock') renderLowStock();
+    }
+    _syncBadge.textContent = '✓ Data loaded';
+    _syncBadge.style.background = 'var(--green)';
+    setTimeout(() => { _syncBadge.remove(); }, 2000);
+  }).catch(() => { _syncBadge.remove(); });
 }
 
 async function preloadData() {
