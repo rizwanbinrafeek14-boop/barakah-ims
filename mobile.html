@@ -1055,12 +1055,41 @@ async function init() {
       auth: { storage: _safeStorage, persistSession: true, autoRefreshToken: true }
     });
 
-    // Listen for auth
+    // Listen for auth state changes
     sb.auth.onAuthStateChange(async (event, session) => {
       clearTimeout(safetyTimer);
-      if (session?.user) {
-        await launchApp(session.user);
-      } else {
+
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session?.user && !_appLaunched) {
+          await launchApp(session.user);
+        }
+        // TOKEN_REFRESHED / SIGNED_IN while app already running — just update user
+        if (session?.user && _appLaunched) {
+          currentUser = session.user;
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        if (session?.user) currentUser = session.user;
+      } else if (event === 'SIGNED_OUT') {
+        // Only truly sign out if this wasn't a forced page refresh
+        // Try to recover the session once before giving up
+        if (_appLaunched) {
+          try {
+            const { data: recovered } = await sb.auth.getSession();
+            if (recovered?.session?.user) {
+              currentUser = recovered.session.user;
+              return; // Session recovered — stay in app
+            }
+          } catch(e) {}
+          // Genuine sign-out
+          _appLaunched = false;
+          currentUser = null; currentProfile = null;
+          hideLoading();
+          document.getElementById('auth-screen').style.display = 'flex';
+        } else {
+          hideLoading();
+          document.getElementById('auth-screen').style.display = 'flex';
+        }
+      } else if (!session?.user && !_appLaunched) {
         hideLoading();
         document.getElementById('auth-screen').style.display = 'flex';
       }
