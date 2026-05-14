@@ -828,13 +828,25 @@ async function init() {
     const errEl = document.getElementById('login-error');
     if (errEl && !errEl.textContent) errEl.textContent = 'Connection timed out. Check your internet.';
     document.getElementById('auth-screen').style.display = 'flex';
-  }, 15000);
+  }, 5000);
 
   try {
-    // Init Supabase
+    // Init Supabase with safe storage (Edge Tracking Prevention workaround)
     const _sc = window.supabase?.createClient || window.supabase?.default?.createClient;
     if (!_sc) throw new Error('Supabase SDK not loaded');
-    sb = _sc(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let _safeStorage = window.localStorage;
+    try { localStorage.setItem('__bims_test__', '1'); localStorage.removeItem('__bims_test__'); }
+    catch(_) {
+      const _mem = {};
+      _safeStorage = {
+        getItem:    k => { try { return sessionStorage.getItem(k); } catch(e) { return _mem[k] ?? null; } },
+        setItem:    (k,v) => { try { sessionStorage.setItem(k,v); } catch(e) { _mem[k] = v; } },
+        removeItem: k => { try { sessionStorage.removeItem(k); } catch(e) { delete _mem[k]; } }
+      };
+    }
+    sb = _sc(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { storage: _safeStorage, persistSession: true, autoRefreshToken: true }
+    });
 
     // Listen for auth
     sb.auth.onAuthStateChange(async (event, session) => {
@@ -868,10 +880,24 @@ async function handleLogin() {
     if (!sb) {
       const _sc = window.supabase?.createClient || window.supabase?.default?.createClient;
       if (!_sc) throw new Error('Supabase SDK not loaded. Check connection.');
-      sb = _sc(SUPABASE_URL, SUPABASE_ANON_KEY);
+      let _safeStorage = window.localStorage;
+      try { localStorage.setItem('__bims_test__', '1'); localStorage.removeItem('__bims_test__'); }
+      catch(_) {
+        const _mem = {};
+        _safeStorage = {
+          getItem:    k => { try { return sessionStorage.getItem(k); } catch(e) { return _mem[k] ?? null; } },
+          setItem:    (k,v) => { try { sessionStorage.setItem(k,v); } catch(e) { _mem[k] = v; } },
+          removeItem: k => { try { sessionStorage.removeItem(k); } catch(e) { delete _mem[k]; } }
+        };
+      }
+      sb = _sc(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { storage: _safeStorage, persistSession: true, autoRefreshToken: true } });
     }
-    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     if (error) throw error;
+    // Explicitly launch — onAuthStateChange may not fire in Edge with tracking prevention
+    showLoading('LOADING...');
+    document.getElementById('auth-screen').style.display = 'none';
+    await launchApp(data.user);
   } catch(e) {
     if (errEl) errEl.textContent = '⚠️ ' + (e.message || 'Login failed');
     if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
@@ -911,6 +937,7 @@ async function launchApp(user) {
     hideLoading();
   } catch(e) {
     hideLoading();
+    document.getElementById('auth-screen').style.display = 'flex';
     showToast('Launch failed: ' + e.message, 'error');
   }
 }
