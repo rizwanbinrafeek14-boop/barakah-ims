@@ -532,24 +532,23 @@ input,select,textarea,button{font-family:var(--font)}
     </div>
     <div class="field-row">
       <div class="field"><label>Category</label><input id="sp-cat" placeholder="e.g. Valves"></div>
+      <div class="field"><label>Material</label><input id="sp-material" placeholder="e.g. CS, SS"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Size</label><input id="sp-size" placeholder="e.g. 2 inch"></div>
       <div class="field"><label>Unit</label><input id="sp-unit" placeholder="PCS"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Cost Price (SAR)</label><input id="sp-cost" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="field"><label>Sell Price (SAR)</label><input id="sp-sell" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Price (SAR)</label><input id="sp-price" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Min Qty (Reorder)</label><input id="sp-min" type="number" min="0" placeholder="10"></div>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Current Stock</label><input id="sp-stock" type="number" min="0" placeholder="0"></div>
-      <div class="field"><label>Min Stock (Reorder)</label><input id="sp-min" type="number" min="0" placeholder="5"></div>
+    <div class="section-hd">Stock Qty per Company</div>
+    <div class="field-row-3">
+      <div class="field"><label>Barakah Valves</label><input id="sp-qty-bv" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>Iron Spring</label><input id="sp-qty-is" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>Stable Way</label><input id="sp-qty-sw" type="number" min="0" placeholder="0"></div>
     </div>
     <div class="field"><label>Description</label><textarea id="sp-desc" placeholder="Optional description…"></textarea></div>
-    <div class="field"><label>Company</label>
-      <select id="sp-co">
-        <option value="bv">Barakah Valves</option>
-        <option value="is">Iron Spring</option>
-        <option value="sw">Stable Way</option>
-      </select>
-    </div>
   </div>
   <div class="sheet-footer">
     <button class="sheet-btn secondary" onclick="closeSheet('sheet-product')">Cancel</button>
@@ -982,7 +981,7 @@ async function loadAllData() {
 }
 
 async function loadProducts() {
-  const { data } = await sb.from('products').select('*').eq('company', currentCo).order('name');
+  const { data } = await sb.from('products').select('*').order('name');
   allProducts = data || [];
   populateCategoryFilter();
 }
@@ -1011,7 +1010,7 @@ async function loadSuppliers() {
 }
 
 async function loadMovements() {
-  const { data } = await sb.from('stock_movements').select('*, products(name,code)').eq('company', currentCo).order('created_at', { ascending: false }).limit(200);
+  const { data } = await sb.from('stock_movements').select('*, products(name,code)').order('created_at', { ascending: false }).limit(300);
   allMovements = data || [];
 }
 
@@ -1105,19 +1104,26 @@ function updateCoUI() {
 }
 async function switchCompany(co) {
   currentCo = co; _writeLocal('currentCo', co); hideCoModal(); updateCoUI();
-  await loadAllData();
+  // Products are global (all companies share one table); POs/quotations/etc. are per-company
+  showLoading('Switching…');
+  await Promise.all([loadPOs(), loadQuotations(), loadCustomers(), loadSuppliers(), loadMovements()]);
+  hideLoading();
   navTo(currentPage);
 }
 
 // ─── DASHBOARD ───
+function pTotal(p) { return (p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0); }
+function pCoQty(p, co) { return p['qty_'+co]||0; }
+function pIsLow(p) { const t = parseInt(settings.lowStockThreshold||10); return (p.qty_bv||0)<t && (p.qty_is||0)<t && (p.qty_sw||0)<t; }
+
 function renderDashboard() {
-  const lowStockItems = allProducts.filter(p => p.stock_qty <= p.min_stock);
-  const totalValue = allProducts.reduce((a, p) => a + (p.stock_qty || 0) * (p.cost_price || 0), 0);
+  const lowStockItems = allProducts.filter(pIsLow);
+  const totalValue = allProducts.reduce((a, p) => a + pTotal(p) * (p.price || 0), 0);
   const openPOs = allPOs.filter(p => p.status === 'draft' || p.status === 'sent').length;
   document.getElementById('dash-stats').innerHTML = `
     <div class="stat-card accent"><div class="label">Products</div><div class="value accent">${allProducts.length}</div><div class="sub">Total SKUs</div></div>
     <div class="stat-card warning"><div class="label">Low Stock</div><div class="value warning">${lowStockItems.length}</div><div class="sub">Need reorder</div></div>
-    <div class="stat-card success"><div class="label">Stock Value</div><div class="value success" style="font-size:18px">SAR ${totalValue.toLocaleString('en-SA',{minimumFractionDigits:0,maximumFractionDigits:0})}</div><div class="sub">At cost</div></div>
+    <div class="stat-card success"><div class="label">Stock Value</div><div class="value success" style="font-size:18px">SAR ${totalValue.toLocaleString('en-SA',{minimumFractionDigits:0,maximumFractionDigits:0})}</div><div class="sub">All companies</div></div>
     <div class="stat-card"><div class="label">Open POs</div><div class="value">${openPOs}</div><div class="sub">Pending</div></div>`;
 
   const lowEl = document.getElementById('dash-lowstock');
@@ -1127,7 +1133,7 @@ function renderDashboard() {
       <div class="list-item" onclick="openProductSheet(${JSON.stringify(p).replace(/"/g,'&quot;')})">
         <div class="item-icon">📦</div>
         <div class="item-body"><div class="item-name">${p.name}</div><div class="item-sub">${p.code||''}</div></div>
-        <div class="item-right"><div class="item-value" style="color:var(--danger)">${p.stock_qty}</div><div style="font-size:11px;color:var(--text3)">min ${p.min_stock}</div></div>
+        <div class="item-right"><div class="item-value" style="color:var(--danger)">${pTotal(p)}</div><div style="font-size:11px;color:var(--text3)">min ${p.min_qty||10}</div></div>
       </div>`).join('');
   }
 
@@ -1147,9 +1153,9 @@ function renderDashboard() {
   else {
     movEl.innerHTML = allMovements.slice(0,4).map(m => `
       <div class="list-item">
-        <div class="item-icon">${m.movement_type==='in'?'📥':m.movement_type==='out'?'📤':'🔄'}</div>
-        <div class="item-body"><div class="item-name">${m.products?.name||'—'}</div><div class="item-sub">${m.movement_type} · ${new Date(m.created_at).toLocaleDateString()}</div></div>
-        <div class="item-right"><div class="item-value" style="color:${m.movement_type==='in'?'var(--success)':'var(--danger)'}">${m.movement_type==='in'?'+':'-'}${m.qty}</div></div>
+        <div class="item-icon">${m.type==='in'?'📥':m.type==='out'?'📤':'🔄'}</div>
+        <div class="item-body"><div class="item-name">${m.products?.name||'—'}</div><div class="item-sub">${m.type} · ${(m.company||'').toUpperCase()} · ${new Date(m.created_at).toLocaleDateString()}</div></div>
+        <div class="item-right"><div class="item-value" style="color:${m.type==='in'?'var(--success)':'var(--danger)'}">${m.type==='in'?'+':'-'}${m.qty}</div></div>
       </div>`).join('');
   }
 }
@@ -1157,33 +1163,48 @@ function renderDashboard() {
 // ─── INVENTORY ───
 function populateCategoryFilter() {
   const cats = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+  const mats = [...new Set(allProducts.map(p => p.material).filter(Boolean))].sort();
   const sel = document.getElementById('inv-cat');
   if (!sel) return;
   const cur = sel.value;
-  sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+  sel.innerHTML = '<option value="">All Categories</option>' +
+    cats.map(c => `<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('') +
+    (mats.length ? '<option disabled>── Materials ──</option>' + mats.map(m => `<option value="_mat_${m}"${('_mat_'+m)===cur?' selected':''}>${m}</option>`).join('') : '');
+}
+
+function filterByCategory(p, cat) {
+  if (!cat) return true;
+  if (cat.startsWith('_mat_')) return p.material === cat.slice(5);
+  return p.category === cat;
 }
 
 function renderInventory() {
   const q = (document.getElementById('inv-search')?.value || '').toLowerCase();
   const cat = document.getElementById('inv-cat')?.value || '';
   let items = allProducts.filter(p => {
-    if (cat && p.category !== cat) return false;
-    if (q && !p.name.toLowerCase().includes(q) && !(p.code||'').toLowerCase().includes(q)) return false;
+    if (cat && !filterByCategory(p, cat)) return false;
+    if (q && !p.name.toLowerCase().includes(q) && !(p.code||'').toLowerCase().includes(q) && !(p.material||'').toLowerCase().includes(q) && !(p.size||'').toLowerCase().includes(q)) return false;
     return true;
   });
   const el = document.getElementById('inv-list');
   if (!items.length) { el.innerHTML = '<div class="empty-state"><div class="icon">📦</div><p>No products found</p></div>'; return; }
   el.innerHTML = items.map(p => {
-    const isLow = p.stock_qty <= p.min_stock;
+    const total = pTotal(p);
+    const isLow = pIsLow(p);
     return `<div class="list-item" onclick="openProductSheet(${JSON.stringify(p).replace(/"/g,'&quot;')})">
       <div class="item-icon">${isLow?'⚠️':'📦'}</div>
       <div class="item-body">
         <div class="item-name">${p.name}</div>
-        <div class="item-sub">${[p.code,p.category].filter(Boolean).join(' · ')}</div>
+        <div class="item-sub">${[p.code,p.material,p.size].filter(Boolean).join(' · ')}</div>
+        <div style="display:flex;gap:6px;margin-top:3px">
+          <span style="font-size:10px;background:rgba(37,99,235,.2);color:#3b82f6;padding:1px 5px;border-radius:4px">BV:${p.qty_bv||0}</span>
+          <span style="font-size:10px;background:rgba(220,38,38,.2);color:#ef4444;padding:1px 5px;border-radius:4px">IS:${p.qty_is||0}</span>
+          <span style="font-size:10px;background:rgba(42,95,117,.2);color:#2a5f75;padding:1px 5px;border-radius:4px">SW:${p.qty_sw||0}</span>
+        </div>
       </div>
       <div class="item-right">
-        <div class="item-value" style="color:${isLow?'var(--danger)':'var(--text)'}">${p.stock_qty} <span style="font-size:11px;color:var(--text3)">${p.unit||'PCS'}</span></div>
-        <div style="font-size:11px;color:var(--text3)">SAR ${Number(p.sell_price||0).toFixed(2)}</div>
+        <div class="item-value" style="color:${isLow?'var(--danger)':'var(--text)';font-weight:700">${total} <span style="font-size:11px;color:var(--text3)">${p.unit||'PCS'}</span></div>
+        <div style="font-size:11px;color:var(--text3)">SAR ${Number(p.price||0).toFixed(2)}</div>
       </div>
     </div>`;
   }).join('');
@@ -1195,13 +1216,15 @@ function openProductSheet(product) {
   document.getElementById('sp-name').value = product?.name || '';
   document.getElementById('sp-code').value = product?.code || '';
   document.getElementById('sp-cat').value = product?.category || '';
+  document.getElementById('sp-material').value = product?.material || '';
+  document.getElementById('sp-size').value = product?.size || '';
   document.getElementById('sp-unit').value = product?.unit || 'PCS';
-  document.getElementById('sp-cost').value = product?.cost_price || '';
-  document.getElementById('sp-sell').value = product?.sell_price || '';
-  document.getElementById('sp-stock').value = product?.stock_qty ?? '';
-  document.getElementById('sp-min').value = product?.min_stock ?? '';
+  document.getElementById('sp-price').value = product?.price || '';
+  document.getElementById('sp-min').value = product?.min_qty ?? '10';
+  document.getElementById('sp-qty-bv').value = product?.qty_bv ?? '0';
+  document.getElementById('sp-qty-is').value = product?.qty_is ?? '0';
+  document.getElementById('sp-qty-sw').value = product?.qty_sw ?? '0';
   document.getElementById('sp-desc').value = product?.description || '';
-  document.getElementById('sp-co').value = product?.company || currentCo;
   document.getElementById('sp-delete-btn').style.display = product ? '' : 'none';
   openSheet('sheet-product');
 }
@@ -1210,21 +1233,26 @@ async function saveProduct() {
   const name = document.getElementById('sp-name').value.trim();
   if (!name) { showToast('Product name required', 'error'); return; }
   const payload = {
-    name, code: document.getElementById('sp-code').value.trim() || null,
+    name,
+    code: document.getElementById('sp-code').value.trim() || null,
     category: document.getElementById('sp-cat').value.trim() || null,
+    material: document.getElementById('sp-material').value.trim() || null,
+    size: document.getElementById('sp-size').value.trim() || null,
     unit: document.getElementById('sp-unit').value.trim() || 'PCS',
-    cost_price: parseFloat(document.getElementById('sp-cost').value) || 0,
-    sell_price: parseFloat(document.getElementById('sp-sell').value) || 0,
-    stock_qty: parseInt(document.getElementById('sp-stock').value) || 0,
-    min_stock: parseInt(document.getElementById('sp-min').value) || 0,
+    price: parseFloat(document.getElementById('sp-price').value) || 0,
+    min_qty: parseInt(document.getElementById('sp-min').value) || 10,
+    qty_bv: parseInt(document.getElementById('sp-qty-bv').value) || 0,
+    qty_is: parseInt(document.getElementById('sp-qty-is').value) || 0,
+    qty_sw: parseInt(document.getElementById('sp-qty-sw').value) || 0,
     description: document.getElementById('sp-desc').value.trim() || null,
-    company: document.getElementById('sp-co').value,
+    updated_at: new Date().toISOString(),
   };
   showLoading('Saving…');
   let err;
   if (editingProductId) {
     ({ error: err } = await sb.from('products').update(payload).eq('id', editingProductId));
   } else {
+    payload.created_by = currentUser.id;
     ({ error: err } = await sb.from('products').insert(payload));
   }
   hideLoading();
@@ -1268,16 +1296,18 @@ async function saveAdjustment() {
   if (!adjustingProductId) { showToast('No product selected', 'error'); return; }
   showLoading('Saving…');
   const { error: me } = await sb.from('stock_movements').insert({
-    product_id: adjustingProductId, movement_type: type, qty,
+    product_id: adjustingProductId, type, qty,
     notes: notes || null, company: currentCo, created_by: currentUser.id
   });
   if (me) { hideLoading(); showToast(me.message, 'error'); return; }
   const product = allProducts.find(p => p.id === adjustingProductId);
-  let newStock = (product?.stock_qty || 0);
-  if (type === 'in') newStock += qty;
-  else if (type === 'out') newStock = Math.max(0, newStock - qty);
-  else newStock = qty;
-  await sb.from('products').update({ stock_qty: newStock }).eq('id', adjustingProductId);
+  const qtyKey = 'qty_' + currentCo;
+  let cur = product?.[qtyKey] || 0;
+  let newQty;
+  if (type === 'in') newQty = cur + qty;
+  else if (type === 'out') newQty = Math.max(0, cur - qty);
+  else newQty = qty;
+  await sb.from('products').update({ [qtyKey]: newQty, updated_at: new Date().toISOString() }).eq('id', adjustingProductId);
   hideLoading();
   showToast('Adjustment saved', 'success');
   closeSheet('sheet-adjust');
@@ -1368,8 +1398,10 @@ async function saveReceive() {
     if (qty < ordered) allReceived = false;
     if (qty > 0 && inp.dataset.productId) {
       const prod = allProducts.find(p => p.id === inp.dataset.productId);
-      if (prod) await sb.from('products').update({ stock_qty: (prod.stock_qty||0) + qty }).eq('id', prod.id);
-      await sb.from('stock_movements').insert({ product_id: inp.dataset.productId, movement_type: 'in', qty, notes: 'Received from PO: ' + currentPODetail.po_no, company: currentCo, created_by: currentUser.id });
+      const co = currentPODetail.company || currentCo;
+      const qtyKey = 'qty_' + co;
+      if (prod) await sb.from('products').update({ [qtyKey]: (prod[qtyKey]||0) + qty, updated_at: new Date().toISOString() }).eq('id', prod.id);
+      await sb.from('stock_movements').insert({ product_id: inp.dataset.productId, type: 'in', qty, reference: currentPODetail.po_no, notes: 'PO Receipt', company: co, created_by: currentUser.id });
       await sb.from('purchase_order_lines').update({ qty_received: qty }).eq('id', inp.dataset.lineId);
     }
   }
@@ -1759,36 +1791,45 @@ function renderMovements() {
   const q = (document.getElementById('mov-search')?.value || '').toLowerCase();
   const type = document.getElementById('mov-type')?.value || '';
   let items = allMovements.filter(m => {
-    if (type && m.movement_type !== type) return false;
+    if (type && m.type !== type) return false;
     if (q && !(m.products?.name||'').toLowerCase().includes(q) && !(m.notes||'').toLowerCase().includes(q)) return false;
     return true;
   });
   const el = document.getElementById('mov-list');
   if (!items.length) { el.innerHTML = '<div class="empty-state"><div class="icon">📦</div><p>No movements found</p></div>'; return; }
   el.innerHTML = items.map(m => `
-    <div class="list-item" onclick="openAdjustSheet(allProducts.find(p=>p.id==='${m.product_id}'))">
-      <div class="item-icon">${m.movement_type==='in'?'📥':m.movement_type==='out'?'📤':'🔄'}</div>
+    <div class="list-item">
+      <div class="item-icon">${m.type==='in'?'📥':m.type==='out'?'📤':'🔄'}</div>
       <div class="item-body">
         <div class="item-name">${m.products?.name||'Unknown'}</div>
-        <div class="item-sub">${m.movement_type} · ${new Date(m.created_at).toLocaleDateString()}${m.notes?' · '+m.notes:''}</div>
+        <div class="item-sub">${m.type} · ${(m.company||'').toUpperCase()} · ${new Date(m.created_at).toLocaleDateString()}${m.notes?' · '+m.notes:''}</div>
       </div>
-      <div class="item-right"><div class="item-value" style="color:${m.movement_type==='in'?'var(--success)':'var(--danger)'}">${m.movement_type==='in'?'+':'-'}${m.qty}</div></div>
+      <div class="item-right"><div class="item-value" style="color:${m.type==='in'?'var(--success)':'var(--danger)'}">${m.type==='in'?'+':'-'}${m.qty}</div></div>
     </div>`).join('');
 }
 
 // ─── LOW STOCK ───
 function renderLowStock() {
-  const items = allProducts.filter(p => p.stock_qty <= p.min_stock).sort((a,b) => (a.stock_qty/Math.max(a.min_stock,1)) - (b.stock_qty/Math.max(b.min_stock,1)));
+  const t = parseInt(settings.lowStockThreshold||10);
+  const items = allProducts.filter(pIsLow).sort((a,b) => pTotal(a) - pTotal(b));
   const el = document.getElementById('lowstock-list');
   if (!items.length) { el.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>All products are well-stocked!</p></div>'; return; }
   el.innerHTML = `<div class="card"><div class="card-header"><span class="card-title">${items.length} item${items.length!==1?'s':''} need reorder</span></div>` +
     items.map(p => `
     <div class="list-item" onclick="openProductSheet(${JSON.stringify(p).replace(/"/g,'&quot;')})">
       <div class="item-icon">⚠️</div>
-      <div class="item-body"><div class="item-name">${p.name}</div><div class="item-sub">${p.code||''} · ${p.category||''}</div></div>
+      <div class="item-body">
+        <div class="item-name">${p.name}</div>
+        <div class="item-sub">${p.code||''} · ${p.category||''}</div>
+        <div style="display:flex;gap:6px;margin-top:3px">
+          <span style="font-size:10px;background:rgba(37,99,235,.2);color:#3b82f6;padding:1px 5px;border-radius:4px">BV:${p.qty_bv||0}</span>
+          <span style="font-size:10px;background:rgba(220,38,38,.2);color:#ef4444;padding:1px 5px;border-radius:4px">IS:${p.qty_is||0}</span>
+          <span style="font-size:10px;background:rgba(42,95,117,.2);color:#2a5f75;padding:1px 5px;border-radius:4px">SW:${p.qty_sw||0}</span>
+        </div>
+      </div>
       <div class="item-right">
-        <div class="item-value" style="color:var(--danger)">${p.stock_qty} / ${p.min_stock}</div>
-        <div style="font-size:11px;color:var(--text3)">current / min</div>
+        <div class="item-value" style="color:var(--danger)">${pTotal(p)}</div>
+        <div style="font-size:11px;color:var(--text3)">total · min ${p.min_qty||t}</div>
       </div>
     </div>`).join('') + '</div>';
 }
@@ -1796,22 +1837,25 @@ function renderLowStock() {
 // ─── REPORTS ───
 function renderReports() {
   const el = document.getElementById('reports-inner');
-  const totalStock = allProducts.reduce((a,p) => a + (p.stock_qty||0)*(p.cost_price||0), 0);
-  const totalSellValue = allProducts.reduce((a,p) => a + (p.stock_qty||0)*(p.sell_price||0), 0);
-  const lowStockCount = allProducts.filter(p => p.stock_qty <= p.min_stock).length;
+  const totalStock = allProducts.reduce((a,p) => a + pTotal(p)*(p.price||0), 0);
+  const bvStock = allProducts.reduce((a,p) => a + (p.qty_bv||0), 0);
+  const isStock = allProducts.reduce((a,p) => a + (p.qty_is||0), 0);
+  const swStock = allProducts.reduce((a,p) => a + (p.qty_sw||0), 0);
+  const lowStockCount = allProducts.filter(pIsLow).length;
   const totalPOValue = allPOs.reduce((a, po) => { const lines = po.purchase_order_lines||[]; return a + lines.reduce((b,l)=>b+(l.qty_ordered||0)*(l.unit_price||0),0); }, 0);
   const totalQtValue = allQuotations.reduce((a, qt) => { const lines = qt.quotation_lines||[]; return a + lines.reduce((b,l)=>b+(l.qty||0)*(l.unit_price||0),0); }, 0);
   const catMap = {};
-  allProducts.forEach(p => { const c = p.category||'Uncategorised'; catMap[c] = (catMap[c]||0) + (p.stock_qty||0)*(p.cost_price||0); });
+  allProducts.forEach(p => { const c = p.category||'Uncategorised'; catMap[c] = (catMap[c]||0) + pTotal(p)*(p.price||0); });
 
   el.innerHTML = `
     <div class="report-section">
       <h3>Inventory Summary</h3>
       <div class="card">
         <div class="kv-row"><span class="k">Total SKUs</span><span class="v">${allProducts.length}</span></div>
-        <div class="kv-row"><span class="k">Stock Value (Cost)</span><span class="v">SAR ${totalStock.toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
-        <div class="kv-row"><span class="k">Stock Value (Sell)</span><span class="v">SAR ${totalSellValue.toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
-        <div class="kv-row"><span class="k">Potential Profit</span><span class="v" style="color:var(--success)">SAR ${(totalSellValue-totalStock).toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
+        <div class="kv-row"><span class="k">Total Stock Value</span><span class="v">SAR ${totalStock.toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
+        <div class="kv-row"><span class="k">BV Stock (units)</span><span class="v" style="color:#3b82f6">${bvStock}</span></div>
+        <div class="kv-row"><span class="k">IS Stock (units)</span><span class="v" style="color:#ef4444">${isStock}</span></div>
+        <div class="kv-row"><span class="k">SW Stock (units)</span><span class="v" style="color:#2a5f75">${swStock}</span></div>
         <div class="kv-row"><span class="k">Low Stock Items</span><span class="v" style="color:var(--danger)">${lowStockCount}</span></div>
       </div>
     </div>
