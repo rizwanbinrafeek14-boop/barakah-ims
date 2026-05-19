@@ -2879,6 +2879,7 @@ async function preloadData() {
       from += PAGE;
     }
     allProducts = allProds;
+    updateCatNavBadges();
 
     // Movements and quotations — use allSettled so one failure doesn't kill both
     const [mRes, qRes] = await Promise.allSettled([
@@ -2901,6 +2902,15 @@ async function preloadData() {
     if (!allQuotations.length) allQuotations = [];
   }
   checkLowStock();
+}
+
+function updateCatNavBadges() {
+  const counts = {};
+  allProducts.forEach(p => { if (p.material) counts[p.material] = (counts[p.material] || 0) + 1; });
+  Object.entries(counts).forEach(([mat, n]) => {
+    const el = document.getElementById('nav-badge-' + mat);
+    if (el) el.textContent = n;
+  });
 }
 
 async function loadSettings() {
