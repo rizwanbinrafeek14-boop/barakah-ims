@@ -3145,10 +3145,11 @@ function renderProductCard(p, threshold) {
     <div class="product-card-body">
       <div class="product-card-name">${p.name}</div>
       <div class="product-card-code">${p.code||''} · ${p.material||''}</div>
-      <div style="display:flex;gap:4px;margin-bottom:6px">
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">
         <span class="qty-tag qty-bv">BV:${p.qty_bv||0}</span>
         <span class="qty-tag qty-is">IS:${p.qty_is||0}</span>
         <span class="qty-tag qty-sw">SW:${p.qty_sw||0}</span>
+        <span class="qty-tag" style="background:rgba(212,175,55,.15);color:var(--gold);border-color:rgba(212,175,55,.3);font-weight:700">∑${total}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><div class="stock-bar-wrap" style="width:80px"><div class="stock-bar ${isLow?'stock-low':total>50?'stock-high':'stock-med'}" style="width:${Math.min(total,100)}%"></div></div></div>
@@ -7700,6 +7701,7 @@ function renderGroupedProductsV2() {
                       <span class="qty-tag qty-bv" style="font-size:11px;color:${(p.qty_bv||0)<threshold?'#dc2626':'inherit'}">BV:${p.qty_bv||0}</span>
                       <span class="qty-tag qty-is" style="font-size:11px;color:${(p.qty_is||0)<threshold?'#dc2626':'inherit'}">IS:${p.qty_is||0}</span>
                       <span class="qty-tag qty-sw" style="font-size:11px;color:${(p.qty_sw||0)<threshold?'#dc2626':'inherit'}">SW:${p.qty_sw||0}</span>
+                      <span style="font-size:11px;font-weight:700;color:${((p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0))<threshold?'#dc2626':'var(--gold)'};margin-left:4px;border-left:1px solid var(--border);padding-left:4px;">∑${(p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0)}</span>
                     </div>
                   </td>
                   <td style="padding:8px 10px" onclick="event.stopPropagation()">
@@ -9319,6 +9321,7 @@ function _renderCatSubTypes(catId, mat, activeSubTypes, searchQuery) {
         +'<span class="qty-tag qty-is" style="'+(isC?'color:'+isC+';font-weight:700;':'')+'">IS:'+(p.qty_is||0)+'</span> '
         +'<span class="qty-tag qty-sw" style="'+(swC?'color:'+swC+';font-weight:700;':'')+'">SW:'+(p.qty_sw||0)+'</span>'
         +'</td>'
+        +'<td style="padding:10px 14px;text-align:right;"><span style="font-size:13px;font-weight:700;color:'+(isLow?'#dc2626':'var(--gold)')+';font-family:var(--font-mono);">'+(((p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0)))+'</span></td>'
         +'<td style="padding:10px 14px;font-size:12px;font-family:var(--font-mono);">'+(p.price?'SAR '+Number(p.price).toFixed(2):'—')+'</td>'
         +'</tr>';
     });
@@ -9387,6 +9390,7 @@ function _renderCatSubTypes(catId, mat, activeSubTypes, searchQuery) {
     + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Name</th>'
     + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Sub-type</th>'
     + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Stock</th>'
+    + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:right;">Total</th>'
     + '<th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Price</th>'
     + '</tr></thead>'
     + '<tbody>'+rowsHtml+'</tbody>'
@@ -9948,6 +9952,7 @@ function catSearchLevel1(query, mat) {
       + '<td style="padding:9px 12px;"><div style="font-weight:500;font-size:13px;">' + p.name + '</div><div style="font-size:11px;color:var(--text-muted);">' + (p.code||'') + (p.size?' · '+p.size:'') + '</div></td>'
       + '<td style="padding:9px 12px;font-size:12px;color:var(--text-muted);">' + (p.sub_type||'—') + '</td>'
       + '<td style="padding:9px 12px;"><span class="qty-tag qty-bv">BV:' + (p.qty_bv||0) + '</span> <span class="qty-tag qty-is">IS:' + (p.qty_is||0) + '</span> <span class="qty-tag qty-sw">SW:' + (p.qty_sw||0) + '</span></td>'
+      + '<td style="padding:9px 12px;text-align:right;"><span style="font-size:13px;font-weight:700;color:' + (isLow?'#dc2626':'var(--gold)') + ';font-family:var(--font-mono);">' + ((p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0)) + '</span></td>'
       + '</tr>';
   });
 
@@ -9964,6 +9969,7 @@ function catSearchLevel1(query, mat) {
       + '<th style="padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Name</th>'
       + '<th style="padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Sub-type</th>'
       + '<th style="padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:left;">Stock</th>'
+      + '<th style="padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);text-align:right;">Total</th>'
       + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
     // Attach row clicks
     root.querySelectorAll('tr[data-id]').forEach(tr => {
