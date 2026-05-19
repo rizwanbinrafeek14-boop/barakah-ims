@@ -3132,7 +3132,7 @@ function renderInventory() {
     document.getElementById('inventory-container').innerHTML = `<div class="product-grid">${list.map(p=>renderProductCard(p,threshold)).join('')}</div>`;
   } else {
     document.getElementById('inventory-container').innerHTML = `<div class="card"><div class="table-wrap"><table id="inv-table">
-      <thead><tr><th id="inv-select-header" style="display:none"><input type="checkbox" id="inv-select-all" onchange="toggleSelectAll(this)" style="width:15px;height:15px;cursor:pointer"></th><th>Photo</th><th>Code</th><th>Name</th><th>Material</th><th>Size</th><th>BV</th><th>IS</th><th>SW</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th id="inv-select-header" style="display:none"><input type="checkbox" id="inv-select-all" onchange="toggleSelectAll(this)" style="width:15px;height:15px;cursor:pointer"></th><th>Photo</th><th>Code</th><th>Name</th><th>Material</th><th>Size</th><th>BV</th><th>IS</th><th>SW</th><th>Total</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>${list.map(p=>renderProductRow(p,threshold,canEdit)).join('')}</tbody></table></div></div>`;
   }
 }
@@ -3169,6 +3169,7 @@ function renderProductRow(p, threshold, canEdit) {
     <td class="mono" style="color:${(p.qty_bv||0)<threshold?'var(--warn)':'inherit'}">${p.qty_bv||0}</td>
     <td class="mono" style="color:${(p.qty_is||0)<threshold?'var(--warn)':'inherit'}">${p.qty_is||0}</td>
     <td class="mono" style="color:${(p.qty_sw||0)<threshold?'var(--warn)':'inherit'}">${p.qty_sw||0}</td>
+    <td class="mono" style="font-weight:700;color:${isLow?'var(--warn)':'var(--gold)'}">${(p.qty_bv||0)+(p.qty_is||0)+(p.qty_sw||0)}</td>
     <td class="mono">${p.price?'SAR '+Number(p.price).toFixed(2):'-'}</td>
     <td><span class="badge ${isLow?'badge-red':'badge-green'}" style="font-size:10px">${isLow?'LOW':'OK'}</span></td>
     <td onclick="event.stopPropagation()" style="white-space:nowrap">
