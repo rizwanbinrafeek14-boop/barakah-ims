@@ -967,7 +967,24 @@ input,select,textarea,button{font-family:var(--font)}
 // ─── SUPABASE ───
 const SB_URL = 'https://cmxmqofpnwyftliwuvgp.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteG1xb2Zwbnd5ZnRsaXd1dmdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMjI2MDcsImV4cCI6MjA5MjY5ODYwN30.P-Sc5gD3dOAAgtrH7-80JSo_IO6yFkct1jQDyKgrEoA';
+
+// Guard: if Supabase CDN failed to load show auth screen immediately
+if (typeof supabase === 'undefined') {
+  document.getElementById('splash-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('auth-err').textContent = 'Network error: could not load Supabase. Check your connection.';
+  throw new Error('Supabase SDK not loaded');
+}
 const sb = supabase.createClient(SB_URL, SB_KEY);
+
+// Fallback: if onAuthStateChange never fires within 6s, show auth screen
+setTimeout(() => {
+  const splash = document.getElementById('splash-screen');
+  if (splash && splash.style.display !== 'none') {
+    splash.style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+  }
+}, 6000);
 
 // ─── COMPANY INFO ───
 const COMPANY_INFO = {
