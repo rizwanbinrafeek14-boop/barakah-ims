@@ -76,7 +76,8 @@ input,select,textarea,button{font-family:var(--font)}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
 /* ─── AUTH SCREEN ─── */
-#auth-screen{display:none;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:linear-gradient(160deg,#e8f0fb 0%,#f4f6f9 60%,#e0ecf8 100%)}
+/* Auth screen is always rendered; the splash sits on top and fades away */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:linear-gradient(160deg,#e8f0fb 0%,#f4f6f9 60%,#e0ecf8 100%)}
 .auth-card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 28px;box-shadow:var(--shadow-lg)}
 .auth-logo{text-align:center;margin-bottom:28px}
 .auth-logo-icon{width:68px;height:68px;background:linear-gradient(135deg,#0070c9,#1a8de9);border-radius:18px;display:inline-flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#fff;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,112,201,.35)}
@@ -386,6 +387,9 @@ input,select,textarea,button{font-family:var(--font)}
 .loading-overlay.show{display:flex}
 .spinner{width:40px;height:40px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Splash auto-exits after 3 s even with no JS — auth screen is already behind it */
+#splash-screen{animation:splash-exit .4s ease-in 3s both}
+@keyframes splash-exit{to{opacity:0;pointer-events:none;visibility:hidden}}
 .loading-text{font-size:13px;color:var(--text2);font-weight:600;letter-spacing:.4px}
 
 /* ─── COMPANY SELECTOR MODAL ─── */
@@ -975,7 +979,7 @@ input,select,textarea,button{font-family:var(--font)}
       var auth = document.getElementById('auth-screen');
       if (auth) auth.style.display = 'flex';
     }
-  }, 4000);
+  }, 2000);
   window._splashTimer = _t;
 })();
 

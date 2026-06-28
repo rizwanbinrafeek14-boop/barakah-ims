@@ -4115,7 +4115,7 @@ async function init() {
     if (auth) { auth.style.display = 'flex'; }
     const errEl = document.getElementById('login-error');
     if (errEl && !errEl.textContent) errEl.textContent = 'Connection timed out. Check your internet and try again.';
-  }, 12000); // 12 second max
+  }, 4000); // 4 second max
   window._loadingTimeout = loadingTimeout;
 
   // Check Supabase SDK loaded
