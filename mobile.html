@@ -536,6 +536,7 @@ input,select,textarea,button{font-family:var(--font)}
         <div class="sub-tabs">
           <div class="sub-tab active" onclick="switchOrderTab('po',this)">Purchase Orders</div>
           <div class="sub-tab" onclick="switchOrderTab('quot',this)">Quotations</div>
+          <div class="sub-tab" onclick="switchOrderTab('dn',this)">Delivery Notes</div>
         </div>
         <div id="orders-po-panel">
           <div class="search-bar">
@@ -563,6 +564,18 @@ input,select,textarea,button{font-family:var(--font)}
             </select>
           </div>
           <div id="quot-list"></div>
+        </div>
+        <div id="orders-dn-panel" style="display:none">
+          <div class="search-bar">
+            <input class="search-input" id="dn-search" placeholder="Search delivery notes…" oninput="renderDeliveryNotes()">
+            <select class="filter-select" id="dn-status-filter" onchange="renderDeliveryNotes()">
+              <option value="">All Status</option>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="delivered">Delivered</option>
+            </select>
+          </div>
+          <div id="dn-list"></div>
         </div>
       </div>
     </div>
@@ -872,6 +885,45 @@ input,select,textarea,button{font-family:var(--font)}
   </div>
 </div>
 
+<!-- DELIVERY NOTE SHEET -->
+<div class="sheet" id="sheet-dn">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head"><div class="sheet-title" id="sheet-dn-title">New Delivery Note</div><button class="sheet-close" onclick="closeSheet('sheet-dn')">✕</button></div>
+  <div class="sheet-body">
+    <div class="field-row">
+      <div class="field"><label>Customer *</label><input id="dn-customer" placeholder="Customer name"></div>
+      <div class="field"><label>Company</label>
+        <select id="dn-company">
+          <option value="bv">Barakah Valves</option>
+          <option value="is">Iron Spring</option>
+          <option value="sw">Stable Way</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Status</label>
+      <select id="dn-status">
+        <option value="draft">Draft</option>
+        <option value="sent">Sent</option>
+        <option value="delivered">Delivered</option>
+      </select>
+    </div>
+    <div class="section-hd">Items to Deliver</div>
+    <div style="overflow-x:auto">
+      <table class="lines-table">
+        <thead><tr><th>Product</th><th style="width:60px">Qty</th><th style="width:55px">Unit</th><th style="width:24px"></th></tr></thead>
+        <tbody id="dn-lines-tbody"></tbody>
+      </table>
+    </div>
+    <button class="add-line-btn" onclick="addDNLine()">+ Add Item</button>
+    <div class="field" style="margin-top:14px"><label>Notes</label><textarea id="dn-notes" placeholder="Optional notes…"></textarea></div>
+  </div>
+  <div class="sheet-footer">
+    <button class="sheet-btn secondary" onclick="closeSheet('sheet-dn')">Cancel</button>
+    <button class="sheet-btn danger" id="dn-delete-btn" style="display:none;flex:0 0 auto;padding:13px 16px" onclick="deleteDeliveryNote()">Delete</button>
+    <button class="sheet-btn primary" onclick="saveDeliveryNote()">Save</button>
+  </div>
+</div>
+
 <!-- CUSTOMER SHEET -->
 <div class="sheet" id="sheet-customer">
   <div class="sheet-handle"></div>
@@ -1099,6 +1151,10 @@ let adjustingProductId = null;
 
 let _poLines = [];
 let _qtLines = [];
+let _dnLines = [];
+
+let allDeliveryNotes = [];
+let editingDNId = null;
 
 // ─── TOAST ───
 let _toastTimer = null;
@@ -1268,7 +1324,7 @@ function saveSetting(key, val) {
 // ─── DATA LOADING ───
 async function loadAllData() {
   showLoading('Loading data…');
-  await Promise.all([loadProducts(), loadPOs(), loadQuotations(), loadCustomers(), loadSuppliers(), loadMovements()]);
+  await Promise.all([loadProducts(), loadPOs(), loadQuotations(), loadDeliveryNotes(), loadCustomers(), loadSuppliers(), loadMovements()]);
   hideLoading();
 }
 
@@ -1297,6 +1353,11 @@ async function loadPOs() {
 async function loadQuotations() {
   const { data } = await sb.from('quotations').select('*, quotation_lines(*)').eq('company', currentCo).order('created_at', { ascending: false });
   allQuotations = data || [];
+}
+
+async function loadDeliveryNotes() {
+  const { data } = await sb.from('delivery_notes').select('*, delivery_note_lines(*)').eq('company', currentCo).order('created_at', { ascending: false });
+  allDeliveryNotes = data || [];
 }
 
 async function loadCustomers() {
@@ -1342,7 +1403,11 @@ function navTo(page) {
   hideSearch();
   if (page === 'dashboard') renderDashboard();
   if (page === 'inventory') renderInventory();
-  if (page === 'orders') { currentOrderTab === 'po' ? renderPOs() : renderQuotations(); }
+  if (page === 'orders') {
+    if (currentOrderTab === 'po') renderPOs();
+    else if (currentOrderTab === 'quot') renderQuotations();
+    else renderDeliveryNotes();
+  }
   if (page === 'people') { currentPeopleTab === 'customers' ? renderCustomers() : renderSuppliers(); }
   if (page === 'movements') renderMovements();
   if (page === 'lowstock') renderLowStock();
@@ -1352,7 +1417,11 @@ function navTo(page) {
 
 function headerAdd() {
   if (currentPage === 'inventory') openProductSheet();
-  else if (currentPage === 'orders') { currentOrderTab === 'po' ? openPOSheet() : openQtSheet(); }
+  else if (currentPage === 'orders') {
+    if (currentOrderTab === 'po') openPOSheet();
+    else if (currentOrderTab === 'quot') openQtSheet();
+    else openDNSheet();
+  }
   else if (currentPage === 'people') { currentPeopleTab === 'customers' ? openCustomerSheet() : openSupplierSheet(); }
   else if (currentPage === 'movements') openAdjustSheet(null);
   else if (currentPage === 'users') openUserSheet();
@@ -1372,7 +1441,8 @@ function onGlobalSearch(q) {
   if (currentPage === 'inventory') { document.getElementById('inv-search').value = q; renderInventory(); }
   else if (currentPage === 'orders') {
     if (currentOrderTab === 'po') { document.getElementById('po-search').value = q; renderPOs(); }
-    else { document.getElementById('quot-search').value = q; renderQuotations(); }
+    else if (currentOrderTab === 'quot') { document.getElementById('quot-search').value = q; renderQuotations(); }
+    else { document.getElementById('dn-search').value = q; renderDeliveryNotes(); }
   }
 }
 
@@ -1382,7 +1452,10 @@ function switchOrderTab(tab, el) {
   el.classList.add('active');
   document.getElementById('orders-po-panel').style.display = tab === 'po' ? '' : 'none';
   document.getElementById('orders-quot-panel').style.display = tab === 'quot' ? '' : 'none';
-  tab === 'po' ? renderPOs() : renderQuotations();
+  document.getElementById('orders-dn-panel').style.display = tab === 'dn' ? '' : 'none';
+  if (tab === 'po') renderPOs();
+  else if (tab === 'quot') renderQuotations();
+  else renderDeliveryNotes();
 }
 
 function switchPeopleTab(tab, el) {
@@ -1792,6 +1865,11 @@ function updateLineProduct(sel) {
         _poLines[i].unit = unit;
         row.querySelectorAll('input')[1].value = price;
         updatePoTotal();
+      } else if (sel.closest('#dn-lines-tbody')) {
+        _dnLines[i].product_id = productId;
+        _dnLines[i].unit = unit;
+        const unitInput = row.querySelector('.dn-unit-input');
+        if (unitInput) unitInput.value = unit;
       } else {
         _qtLines[i].product_id = productId;
         _qtLines[i].unit_price = price;
@@ -1940,40 +2018,47 @@ async function saveQuotation() {
   const customer = document.getElementById('qt-customer').value.trim();
   if (!customer) { showToast('Customer name required', 'error'); return; }
   showLoading('Saving…');
-  const co = document.getElementById('qt-company').value;
-  const quotNo = editingQtId ? allQuotations.find(q => q.id === editingQtId)?.quot_no : await generateQuotNo(co);
-  const payload = {
-    customer, company: co, quot_no: quotNo,
-    status: document.getElementById('qt-status').value,
-    notes: document.getElementById('qt-notes').value.trim() || null,
-    created_by: currentUser.id,
-  };
-  let err, qtId;
-  if (editingQtId) {
-    ({ error: err } = await sb.from('quotations').update(payload).eq('id', editingQtId));
-    qtId = editingQtId;
-  } else {
-    let row;
-    ({ data: row, error: err } = await sb.from('quotations').insert(payload).select().single());
-    qtId = row?.id;
-  }
-  if (!err && qtId) {
-    await sb.from('quotation_lines').delete().eq('quot_id', qtId);
-    const validLines = _qtLines.filter(l => l.product_id);
-    if (validLines.length) {
-      await sb.from('quotation_lines').insert(validLines.map(l => ({
-        quot_id: qtId, product_id: l.product_id,
-        product_name: allProducts.find(p => p.id === l.product_id)?.name || '',
-        qty: l.qty || 1, unit_price: l.unit_price || 0, unit: l.unit || 'PCS'
-      })));
+  try {
+    const co = document.getElementById('qt-company').value;
+    const quotNo = editingQtId ? allQuotations.find(q => q.id === editingQtId)?.quot_no : await generateQuotNo(co);
+    const payload = {
+      customer, company: co, quot_no: quotNo,
+      status: document.getElementById('qt-status').value,
+      notes: document.getElementById('qt-notes').value.trim() || null,
+      created_by: currentUser.id,
+    };
+    let err, qtId;
+    if (editingQtId) {
+      ({ error: err } = await sb.from('quotations').update(payload).eq('id', editingQtId));
+      qtId = editingQtId;
+    } else {
+      let row;
+      ({ data: row, error: err } = await sb.from('quotations').insert(payload).select().single());
+      qtId = row?.id;
     }
+    if (!err && qtId) {
+      await sb.from('quotation_lines').delete().eq('quot_id', qtId);
+      const validLines = _qtLines.filter(l => l.product_id);
+      if (validLines.length) {
+        const { error: lineErr } = await sb.from('quotation_lines').insert(validLines.map(l => ({
+          quot_id: qtId, product_id: l.product_id,
+          product_name: allProducts.find(p => p.id === l.product_id)?.name || '',
+          qty: l.qty || 1, unit_price: l.unit_price || 0, unit: l.unit || 'PCS'
+        })));
+        if (lineErr) console.error('quotation_lines insert error:', lineErr);
+      }
+    }
+    hideLoading();
+    if (err) { showToast(err.message, 'error'); console.error('saveQuotation error:', err); return; }
+    showToast(editingQtId ? 'Quotation updated' : 'Quotation created', 'success');
+    closeSheet('sheet-quot');
+    await loadQuotations();
+    renderQuotations();
+  } catch (e) {
+    hideLoading();
+    showToast('Error: ' + e.message, 'error');
+    console.error('saveQuotation exception:', e);
   }
-  hideLoading();
-  if (err) { showToast(err.message, 'error'); return; }
-  showToast(editingQtId ? 'Quotation updated' : 'Quotation created', 'success');
-  closeSheet('sheet-quot');
-  await loadQuotations();
-  renderQuotations();
 }
 
 async function deleteQuotation() {
@@ -1986,6 +2071,127 @@ async function deleteQuotation() {
   closeSheet('sheet-quot');
   await loadQuotations();
   renderQuotations();
+}
+
+// ─── DELIVERY NOTES ───
+async function generateDNNo(co) {
+  const prefix = co.toUpperCase();
+  const { data } = await sb.from('delivery_notes').select('dn_no').eq('company', co).order('created_at', { ascending: false }).limit(1);
+  if (data?.length) {
+    const last = (data[0].dn_no || '').replace(/[^0-9]/g, '');
+    return `${prefix}-DN-${String((parseInt(last)||0) + 1).padStart(4,'0')}`;
+  }
+  return `${prefix}-DN-0001`;
+}
+
+function renderDNLines() {
+  const tbody = document.getElementById('dn-lines-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = _dnLines.map((l, i) => `
+    <tr>
+      <td style="min-width:140px">${buildLinesSelect(l.product_id)}</td>
+      <td><input type="number" min="1" value="${l.qty||1}" style="width:52px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 6px;font-family:var(--font)" onchange="_dnLines[${i}].qty=+this.value"></td>
+      <td><input class="dn-unit-input" value="${l.unit||'PCS'}" style="width:48px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 6px;font-family:var(--font);font-size:11px" onchange="_dnLines[${i}].unit=this.value"></td>
+      <td><button class="del-line" onclick="_dnLines.splice(${i},1);renderDNLines()">✕</button></td>
+    </tr>`).join('');
+}
+
+function addDNLine(line) {
+  _dnLines.push(line || { product_id: '', qty: 1, unit: 'PCS' });
+  renderDNLines();
+}
+
+async function openDNSheet(dn) {
+  editingDNId = dn?.id || null;
+  document.getElementById('sheet-dn-title').textContent = dn ? 'Edit Delivery Note' : 'New Delivery Note';
+  document.getElementById('dn-customer').value = dn?.customer || '';
+  document.getElementById('dn-company').value = dn?.company || currentCo;
+  document.getElementById('dn-status').value = dn?.status || 'draft';
+  document.getElementById('dn-notes').value = dn?.notes || '';
+  document.getElementById('dn-delete-btn').style.display = dn ? '' : 'none';
+  _dnLines = (dn?.delivery_note_lines || []).map(l => ({...l}));
+  if (!_dnLines.length) _dnLines.push({ product_id: '', qty: 1, unit: 'PCS' });
+  renderDNLines();
+  openSheet('sheet-dn');
+}
+
+function renderDeliveryNotes() {
+  const q = (document.getElementById('dn-search')?.value || '').toLowerCase();
+  const st = document.getElementById('dn-status-filter')?.value || '';
+  let items = allDeliveryNotes.filter(dn => {
+    if (st && dn.status !== st) return false;
+    if (q && !(dn.dn_no||'').toLowerCase().includes(q) && !(dn.customer||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const el = document.getElementById('dn-list');
+  if (!el) return;
+  if (!items.length) { el.innerHTML = '<div class="empty-state"><div class="icon">🚚</div><p>No delivery notes</p></div>'; return; }
+  el.innerHTML = items.map(dn => {
+    const lines = dn.delivery_note_lines || [];
+    return `<div class="list-item" onclick="openDNSheet(${JSON.stringify(dn).replace(/"/g,'&quot;')})">
+      <div class="item-icon">🚚</div>
+      <div class="item-body"><div class="item-name">${dn.dn_no}</div><div class="item-sub">${dn.customer} · ${new Date(dn.created_at).toLocaleDateString()} · ${lines.length} item${lines.length!==1?'s':''}</div></div>
+      <div class="item-right"><span class="item-badge ${statusBadgeClass(dn.status)}">${dn.status}</span></div>
+    </div>`;
+  }).join('');
+}
+
+async function saveDeliveryNote() {
+  const customer = document.getElementById('dn-customer').value.trim();
+  if (!customer) { showToast('Customer name required', 'error'); return; }
+  showLoading('Saving…');
+  try {
+    const co = document.getElementById('dn-company').value;
+    const dnNo = editingDNId ? allDeliveryNotes.find(d => d.id === editingDNId)?.dn_no : await generateDNNo(co);
+    const payload = {
+      customer, company: co, dn_no: dnNo,
+      status: document.getElementById('dn-status').value,
+      notes: document.getElementById('dn-notes').value.trim() || null,
+      created_by: currentUser.id,
+    };
+    let err, dnId;
+    if (editingDNId) {
+      ({ error: err } = await sb.from('delivery_notes').update(payload).eq('id', editingDNId));
+      dnId = editingDNId;
+    } else {
+      let row;
+      ({ data: row, error: err } = await sb.from('delivery_notes').insert(payload).select().single());
+      dnId = row?.id;
+    }
+    if (!err && dnId) {
+      await sb.from('delivery_note_lines').delete().eq('dn_id', dnId);
+      const validLines = _dnLines.filter(l => l.product_id);
+      if (validLines.length) {
+        await sb.from('delivery_note_lines').insert(validLines.map(l => ({
+          dn_id: dnId, product_id: l.product_id,
+          product_name: allProducts.find(p => p.id === l.product_id)?.name || '',
+          qty: l.qty || 1, unit: l.unit || 'PCS'
+        })));
+      }
+    }
+    hideLoading();
+    if (err) { showToast(err.message, 'error'); console.error('saveDeliveryNote error:', err); return; }
+    showToast(editingDNId ? 'Delivery note updated' : 'Delivery note created', 'success');
+    closeSheet('sheet-dn');
+    await loadDeliveryNotes();
+    renderDeliveryNotes();
+  } catch (e) {
+    hideLoading();
+    showToast('Error: ' + e.message, 'error');
+    console.error('saveDeliveryNote exception:', e);
+  }
+}
+
+async function deleteDeliveryNote() {
+  if (!editingDNId || !confirm('Delete this delivery note?')) return;
+  showLoading('Deleting…');
+  await sb.from('delivery_note_lines').delete().eq('dn_id', editingDNId);
+  await sb.from('delivery_notes').delete().eq('id', editingDNId);
+  hideLoading();
+  showToast('Delivery note deleted', 'success');
+  closeSheet('sheet-dn');
+  await loadDeliveryNotes();
+  renderDeliveryNotes();
 }
 
 // ─── CUSTOMERS ───
