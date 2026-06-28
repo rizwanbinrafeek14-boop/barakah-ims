@@ -1273,8 +1273,16 @@ async function loadAllData() {
 }
 
 async function loadProducts() {
-  const { data } = await sb.from('products').select('*').order('name');
-  allProducts = data || [];
+  const PAGE = 1000;
+  let all = [], from = 0, done = false;
+  while (!done) {
+    const { data, error } = await sb.from('products').select('*').order('name').range(from, from + PAGE - 1);
+    if (error || !data) break;
+    all = all.concat(data);
+    if (data.length < PAGE) done = true;
+    else from += PAGE;
+  }
+  allProducts = all;
   populateCategoryFilter();
 }
 
