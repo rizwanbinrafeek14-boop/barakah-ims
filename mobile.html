@@ -964,27 +964,33 @@ input,select,textarea,button{font-family:var(--font)}
 <script>
 'use strict';
 
+// ─── SPLASH SAFETY NET ───
+// Registered FIRST so it survives any error below.
+// If nothing hides the splash within 4 s, force-show the auth screen.
+(function() {
+  var _t = setTimeout(function() {
+    var splash = document.getElementById('splash-screen');
+    if (splash && splash.style.display !== 'none') {
+      splash.style.display = 'none';
+      var auth = document.getElementById('auth-screen');
+      if (auth) auth.style.display = 'flex';
+    }
+  }, 4000);
+  window._splashTimer = _t;
+})();
+
 // ─── SUPABASE ───
 const SB_URL = 'https://cmxmqofpnwyftliwuvgp.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteG1xb2Zwbnd5ZnRsaXd1dmdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMjI2MDcsImV4cCI6MjA5MjY5ODYwN30.P-Sc5gD3dOAAgtrH7-80JSo_IO6yFkct1jQDyKgrEoA';
 
-// Guard: if Supabase CDN failed to load show auth screen immediately
+// If CDN failed to load, show error and let the 4-s timer above handle the rest
 if (typeof supabase === 'undefined') {
   document.getElementById('splash-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
-  document.getElementById('auth-err').textContent = 'Network error: could not load Supabase. Check your connection.';
-  throw new Error('Supabase SDK not loaded');
+  document.getElementById('auth-err').textContent = 'Network error: Supabase could not load. Check your connection and reload.';
 }
-const sb = supabase.createClient(SB_URL, SB_KEY);
 
-// Fallback: if onAuthStateChange never fires within 6s, show auth screen
-setTimeout(() => {
-  const splash = document.getElementById('splash-screen');
-  if (splash && splash.style.display !== 'none') {
-    splash.style.display = 'none';
-    document.getElementById('auth-screen').style.display = 'flex';
-  }
-}, 6000);
+const sb = typeof supabase !== 'undefined' ? supabase.createClient(SB_URL, SB_KEY) : null;
 
 // ─── COMPANY INFO ───
 const COMPANY_INFO = {
@@ -1106,6 +1112,7 @@ async function doLogin() {
   const errEl = document.getElementById('auth-err');
   errEl.textContent = '';
   if (!email || !pass) { errEl.textContent = 'Enter email and password.'; return; }
+  if (!sb) { errEl.textContent = 'Supabase not loaded. Check your connection and reload.'; return; }
   showLoading('Signing in…');
   const { error } = await sb.auth.signInWithPassword({ email, password: pass });
   hideLoading();
@@ -1123,12 +1130,14 @@ async function doSignOut() {
 }
 
 function hideSplash() {
+  clearTimeout(window._splashTimer);
   const s = document.getElementById('splash-screen');
   if (s) s.style.display = 'none';
 }
 
 let _appBooted = false;
-sb.auth.onAuthStateChange(async (event, session) => {
+if (!sb) { /* sb is null — CDN failed; auth screen already shown above */ }
+else sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
     currentUser = session.user;
     document.getElementById('auth-screen').style.display = 'none';
