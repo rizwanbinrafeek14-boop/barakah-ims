@@ -881,6 +881,8 @@ input,select,textarea,button{font-family:var(--font)}
   <div class="sheet-footer">
     <button class="sheet-btn secondary" onclick="closeSheet('sheet-quot')">Cancel</button>
     <button class="sheet-btn danger" id="qt-delete-btn" style="display:none;flex:0 0 auto;padding:13px 16px" onclick="deleteQuotation()">Delete</button>
+    <button class="sheet-btn secondary" id="qt-print-btn" style="display:none;flex:0 0 auto;padding:13px 16px" onclick="printQuotation()">🖨</button>
+    <button class="sheet-btn secondary" id="qt-share-btn" style="display:none;flex:0 0 auto;padding:13px 16px" onclick="shareQuotation()">🔗</button>
     <button class="sheet-btn primary" onclick="saveQuotation()">Save</button>
   </div>
 </div>
@@ -920,6 +922,8 @@ input,select,textarea,button{font-family:var(--font)}
   <div class="sheet-footer">
     <button class="sheet-btn secondary" onclick="closeSheet('sheet-dn')">Cancel</button>
     <button class="sheet-btn danger" id="dn-delete-btn" style="display:none;flex:0 0 auto;padding:13px 16px" onclick="deleteDeliveryNote()">Delete</button>
+    <button class="sheet-btn secondary" id="dn-print-btn" style="display:none;flex:0 0 auto;padding:13px 16px" onclick="printDeliveryNote()">🖨</button>
+    <button class="sheet-btn secondary" id="dn-share-btn" style="display:none;flex:0 0 auto;padding:13px 16px" onclick="shareDeliveryNote()">🔗</button>
     <button class="sheet-btn primary" onclick="saveDeliveryNote()">Save</button>
   </div>
 </div>
@@ -1479,7 +1483,7 @@ async function switchCompany(co) {
   currentCo = co; _writeLocal('currentCo', co); hideCoModal(); updateCoUI();
   // Products are global (all companies share one table); POs/quotations/etc. are per-company
   showLoading('Switching…');
-  await Promise.all([loadPOs(), loadQuotations(), loadCustomers(), loadSuppliers(), loadMovements()]);
+  await Promise.all([loadPOs(), loadQuotations(), loadDeliveryNotes(), loadCustomers(), loadSuppliers(), loadMovements()]);
   hideLoading();
   navTo(currentPage);
 }
@@ -1987,6 +1991,8 @@ async function openQtSheet(qt) {
   document.getElementById('qt-status').value = qt?.status || 'draft';
   document.getElementById('qt-notes').value = qt?.notes || '';
   document.getElementById('qt-delete-btn').style.display = qt ? '' : 'none';
+  document.getElementById('qt-print-btn').style.display = qt ? '' : 'none';
+  document.getElementById('qt-share-btn').style.display = qt ? '' : 'none';
   _qtLines = (qt?.quotation_lines || []).map(l => ({...l}));
   if (!_qtLines.length) _qtLines.push({ product_id: '', qty: 1, unit_price: 0, unit: 'PCS' });
   renderQtLines();
@@ -2109,6 +2115,8 @@ async function openDNSheet(dn) {
   document.getElementById('dn-status').value = dn?.status || 'draft';
   document.getElementById('dn-notes').value = dn?.notes || '';
   document.getElementById('dn-delete-btn').style.display = dn ? '' : 'none';
+  document.getElementById('dn-print-btn').style.display = dn ? '' : 'none';
+  document.getElementById('dn-share-btn').style.display = dn ? '' : 'none';
   _dnLines = (dn?.delivery_note_lines || []).map(l => ({...l}));
   if (!_dnLines.length) _dnLines.push({ product_id: '', qty: 1, unit: 'PCS' });
   renderDNLines();
@@ -2564,6 +2572,133 @@ function printPoDeliveryNote(po) {
   const w = window.open('','_blank','width=960,height=800');
   w.document.write(_buildPoHtml(po, 'delivery'));
   w.document.close(); w.focus();
+}
+
+function _docCss(ac, ac2) {
+  return `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  @page{size:A4;margin:0}*{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:210mm;font-family:'Inter',Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{width:210mm;min-height:297mm;height:297mm;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .lh-header{display:flex;justify-content:space-between;align-items:flex-start;padding:20px 28px 14px;border-bottom:4px solid ${ac};flex-shrink:0}
+  .lh-left{display:flex;align-items:flex-start;gap:14px}
+  .lh-logo{width:80px;height:60px;object-fit:contain}
+  .lh-logo-ph{width:80px;height:60px;display:flex;align-items:center;justify-content:center;background:#f1f5f9;border-radius:6px;font-size:9px;font-weight:700;color:${ac};text-align:center;padding:4px;line-height:1.2}
+  .co-en{font-size:16px;font-weight:800;color:${ac}}.co-tag{font-size:10px;color:#64748b;margin-top:2px}
+  .co-cr{font-size:11px;font-weight:600;color:${ac2};margin-top:3px}
+  .lh-right{text-align:right;direction:rtl}.co-ar{font-size:16px;font-weight:800;color:${ac};font-family:'Segoe UI',Tahoma,Arial,sans-serif}
+  .co-vat{font-size:11px;font-weight:600;color:${ac2};margin-top:3px}
+  .doc-band{background:${ac};color:#fff;padding:9px 28px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+  .doc-band h1{font-size:16px;font-weight:700;letter-spacing:1.5px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;padding:14px 28px;border-bottom:1px solid #e2e8f0;gap:20px;flex-shrink:0}
+  .ib .label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:2px}
+  .ib .val{font-size:13px;font-weight:600;color:#1a1a2e}.ib .sub{font-size:11px;color:#64748b;margin-top:1px}
+  .items{padding:14px 28px;flex:1}.items h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:8px}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:${ac};color:#fff;padding:8px 10px;text-align:left;font-size:11px;font-weight:700}
+  tbody tr:nth-child(even){background:#f8fafc}tbody td{padding:8px 10px;font-size:12px;border-bottom:1px solid #e2e8f0;vertical-align:middle}
+  tfoot td{padding:7px 10px;font-size:12px;text-align:right;border-top:2px solid ${ac};color:${ac};font-weight:700}
+  .sig-section{display:grid;grid-template-columns:1fr 1fr;gap:40px;padding:16px 28px;margin-top:8px;flex-shrink:0}
+  .sig-box{border-top:1px solid #94a3b8;padding-top:6px;font-size:11px;color:#64748b}
+  .lh-footer{background:${ac};color:rgba(255,255,255,.92);padding:9px 28px;font-size:10px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;margin-top:auto}
+  .footer-ar{direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif}
+  .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:70px;font-weight:900;color:rgba(0,0,0,.025);pointer-events:none;z-index:0;white-space:nowrap}
+  .print-btn{position:fixed;top:14px;right:14px;z-index:9999;padding:9px 20px;background:${ac};color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.2);font-family:'Inter',sans-serif}
+  .print-btn:hover{opacity:.92}
+  @media print{.print-btn{display:none!important}@page{size:A4;margin:0mm}html,body{width:210mm;height:297mm}.page{height:297mm;page-break-after:avoid}}`;
+}
+
+function _openDocWindow(title, html) {
+  const w = window.open('', '_blank', 'width=960,height=800');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
+async function _shareDoc(title, text) {
+  if (navigator.share) {
+    try { await navigator.share({ title, text }); return; } catch(e) { if (e.name === 'AbortError') return; }
+  }
+  if (navigator.clipboard) {
+    try { await navigator.clipboard.writeText(text); showToast('Copied to clipboard', 'success'); return; } catch(e) {}
+  }
+  showToast('Share not supported on this browser', 'error');
+}
+
+function _buildQuotationHtml(qt) {
+  const co = qt.company || 'bv';
+  const info = COMPANY_INFO[co] || COMPANY_INFO.bv;
+  const stored = getCompanyData(co);
+  const lines = qt.quotation_lines || [];
+  const coName = stored.name || info.nameEn;
+  const logoUrl = stored.logoUrl || '';
+  const subtotal = lines.reduce((a,l) => a+(l.qty||0)*(l.unit_price||0), 0);
+  const vatRate = parseFloat(settings?.vatRate || 15) / 100;
+  const vatAmt = subtotal * vatRate;
+  const total = subtotal + vatAmt;
+  const dateStr = new Date(qt.created_at).toLocaleDateString('en-SA',{day:'numeric',month:'long',year:'numeric'});
+  const ac = info.accentColor, ac2 = info.accentColor2;
+  const hdr = `<div class="lh-header"><div class="lh-left">${logoUrl?`<img src="${logoUrl}" class="lh-logo">`:`<div class="lh-logo-ph">${coName}</div>`}<div><div class="co-en">${coName}</div><div class="co-tag">${info.taglineEn}</div><div class="co-cr">C.R. ${stored.cr||info.cr}</div></div></div><div class="lh-right"><div class="co-ar">${info.nameAr}</div><div class="co-tag" style="direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif">${info.taglineAr}</div><div class="co-vat">VAT Reg No: ${stored.vat||info.vat}</div></div></div>`;
+  const ftr = `<div class="lh-footer"><div>Tel: ${stored.phone||info.phone}${(stored.email||info.email||'')?(' · '+(stored.email||info.email)):''} · ${stored.addr||info.address}</div><div class="footer-ar">${info.addressAr}</div></div>`;
+  const body = `<div class="doc-band"><h1>QUOTATION / عرض سعر</h1><div style="font-size:13px;opacity:.85">${qt.quot_no} · ${dateStr}</div></div>
+<div class="info-grid"><div class="ib"><div class="label">Customer / العميل</div><div class="val">${qt.customer}</div></div><div class="ib" style="text-align:right"><div class="label">Company / الشركة</div><div class="val">${coName}</div><div class="sub">Date: ${dateStr}</div><div class="sub">Status: ${qt.status}</div></div></div>
+<div class="items"><h3>Items / البنود</h3><table><thead><tr><th style="width:28px">#</th><th>Description / الوصف</th><th style="width:55px;text-align:center">Qty</th><th style="width:55px;text-align:center">Unit</th><th style="width:100px;text-align:right">Unit Price (SAR)</th><th style="width:100px;text-align:right">Total (SAR)</th></tr></thead>
+<tbody>${lines.map((l,i)=>{const p=allProducts.find(x=>x.id===l.product_id);const n=p?.name||l.product_name||'Item';const tot=(l.qty||0)*(l.unit_price||0);return`<tr><td style="color:#94a3b8">${i+1}</td><td>${n}${p?.code?` <span style="font-size:10px;color:#94a3b8">(${p.code})</span>`:''}</td><td style="text-align:center">${l.qty||0}</td><td style="text-align:center">${l.unit||p?.unit||'PCS'}</td><td style="text-align:right">${Number(l.unit_price||0).toFixed(2)}</td><td style="text-align:right">${tot.toFixed(2)}</td></tr>`;}).join('')}</tbody>
+<tfoot><tr><td colspan="5" style="color:#64748b;text-align:right">Subtotal / المجموع الفرعي</td><td>SAR ${subtotal.toFixed(2)}</td></tr><tr><td colspan="5" style="color:#64748b;text-align:right">VAT ${Math.round(vatRate*100)}%</td><td>SAR ${vatAmt.toFixed(2)}</td></tr><tr><td colspan="5" style="text-align:right;font-weight:700">Total / الإجمالي</td><td style="font-weight:700">SAR ${total.toFixed(2)}</td></tr></tfoot></table></div>
+${qt.notes?`<div style="padding:0 28px 12px"><div style="background:#fffbf0;border-left:3px solid ${ac2};padding:9px 13px;border-radius:0 5px 5px 0;font-size:12px"><b>Notes:</b> ${qt.notes}</div></div>`:''}
+<div class="sig-section"><div class="sig-box">Authorized by / معتمد من<br><br><br></div><div class="sig-box" style="text-align:right">Customer Acknowledgment / إقرار العميل<br><br><br></div></div>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${qt.quot_no}</title><script>document.title="${qt.quot_no}";<\/script><style>${_docCss(ac,ac2)}</style></head><body><div class="page"><div class="watermark">${info.nameEn}</div>${hdr}${body}${ftr}</div><button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button></body></html>`;
+}
+
+function _buildDeliveryNoteHtml(dn) {
+  const co = dn.company || 'bv';
+  const info = COMPANY_INFO[co] || COMPANY_INFO.bv;
+  const stored = getCompanyData(co);
+  const lines = dn.delivery_note_lines || [];
+  const coName = stored.name || info.nameEn;
+  const logoUrl = stored.logoUrl || '';
+  const dateStr = new Date(dn.created_at).toLocaleDateString('en-SA',{day:'numeric',month:'long',year:'numeric'});
+  const ac = info.accentColor, ac2 = info.accentColor2;
+  const hdr = `<div class="lh-header"><div class="lh-left">${logoUrl?`<img src="${logoUrl}" class="lh-logo">`:`<div class="lh-logo-ph">${coName}</div>`}<div><div class="co-en">${coName}</div><div class="co-tag">${info.taglineEn}</div><div class="co-cr">C.R. ${stored.cr||info.cr}</div></div></div><div class="lh-right"><div class="co-ar">${info.nameAr}</div><div class="co-tag" style="direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif">${info.taglineAr}</div><div class="co-vat">VAT Reg No: ${stored.vat||info.vat}</div></div></div>`;
+  const ftr = `<div class="lh-footer"><div>Tel: ${stored.phone||info.phone}${(stored.email||info.email||'')?(' · '+(stored.email||info.email)):''} · ${stored.addr||info.address}</div><div class="footer-ar">${info.addressAr}</div></div>`;
+  const body = `<div class="doc-band"><h1>DELIVERY NOTE / مذكرة تسليم</h1><div style="font-size:13px;opacity:.85">${dn.dn_no} · ${dateStr}</div></div>
+<div class="info-grid"><div class="ib"><div class="label">Customer / العميل</div><div class="val">${dn.customer}</div></div><div class="ib" style="text-align:right"><div class="label">Delivered From / من</div><div class="val">${coName}</div><div class="sub">Date: ${dateStr}</div></div></div>
+<div class="items"><h3>Items / البنود</h3><table><thead><tr><th style="width:28px">#</th><th>Description / الوصف</th><th style="width:70px;text-align:center">Qty</th><th style="width:55px;text-align:center">Unit</th><th>Remarks / ملاحظات</th></tr></thead>
+<tbody>${lines.map((l,i)=>{const p=allProducts.find(x=>x.id===l.product_id);const n=p?.name||l.product_name||'Item';return`<tr><td style="color:#94a3b8">${i+1}</td><td>${n}${p?.code?` <span style="font-size:10px;color:#94a3b8">(${p.code})</span>`:''}</td><td style="text-align:center">${l.qty||0}</td><td style="text-align:center">${l.unit||p?.unit||'PCS'}</td><td></td></tr>`;}).join('')}</tbody></table></div>
+${dn.notes?`<div style="padding:0 28px 12px"><div style="background:#fffbf0;border-left:3px solid ${ac2};padding:9px 13px;border-radius:0 5px 5px 0;font-size:12px"><b>Notes:</b> ${dn.notes}</div></div>`:''}
+<div class="sig-section"><div class="sig-box">Delivered by / سلّمه<br><br><br></div><div class="sig-box" style="text-align:right">Received by / استلمه<br><br><br></div></div>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${dn.dn_no}</title><script>document.title="${dn.dn_no}";<\/script><style>${_docCss(ac,ac2)}</style></head><body><div class="page"><div class="watermark">${info.nameEn}</div>${hdr}${body}${ftr}</div><button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button></body></html>`;
+}
+
+function printQuotation() {
+  const qt = allQuotations.find(q => q.id === editingQtId);
+  if (!qt) { showToast('Save the quotation first', 'error'); return; }
+  _openDocWindow(qt.quot_no, _buildQuotationHtml(qt));
+}
+
+async function shareQuotation() {
+  const qt = allQuotations.find(q => q.id === editingQtId);
+  if (!qt) { showToast('Save the quotation first', 'error'); return; }
+  const lines = qt.quotation_lines || [];
+  const total = lines.reduce((a,l) => a+(l.qty||0)*(l.unit_price||0), 0);
+  const vatRate = parseFloat(settings?.vatRate || 15) / 100;
+  const items = lines.map(l => `• ${l.product_name||'Item'} x${l.qty} @ SAR ${Number(l.unit_price||0).toFixed(2)}`).join('\n');
+  const text = `${qt.quot_no}\nCustomer: ${qt.customer}\nStatus: ${qt.status}\nSubtotal: SAR ${total.toFixed(2)}\nVAT: SAR ${(total*vatRate).toFixed(2)}\nTotal: SAR ${(total*(1+vatRate)).toFixed(2)}${items?'\n\nItems:\n'+items:''}${qt.notes?'\n\nNotes: '+qt.notes:''}`;
+  await _shareDoc(qt.quot_no, text);
+}
+
+function printDeliveryNote() {
+  const dn = allDeliveryNotes.find(d => d.id === editingDNId);
+  if (!dn) { showToast('Save the delivery note first', 'error'); return; }
+  _openDocWindow(dn.dn_no, _buildDeliveryNoteHtml(dn));
+}
+
+async function shareDeliveryNote() {
+  const dn = allDeliveryNotes.find(d => d.id === editingDNId);
+  if (!dn) { showToast('Save the delivery note first', 'error'); return; }
+  const lines = dn.delivery_note_lines || [];
+  const items = lines.map(l => `• ${l.product_name||'Item'} x${l.qty} ${l.unit||'PCS'}`).join('\n');
+  const text = `${dn.dn_no}\nCustomer: ${dn.customer}\nStatus: ${dn.status}${items?'\n\nItems:\n'+items:''}${dn.notes?'\n\nNotes: '+dn.notes:''}`;
+  await _shareDoc(dn.dn_no, text);
 }
 
 // ─── KEYBOARD / GLOBAL ───
