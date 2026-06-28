@@ -1117,6 +1117,10 @@ const COMPANY_INFO = {
 };
 
 function getCompanyData(co) {
+  try {
+    const fromSupabase = settings['company_' + co];
+    if (fromSupabase) return typeof fromSupabase === 'string' ? JSON.parse(fromSupabase) : fromSupabase;
+  } catch {}
   try { return JSON.parse(localStorage.getItem('co_data_' + co) || '{}'); } catch { return {}; }
 }
 
@@ -1306,7 +1310,16 @@ async function loadProfile() {
 
 async function loadSettings() {
   try {
-    settings = JSON.parse(_readLocal('settings', '{}'));
+    // Load from Supabase (same source as index.html admin portal) so company logos are available
+    if (sb) {
+      const { data } = await sb.from('settings').select('*');
+      if (data) data.forEach(s => { settings[s.key] = s.value; });
+    }
+    // Merge any local-only keys (gemini key, etc.)
+    try {
+      const local = JSON.parse(_readLocal('settings', '{}'));
+      Object.assign(settings, local);
+    } catch {}
     const vatEl = document.getElementById('set-vat');
     const coEl = document.getElementById('set-co');
     const curEl = document.getElementById('set-currency');
