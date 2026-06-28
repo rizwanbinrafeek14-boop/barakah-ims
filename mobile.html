@@ -987,14 +987,45 @@ input,select,textarea,button{font-family:var(--font)}
 const SB_URL = 'https://cmxmqofpnwyftliwuvgp.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteG1xb2Zwbnd5ZnRsaXd1dmdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMjI2MDcsImV4cCI6MjA5MjY5ODYwN30.P-Sc5gD3dOAAgtrH7-80JSo_IO6yFkct1jQDyKgrEoA';
 
-// If CDN failed to load, show error and let the 4-s timer above handle the rest
-if (typeof supabase === 'undefined') {
-  document.getElementById('splash-screen').style.display = 'none';
+function _showAuthErr(msg) {
+  hideSplash();
   document.getElementById('auth-screen').style.display = 'flex';
-  document.getElementById('auth-err').textContent = 'Network error: Supabase could not load. Check your connection and reload.';
+  document.getElementById('auth-err').textContent = msg;
 }
 
-const sb = typeof supabase !== 'undefined' ? supabase.createClient(SB_URL, SB_KEY) : null;
+// Check SDK loaded (handles both UMD and ESM CDN bundles)
+const _sbFn = (typeof supabase !== 'undefined') && (supabase.createClient || supabase.default?.createClient);
+if (!_sbFn) {
+  _showAuthErr('⚠️ Could not load Supabase SDK. Check your internet and reload.');
+}
+
+// Safe storage: Edge Tracking Prevention can block localStorage — fall back to sessionStorage / memory
+let _storage = null;
+if (_sbFn) {
+  try {
+    localStorage.setItem('__bims_chk__', '1');
+    localStorage.removeItem('__bims_chk__');
+    _storage = window.localStorage;
+  } catch (_) {
+    const _mem = {};
+    _storage = {
+      getItem:    k => { try { return sessionStorage.getItem(k); } catch(e) { return _mem[k] ?? null; } },
+      setItem:    (k,v) => { try { sessionStorage.setItem(k,v); } catch(e) { _mem[k] = v; } },
+      removeItem: k => { try { sessionStorage.removeItem(k); } catch(e) { delete _mem[k]; } }
+    };
+  }
+}
+
+let sb = null;
+if (_sbFn) {
+  try {
+    sb = _sbFn(SB_URL, SB_KEY, {
+      auth: { storage: _storage, persistSession: true, autoRefreshToken: true }
+    });
+  } catch(e) {
+    _showAuthErr('⚠️ Supabase init failed: ' + e.message);
+  }
+}
 
 // ─── COMPANY INFO ───
 const COMPANY_INFO = {
@@ -1112,21 +1143,26 @@ function selectAuthCo(co) {
 
 async function doLogin() {
   const email = document.getElementById('auth-email').value.trim();
-  const pass = document.getElementById('auth-pass').value;
+  const pass  = document.getElementById('auth-pass').value;
   const errEl = document.getElementById('auth-err');
   errEl.textContent = '';
   if (!email || !pass) { errEl.textContent = 'Enter email and password.'; return; }
-  if (!sb) { errEl.textContent = 'Supabase not loaded. Check your connection and reload.'; return; }
+  if (!sb) { errEl.textContent = '⚠️ Not connected. Check your internet and reload.'; return; }
   showLoading('Signing in…');
-  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-  hideLoading();
-  if (error) { errEl.textContent = error.message; return; }
-  _writeLocal('authCo', _authCo);
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    hideLoading();
+    if (error) { errEl.textContent = error.message; return; }
+    _writeLocal('authCo', _authCo);
+  } catch(e) {
+    hideLoading();
+    errEl.textContent = '⚠️ Login failed: ' + e.message;
+  }
 }
 
 async function doSignOut() {
   showLoading('Signing out…');
-  await sb.auth.signOut();
+  try { if (sb) await sb.auth.signOut(); } catch(_) {}
   hideLoading();
   currentUser = null; currentProfile = null; _appBooted = false;
   document.getElementById('app').classList.remove('visible');
@@ -1139,29 +1175,63 @@ function hideSplash() {
   if (s) s.style.display = 'none';
 }
 
+// ─── BOOT ───
 let _appBooted = false;
-if (!sb) { /* sb is null — CDN failed; auth screen already shown above */ }
-else sb.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    currentUser = session.user;
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('app').classList.add('visible');
-    hideSplash();
-    if (!_appBooted) {
-      _appBooted = true;
-      currentCo = _readLocal('currentCo', _readLocal('authCo', 'bv'));
-      await loadProfile();
-      await loadSettings();
-      await loadAllData();
-      renderDashboard();
+
+async function _bootApp(user) {
+  currentUser = user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  hideSplash();
+  if (_appBooted) return;
+  _appBooted = true;
+  currentCo = _readLocal('currentCo', _readLocal('authCo', 'bv'));
+  await loadProfile();
+  await loadSettings();
+  await loadAllData();
+  renderDashboard();
+}
+
+function _showLogin() {
+  currentUser = null; _appBooted = false;
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('auth-screen').style.display = 'flex';
+  hideSplash();
+}
+
+if (sb) {
+  // Check existing session first (with timeout) — same pattern as desktop
+  (async () => {
+    try {
+      const result = await Promise.race([
+        sb.auth.getSession(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))
+      ]);
+      const session = result?.data?.session;
+      if (session?.user) {
+        await _bootApp(session.user);
+      } else {
+        _showLogin();
+      }
+    } catch(e) {
+      console.warn('Session check:', e.message);
+      _showLogin();
     }
-  } else {
-    currentUser = null; _appBooted = false;
-    document.getElementById('app').classList.remove('visible');
-    document.getElementById('auth-screen').style.display = 'flex';
-    hideSplash();
-  }
-});
+
+    // Listen for ongoing auth changes (token refresh, sign-out, etc.)
+    sb.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user && !_appBooted) {
+        await _bootApp(session.user);
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        currentUser = session.user;
+      } else if (event === 'SIGNED_OUT') {
+        _showLogin();
+      }
+    });
+  })();
+} else {
+  _showLogin();
+}
 
 async function loadProfile() {
   const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
